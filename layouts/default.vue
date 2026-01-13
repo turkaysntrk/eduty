@@ -19,18 +19,19 @@
         <div class="links" :class="{ 'nav-active': isMenuOpen }">
           <NuxtLink to="/" @click="closeMenu">Ana Sayfa</NuxtLink>
           <NuxtLink to="/hakkimizda" @click="closeMenu">Hakkımızda</NuxtLink>
-          <NuxtLink to="/destek_al" @click="closeMenu">Destek Al</NuxtLink>
-          <NuxtLink to="/destek_ol" @click="closeMenu">Destek Ol</NuxtLink>
           <NuxtLink to="/S.S.S." @click="closeMenu">S.S.S.</NuxtLink>
           <NuxtLink to="/iletisim" @click="closeMenu">İletişim</NuxtLink>
-          
-          <template v-if="!user">
-             <NuxtLink to="/kayit-giris" class="apply-btn" @click="closeMenu">Kayıt / Giriş</NuxtLink>
-          </template>
-          <template v-else>
-             <button class="apply-btn logout-btn" @click="handleLogout">Çıkış Yap</button>
-          </template>
 
+          <div class="nav-actions">
+            <NuxtLink to="/destek_ol" class="apply-btn support-btn" @click="closeMenu">Destek Ol</NuxtLink>
+
+            <template v-if="!user">
+              <NuxtLink to="/kayit-giris" class="apply-btn" @click="closeMenu">Kayıt / Giriş</NuxtLink>
+            </template>
+            <template v-else>
+              <button class="apply-btn logout-btn" @click="handleLogout">Çıkış Yap</button>
+            </template>
+          </div>
         </div>
       </div>
     </nav>
@@ -102,7 +103,7 @@ watch(() => route.path, () => {
 
 onMounted(() => {
   window.addEventListener('scroll', handleScroll);
-  
+
   // Firebase Auth Durumunu Dinle
   // Kullanıcı giriş yaptığında veya çıktığında 'user' değişkenini günceller
   onAuthStateChanged($auth, (currentUser) => {
@@ -202,11 +203,15 @@ nav.scrolled {
   font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
 }
 
-.eduty-text span:nth-child(1), .eduty-text span:nth-child(2) {
+.eduty-text span:nth-child(1),
+.eduty-text span:nth-child(2) {
   color: #0055ff;
   text-shadow: 0 0 10px rgb(0, 85, 255, 0.3);
 }
-.eduty-text span:nth-child(3), .eduty-text span:nth-child(4), .eduty-text span:nth-child(5) {
+
+.eduty-text span:nth-child(3),
+.eduty-text span:nth-child(4),
+.eduty-text span:nth-child(5) {
   color: #003bb0;
   text-shadow: 0 0 10px rgb(0, 59, 176, 0.3);
 }
@@ -215,8 +220,33 @@ nav.scrolled {
   filter: brightness(1.2);
 }
 
+.nav-actions {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+}
+
+.support-btn {
+  border-color: var(--primary-color) !important;
+  color: var(--primary-color) !important;
+}
+
+.support-btn:hover {
+  background: var(--primary-color) !important;
+  color: white !important;
+}
+
+@media (max-width: 1030px) {
+  .nav-actions {
+    flex-direction: column;
+    width: 100%;
+    padding: 0 40px;
+  }
+}
+
 /* --- LINK STİLLERİ --- */
-.links a, .links button {
+.links a,
+.links button {
   text-decoration: none;
   color: #ccc;
   font-size: 0.9rem;
@@ -326,7 +356,8 @@ nav.scrolled {
     transform: translateX(0);
   }
 
-  .links a, .links button {
+  .links a,
+  .links button {
     font-size: 1.5rem;
     color: white;
     margin: 0;

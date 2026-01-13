@@ -9,9 +9,11 @@ import {
   browserLocalPersistence,
   browserSessionPersistence
 } from "firebase/auth";
+import { getFirestore, doc, setDoc } from "firebase/firestore"; // Firestore eklendi
 
 const router = useRouter();
 const { $auth } = useNuxtApp(); 
+const db = getFirestore(); // Veritabanını başlat
 
 // GÖRÜNÜM KONTROLLERİ
 const currentView = ref('login');
@@ -52,6 +54,7 @@ const teacherForm = reactive({
 const resetRegister = () => {
   registerStep.value = 1;
   selectedRole.value = null;
+  // Formları temizle (İsteğe bağlı)
 };
 
 // --- GİRİŞ İŞLEMLERİ ---
@@ -60,6 +63,8 @@ const handleLogin = async () => {
     const persistenceType = loginForm.rememberMe ? browserLocalPersistence : browserSessionPersistence;
     await setPersistence($auth, persistenceType);
     await signInWithEmailAndPassword($auth, loginForm.identity, loginForm.password);
+    
+    // Giriş başarılı, ana sayfaya yönlendir
     router.push('/');
   } catch (error) {
     alert("Giriş başarısız: " + error.message);
@@ -70,6 +75,7 @@ const handleLogin = async () => {
 const handleRegister = async () => {
   let formToUse = selectedRole.value === 'student' ? studentForm : teacherForm;
 
+  // 1. Basit Doğrulamalar
   if (formToUse.password !== formToUse.passwordConfirm) {
     alert("Parolalar eşleşmiyor!");
     return;
@@ -78,19 +84,49 @@ const handleRegister = async () => {
     alert("Parola en az 6 karakter olmalıdır.");
     return;
   }
-
-  // --- BURAYI EKLE ---
   if (selectedRole.value === 'teacher' && !teacherForm.certificateFile) {
     alert("Lütfen öğretmenlik belgenizi veya diplomanızı yükleyin.");
     return;
   }
 
   try {
+    // 2. Kullanıcıyı Firebase Auth'ta oluştur
     const userCredential = await createUserWithEmailAndPassword($auth, formToUse.email, formToUse.password);
+    const user = userCredential.user;
     
-    // Firestore kayıt işlemleri buraya gelecek (ileride)
-    console.log("Kayıt olunan rol:", selectedRole.value);
+    // 3. Verileri Hazırla
+    // Ortak veriler
+    let userData = {
+      email: formToUse.email,
+      role: selectedRole.value, // 'student' veya 'teacher'
+      createdAt: new Date().toISOString()
+    };
+
+    // Role özel verileri ekle
+    if (selectedRole.value === 'student') {
+      Object.assign(userData, {
+        grade: studentForm.grade,
+        city: studentForm.city,
+        district: studentForm.district,
+        schoolName: studentForm.schoolName
+      });
+    } else if (selectedRole.value === 'teacher') {
+      Object.assign(userData, {
+        workStatus: teacherForm.workStatus,
+        city: teacherForm.city || '', 
+        district: teacherForm.district || '',
+        schoolName: teacherForm.schoolName || ''
+        // Not: Dosya yükleme (certificateFile) işlemi için Firebase Storage gerekir.
+        // Şimdilik sadece veritabanı kaydını yapıyoruz.
+      });
+    }
+
+    // 4. Firestore'a Kaydet ("users" koleksiyonu altında UID ile)
+    await setDoc(doc(db, "users", user.uid), userData);
     
+    console.log("Kayıt başarılı, rol:", selectedRole.value);
+    
+    // Güvenlik veya akış gereği çıkış yaptırıp giriş ekranına atıyoruz
     await $auth.signOut(); 
     alert("Kayıt başarılı! Giriş ekranına yönlendiriliyorsunuz.");
     
@@ -98,6 +134,7 @@ const handleRegister = async () => {
     resetRegister();
 
   } catch (error) {
+    console.error("Kayıt hatası:", error);
     alert("Kayıt hatası: " + error.message);
   }
 };
@@ -119,8 +156,6 @@ const handleForgot = async () => {
     alert("Hata: " + error.message);
   }
 };
-
-
 </script>
 
 <template>
@@ -155,7 +190,6 @@ const handleForgot = async () => {
           <button type="submit" class="btn-primary">Giriş Yap</button>
         </form>
         
-
         <p class="switch-text">
           Hesabın yok mu?
           <a href="#" @click.prevent="currentView = 'register'">Hemen kayıt ol</a>
