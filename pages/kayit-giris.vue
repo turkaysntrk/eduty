@@ -1,5 +1,5 @@
 <script setup>
-import { ref, reactive, computed, watch } from 'vue'
+import { ref, reactive } from 'vue'
 import { useRouter } from 'vue-router'
 import { 
   signInWithEmailAndPassword, 
@@ -9,11 +9,11 @@ import {
   browserLocalPersistence,
   browserSessionPersistence
 } from "firebase/auth";
-import { getFirestore, doc, setDoc } from "firebase/firestore"; // Firestore eklendi
+import { getFirestore, doc, setDoc } from "firebase/firestore";
 
 const router = useRouter();
 const { $auth } = useNuxtApp(); 
-const db = getFirestore(); // Veritabanını başlat
+const db = getFirestore();
 
 // GÖRÜNÜM KONTROLLERİ
 const currentView = ref('login');
@@ -43,6 +43,8 @@ const teacherForm = reactive({
   email: '',
   password: '',
   passwordConfirm: '',
+  branch: '',          // YENİ: Branş
+  educationLevel: '',  // YENİ: Eğitim Kademesi
   workStatus: '',
   city: '',
   district: '',
@@ -54,7 +56,7 @@ const teacherForm = reactive({
 const resetRegister = () => {
   registerStep.value = 1;
   selectedRole.value = null;
-  // Formları temizle (İsteğe bağlı)
+  // Formları temizle
 };
 
 // --- GİRİŞ İŞLEMLERİ ---
@@ -63,8 +65,6 @@ const handleLogin = async () => {
     const persistenceType = loginForm.rememberMe ? browserLocalPersistence : browserSessionPersistence;
     await setPersistence($auth, persistenceType);
     await signInWithEmailAndPassword($auth, loginForm.identity, loginForm.password);
-    
-    // Giriş başarılı, ana sayfaya yönlendir
     router.push('/');
   } catch (error) {
     alert("Giriş başarısız: " + error.message);
@@ -95,14 +95,12 @@ const handleRegister = async () => {
     const user = userCredential.user;
     
     // 3. Verileri Hazırla
-    // Ortak veriler
     let userData = {
       email: formToUse.email,
-      role: selectedRole.value, // 'student' veya 'teacher'
+      role: selectedRole.value,
       createdAt: new Date().toISOString()
     };
 
-    // Role özel verileri ekle
     if (selectedRole.value === 'student') {
       Object.assign(userData, {
         grade: studentForm.grade,
@@ -112,21 +110,20 @@ const handleRegister = async () => {
       });
     } else if (selectedRole.value === 'teacher') {
       Object.assign(userData, {
+        branch: teacherForm.branch,                 // YENİ: Firestore'a kaydediliyor
+        educationLevel: teacherForm.educationLevel, // YENİ: Firestore'a kaydediliyor
         workStatus: teacherForm.workStatus,
         city: teacherForm.city || '', 
         district: teacherForm.district || '',
         schoolName: teacherForm.schoolName || ''
-        // Not: Dosya yükleme (certificateFile) işlemi için Firebase Storage gerekir.
-        // Şimdilik sadece veritabanı kaydını yapıyoruz.
       });
     }
 
-    // 4. Firestore'a Kaydet ("users" koleksiyonu altında UID ile)
+    // 4. Firestore'a Kaydet
     await setDoc(doc(db, "users", user.uid), userData);
     
     console.log("Kayıt başarılı, rol:", selectedRole.value);
     
-    // Güvenlik veya akış gereği çıkış yaptırıp giriş ekranına atıyoruz
     await $auth.signOut(); 
     alert("Kayıt başarılı! Giriş ekranına yönlendiriliyorsunuz.");
     
@@ -234,50 +231,32 @@ const handleForgot = async () => {
             
             <div class="input-row">
               <input 
-                v-if="selectedRole === 'student'"
-                v-model="studentForm.email" 
-                type="email" 
-                placeholder="E-posta Adresi" 
-                required 
+                v-if="selectedRole === 'student'" v-model="studentForm.email" 
+                type="email" placeholder="E-posta Adresi" required 
               />
               <input 
-                v-else
-                v-model="teacherForm.email" 
-                type="email" 
-                placeholder="E-posta Adresi" 
-                required 
+                v-else v-model="teacherForm.email" 
+                type="email" placeholder="E-posta Adresi" required 
               />
             </div>
 
             <div class="input-row two-col">
               <input 
-                v-if="selectedRole === 'student'"
-                v-model="studentForm.password" 
-                type="password" 
-                placeholder="Parola" 
-                required 
+                v-if="selectedRole === 'student'" v-model="studentForm.password" 
+                type="password" placeholder="Parola" required 
               />
               <input 
-                v-else
-                v-model="teacherForm.password" 
-                type="password" 
-                placeholder="Parola" 
-                required 
+                v-else v-model="teacherForm.password" 
+                type="password" placeholder="Parola" required 
               />
 
               <input 
-                v-if="selectedRole === 'student'"
-                v-model="studentForm.passwordConfirm" 
-                type="password" 
-                placeholder="Parola Tekrar" 
-                required 
+                v-if="selectedRole === 'student'" v-model="studentForm.passwordConfirm" 
+                type="password" placeholder="Parola Tekrar" required 
               />
               <input 
-                v-else
-                v-model="teacherForm.passwordConfirm" 
-                type="password" 
-                placeholder="Parola Tekrar" 
-                required 
+                v-else v-model="teacherForm.passwordConfirm" 
+                type="password" placeholder="Parola Tekrar" required 
               />
             </div>
 
@@ -301,6 +280,29 @@ const handleForgot = async () => {
             </div>
 
             <div v-if="selectedRole === 'teacher'">
+              
+              <div class="input-row two-col">
+                <select v-model="teacherForm.branch" required>
+                  <option value="" disabled selected>Branş Seçiniz</option>
+                  <option value="Türkçe/Edebiyat">Türkçe/Edebiyat</option>
+                  <option value="Matematik">Matematik</option>
+                  <option value="Fen">Fen Bilimleri</option>
+                  <option value="Fizik">Fizik</option>
+                  <option value="Kimya">Kimya</option>
+                  <option value="Biyoloji">Biyoloji</option>
+                  <option value="DKAB">DKAB</option>
+                  <option value="İngilizce">İngilizce</option>
+                  <option value="Almanca">Almanca</option>
+                </select>
+
+                <select v-model="teacherForm.educationLevel" required>
+                  <option value="" disabled selected>Eğitim Kademesi</option>
+                  <option value="ilkokul">İlkokul</option>
+                  <option value="ortaokul">Ortaokul</option>
+                  <option value="lise">Lise</option>
+                </select>
+              </div>
+
               <div class="input-group">
                 <select v-model="teacherForm.workStatus" required>
                   <option value="" disabled selected>Çalışma Durumu</option>
@@ -320,12 +322,12 @@ const handleForgot = async () => {
                 </div>
               </div>
                
-               <div v-else-if="teacherForm.workStatus === 'none'">
+              <div v-else-if="teacherForm.workStatus === 'none'">
                  <div class="input-row two-col">
                   <input v-model="teacherForm.city" type="text" placeholder="İl" required />
                   <input v-model="teacherForm.district" type="text" placeholder="İlçe" required />
                 </div>
-               </div>
+              </div>
 
               <div class="input-group file-group">
                 <label>Öğretmenlik Belgesi / Diploma </label>
