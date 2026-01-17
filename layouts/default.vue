@@ -46,7 +46,7 @@
         <p>Eduty, öğrencilere ve genç profesyonellere kaliteli eğitim kaynakları sunmayı amaçlayan bir platformdur.</p>
         <div class="socials">
           <a href="https://instagram.com/eduty" target="_blank" aria-label="Instagram">
-            <img src="/img/instagram-logo.png" alt="Instagram" />
+            <img src="/img/instagram_logo.png" alt="Instagram" />
           </a>
           <a href="mailto:info@eduty.com" aria-label="Email">
             <img src="/img/email-logo.png" alt="Email" />
