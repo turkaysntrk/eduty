@@ -30,7 +30,7 @@
 
         <div class="info-item">
           <div class="icon-box">
-            <img src="/img/instagram-logo.png" alt="Instagram" />
+            <img src="/img/instagram_logo.png" alt="Instagram" />
           </div>
           <div>
             <h4>Sosyal Medya</h4>
