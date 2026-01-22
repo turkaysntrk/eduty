@@ -28,9 +28,22 @@
             <template v-if="!user">
               <NuxtLink to="/kayit-giris" class="apply-btn" @click="closeMenu">Kayıt / Giriş</NuxtLink>
             </template>
-            <template v-else>
-              <button class="apply-btn logout-btn" @click="handleLogout">Çıkış Yap</button>
-            </template>
+
+            <div v-else class="user-dropdown-wrapper">
+              <button @click="toggleDropdown" class="user-account-btn">
+                Hesap, {{ user.displayName?.split(' ')[0] || 'Öğrenci' }} ▼
+              </button>
+
+              <div v-if="isDropdownOpen" class="dropdown-menu">
+                <button @click="goToDashboard" class="dropdown-item">
+                  📊 Çalışma Ortamı
+                </button>
+                <div class="dropdown-divider"></div>
+                <button @click="handleLogout" class="dropdown-item logout-text">
+                  🚪 Çıkış Yap
+                </button>
+              </div>
+            </div>
           </div>
         </div>
       </div>
@@ -61,15 +74,15 @@
 <script setup>
 import { ref, onMounted, onUnmounted, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { onAuthStateChanged, signOut } from "firebase/auth"; // Firebase importları
+import { onAuthStateChanged, signOut } from "firebase/auth"; 
 
 const isScrolled = ref(false)
 const isMenuOpen = ref(false)
+const isDropdownOpen = ref(false) // Dropdown durumu için yeni state
 const route = useRoute()
 const router = useRouter()
-const { $auth } = useNuxtApp() // Plugin'den auth al
+const { $auth } = useNuxtApp() 
 
-// Kullanıcı durumu
 const user = ref(null)
 
 const handleScroll = () => {
@@ -83,15 +96,27 @@ const toggleMenu = () => {
 
 const closeMenu = () => {
   isMenuOpen.value = false
+  isDropdownOpen.value = false // Menü kapanınca dropdown da kapansın
   document.body.style.overflow = ''
 }
 
-// ÇIKIŞ YAPMA FONKSİYONU
+// DROPDOWN FONKSİYONLARI
+const toggleDropdown = () => {
+  isDropdownOpen.value = !isDropdownOpen.value
+}
+
+const goToDashboard = () => {
+  router.push('/dashboard')
+  isDropdownOpen.value = false
+  closeMenu()
+}
+
 const handleLogout = async () => {
   try {
     await signOut($auth);
+    isDropdownOpen.value = false
     closeMenu();
-    router.push('/'); // Ana sayfaya yönlendir
+    router.push('/'); 
   } catch (error) {
     console.error("Çıkış hatası:", error);
   }
@@ -103,12 +128,17 @@ watch(() => route.path, () => {
 
 onMounted(() => {
   window.addEventListener('scroll', handleScroll);
-
-  // Firebase Auth Durumunu Dinle
-  // Kullanıcı giriş yaptığında veya çıktığında 'user' değişkenini günceller
   onAuthStateChanged($auth, (currentUser) => {
     user.value = currentUser;
   });
+  
+  // Ekranda boş bir yere tıklayınca dropdown kapansın
+  document.addEventListener('click', (e) => {
+    const wrapper = document.querySelector('.user-dropdown-wrapper')
+    if (wrapper && !wrapper.contains(e.target)) {
+      isDropdownOpen.value = false
+    }
+  })
 })
 
 onUnmounted(() => {
@@ -274,6 +304,99 @@ nav.scrolled {
 .apply-btn:hover {
   background: white !important;
   color: black !important;
+}
+
+/* USER DROPDOWN STYLES */
+.user-dropdown-wrapper {
+  position: relative;
+  display: inline-block;
+}
+
+.user-account-btn {
+  background: transparent;
+  color: white;
+  border: 1px solid rgba(255,255,255,0.3);
+  padding: 8px 15px;
+  border-radius: 20px;
+  cursor: pointer;
+  font-family: inherit;
+  font-size: 0.9rem;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  transition: 0.3s;
+}
+
+.user-account-btn:hover {
+  background: rgba(255,255,255,0.1);
+  border-color: white;
+}
+
+.dropdown-menu {
+  position: absolute;
+  top: 120%;
+  right: 0;
+  width: 200px;
+  background: #111;
+  border: 1px solid #333;
+  border-radius: 12px;
+  padding: 10px;
+  display: flex;
+  flex-direction: column;
+  box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+  z-index: 10005;
+}
+
+.dropdown-item {
+  background: transparent;
+  border: none;
+  color: #ccc;
+  padding: 10px;
+  text-align: left;
+  cursor: pointer;
+  border-radius: 6px;
+  font-size: 0.9rem;
+  transition: 0.2s;
+}
+
+.dropdown-item:hover {
+  background: #222;
+  color: white;
+}
+
+.dropdown-divider {
+  height: 1px;
+  background: #333;
+  margin: 5px 0;
+}
+
+.logout-text {
+  color: #ff4444;
+}
+
+.logout-text:hover {
+  background: rgba(255, 68, 68, 0.1);
+}
+
+/* Mobilde dropdown düzgün görünsün */
+@media (max-width: 1030px) {
+  .user-dropdown-wrapper {
+    width: 100%;
+    text-align: center;
+    margin-top: 20px;
+  }
+  .user-account-btn {
+    width: 100%;
+    justify-content: center;
+    font-size: 1.2rem;
+    padding: 15px;
+  }
+  .dropdown-menu {
+    position: static;
+    width: 100%;
+    background: rgba(255,255,255,0.05);
+    margin-top: 10px;
+  }
 }
 
 /* =========================================
