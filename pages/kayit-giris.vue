@@ -159,7 +159,7 @@ const handleForgot = async () => {
         </div>
 
         <h1>Giriş Yap</h1>
-        <p class="subtitle">Hoş geldin, seni tekrar görmek güzel.</p>
+        <p class="subtitle">Hoş geldin! Seni tekrar görmek ne güzel.</p>
         
         <form @submit.prevent="handleLogin">
           <div class="input-group">

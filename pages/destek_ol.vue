@@ -133,7 +133,7 @@
 					</div>
 
 					<div class="package-card custom-card">
-						<div class="pkg-header">Sen Belirle</div>
+						<div class="pkg-header">Gönlünden Kopan</div>
 						<p class="custom-desc">Dilediğiniz miktarda bağış yaparak eğitime katkıda bulunun.</p>
 
 						<div class="custom-input-wrapper">

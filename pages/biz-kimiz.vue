@@ -1,7 +1,10 @@
 <template>
   <div class="about-page">
     
-    <div class="container">
+    <div class="page-bg"></div>
+    <div class="page-overlay"></div>
+
+    <div class="container relative-z">
       <div class="header-section">
         <h1 class="main-title">Biz Kimiz?</h1>
         <div class="blue-line"></div>
@@ -10,41 +13,47 @@
       <section class="mission-section">
         <div class="text-content">
           <p class="intro-text">
-            Eduty, eğitimde fırsat eşitliğini güçlendirmeyi hedefleyen bir <span class="highlight">sosyal girişim projesidir.</span>
+            Eduty, eğitimde fırsat eşitliğini güçlendirmeyi hedefleyen bir <span class="highlight">sosyal girişim
+              projesidir.</span>
           </p>
           <p>
-            Fen Lisesi öğrencisi tarafından tasarlanıp geliştirilen bu platform, ekonomik durumu elverişli olmayan öğrencilerin ücretsiz olarak akademik destek almasını sağlar. Amacımız, geleceğin eğitimine yön vermek ve her öğrenciye eşit fırsat sunmaktır.
+            Fen Lisesi öğrencisi tarafından tasarlanıp geliştirilen bu platform, ekonomik durumu elverişli olmayan
+            öğrencilerin ücretsiz olarak akademik destek almasını sağlar. Amacımız, geleceğin eğitimine yön vermek ve
+            her öğrenciye eşit fırsat sunmaktır.
           </p>
         </div>
       </section>
 
       <section class="how-it-works">
         <h2 class="section-heading">Sistem Nasıl İşler?</h2>
-        
+
         <div class="cards-grid">
+          
           <div class="info-card">
             <div class="icon-box">🎓</div>
             <h3>Öğrenciler İçin</h3>
             <p>
-              Sistemimizde öğrenciler her gün <strong>3 test hakkına</strong> sahiptir ve günde en az 1 test çözmeleri gerekir.
-              Her testten kazanılan puanlar, günlük ortalama <strong>150 puana</strong> kadar ulaşabilir.
+              Günde 3 test hakkın var. Soruları çöz, başarı gösterdikçe <span class="highlight">puan kazan</span>. 
+              Biriktirdiğin bu puanlarla dilediğin öğretmenden <span class="highlight">özel ders</span> al veya 
+              ihtiyacın olan <span class="highlight">kaynak kitaplara</span> ücretsiz eriş.
             </p>
           </div>
 
           <div class="info-card">
-            <div class="icon-box">⭐</div>
-            <h3>Puan ve Ödül</h3>
+            <div class="icon-box">👩‍🏫</div>
+            <h3>Öğretmenler İçin</h3>
             <p>
-              Öğrenciler biriktirdikleri bu puanlarla, sistemimize kayıtlı <strong>diplomalı öğretmenlerden</strong> online özel ders alabilirler. 
-              Emek veren öğrenci, eğitimle ödüllendirilir.
+              İçerik üreterek veya canlı ders vererek sisteme katkıda bulun.
+              Geleceğin inşasında <span class="highlight">senin de imzan olsun.</span>
             </p>
           </div>
 
           <div class="info-card">
-            <div class="icon-box">🤝</div>
-            <h3>Destek Ol</h3>
+            <div class="icon-box">💙</div>
+            <h3>Gönüllüler İçin</h3>
             <p>
-              Gönüllüler puan satın alarak bağışta bulunurlar. Bu puanlar, <strong>başarı sıralamasına göre</strong> öğrencilere en yüksekten düşüğe doğru dağıtılır. Böylece toplumsal dayanışma güçlenir.
+              Bir öğrencinin hayatına dokun, <span class="highlight">eğitimdeki engelleri kaldır.</span> 
+              Yapacağın destekle, geleceğin mimarlarına <span class="highlight">umut ışığı ol.</span>
             </p>
           </div>
         </div>
@@ -72,19 +81,48 @@ onMounted(() => {
 </script>
 
 <style scoped>
+/* --- ARKA PLAN AYARLARI --- */
+.page-bg {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background-image: url('/img/biz-kimiz-bg.jpg');
+  background-size: cover;
+  background-position: center;
+  z-index: 0;
+}
+
+.page-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  /* Üstten alta doğru koyulaşan gradient. Üstte %70 koyuluk, altta %95 koyuluk */
+  background: linear-gradient(to bottom, rgba(5, 5, 5, 0.75), rgba(0, 0, 0, 0.98));
+  z-index: 1;
+}
+
+.relative-z {
+  position: relative;
+  z-index: 2; /* İçeriği arka planın üstüne çıkarır */
+}
+
 /* --- GENEL SAYFA AYARLARI --- */
 .about-page {
-  background-color: #050505;
+  /* background-color kaldırıldı çünkü görsel kullanıyoruz */
   min-height: 100vh;
-  padding-top: 140px; 
+  padding-top: 140px;
   padding-bottom: 0;
-  color: var(--text-light); 
-  font-family: var(--font-main);
+  color: #f4f4f4; /* --text-light */
+  font-family: 'Montserrat', sans-serif; /* --font-main */
+  position: relative;
 }
 
 .container {
-  /* Laptoplarda genişliği artırdım (önceki: 1000px idi) */
-  max-width: 1200px; 
+  max-width: 1200px;
   margin: 0 auto;
   padding: 0 20px;
 }
@@ -96,17 +134,19 @@ onMounted(() => {
 }
 
 .main-title {
-  font-family: var(--font-serif);
+  font-family: 'Times New Roman', Times, serif; /* --font-serif */
   font-size: 2.5rem;
   color: #ffffff;
   margin-bottom: 10px;
+  text-shadow: 0 2px 10px rgba(0,0,0,0.5);
 }
 
 .blue-line {
   width: 60px;
   height: 3px;
-  background: var(--accent-color);
+  background: #0055ff; /* --primary-color */
   margin: 0 auto;
+  box-shadow: 0 0 10px rgba(0, 85, 255, 0.5);
 }
 
 /* --- METİN ALANI --- */
@@ -118,12 +158,12 @@ onMounted(() => {
 }
 
 .text-content {
-  /* Genişlik sınırı artırıldı (önceki: 800px idi), artık cümle sığacak */
-  max-width: 950px; 
+  max-width: 950px;
   text-align: center;
   line-height: 1.8;
-  color: #cccccc;
+  color: #dddddd;
   font-size: 1.1rem;
+  text-shadow: 0 1px 2px rgba(0,0,0,0.8); /* Okunabilirlik için gölge */
 }
 
 .intro-text {
@@ -132,7 +172,6 @@ onMounted(() => {
   color: white;
 }
 
-/* Laptop ekranlarında (min-width: 1024px) fontu ve satır yapısını garantiye al */
 @media (min-width: 1024px) {
   .text-content {
     width: 100%;
@@ -140,8 +179,9 @@ onMounted(() => {
 }
 
 .highlight {
-  color: var(--primary-color);
-  font-weight: 600;
+  color: #0055ff; /* --primary-color */
+  font-weight: 700;
+  text-shadow: 0 0 15px rgba(0, 85, 255, 0.4);
 }
 
 /* --- SİSTEM / KARTLAR ALANI --- */
@@ -151,10 +191,11 @@ onMounted(() => {
 
 .section-heading {
   text-align: center;
-  font-family: var(--font-serif);
+  font-family: 'Times New Roman', Times, serif;
   font-size: 2rem;
   margin-bottom: 50px;
-  color: var(--primary-color);
+  color: #0055ff; /* --primary-color */
+  text-shadow: 0 0 10px rgba(0,0,0,0.5);
 }
 
 .cards-grid {
@@ -164,46 +205,47 @@ onMounted(() => {
 }
 
 .info-card {
-  background: #111;
-  border: 1px solid #222;
-  padding: 30px;
-  border-radius: 8px;
+  background: rgba(17, 17, 17, 0.8); /* Yarı saydam arka plan */
+  backdrop-filter: blur(5px);
+  border: 1px solid #333;
+  padding: 35px 30px;
+  border-radius: 12px;
   text-align: center;
-  transition: transform 0.3s ease, border-color 0.3s ease;
+  transition: transform 0.3s ease, border-color 0.3s ease, box-shadow 0.3s ease;
 }
 
 .info-card:hover {
-  transform: translateY(-5px);
-  border-color: var(--secondary-color);
+  transform: translateY(-8px);
+  border-color: #003bb0; /* --secondary-color */
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
+  background: rgba(17, 17, 17, 0.95);
 }
 
 .icon-box {
-  font-size: 2.5rem;
+  font-size: 3rem;
   margin-bottom: 20px;
+  filter: drop-shadow(0 0 10px rgba(255,255,255,0.2));
 }
 
 .info-card h3 {
-  font-family: var(--font-serif);
+  font-family: 'Times New Roman', Times, serif;
   color: white;
-  font-size: 1.4rem;
+  font-size: 1.5rem;
   margin-bottom: 15px;
 }
 
 .info-card p {
-  color: #aaa;
-  font-size: 0.95rem;
-  line-height: 1.6;
-}
-
-.info-card strong {
-  color: var(--primary-color);
+  color: #ccc;
+  font-size: 1rem;
+  line-height: 1.7;
 }
 
 /* --- KAPANIŞ / CTA ALANI --- */
 .closing-section {
   position: relative;
   height: 400px;
-  background-image: url('/img/ana_sayfa_fotoğrafı.png'); 
+  /* Burası senin belirttiğin gibi dokunulmadı, kendi görselini kullanıyor */
+  background-image: url('/img/ana_sayfa_fotoğrafı.png');
   background-size: cover;
   background-position: center;
   background-attachment: fixed;
@@ -212,6 +254,8 @@ onMounted(() => {
   justify-content: center;
   text-align: center;
   margin-top: 40px;
+  z-index: 3; /* En üstte durması için */
+  border-top: 1px solid #222;
 }
 
 .overlay {
@@ -225,15 +269,16 @@ onMounted(() => {
 
 .closing-content {
   position: relative;
-  z-index: 2;
+  z-index: 4;
   padding: 20px;
 }
 
 .closing-content h2 {
-  font-family: var(--font-serif);
+  font-family: 'Times New Roman', Times, serif;
   font-size: 2.2rem;
   color: white;
   margin-bottom: 15px;
+  text-shadow: 0 2px 10px black;
 }
 
 .closing-content p {
@@ -245,7 +290,7 @@ onMounted(() => {
 .btn-glow {
   display: inline-block;
   padding: 12px 35px;
-  background: var(--primary-color);
+  background: #0055ff; /* --primary-color */
   color: white;
   font-weight: 600;
   text-transform: uppercase;
@@ -253,13 +298,13 @@ onMounted(() => {
   border-radius: 30px;
   text-decoration: none;
   transition: all 0.3s ease;
-  box-shadow: 0 0 15px rgba(0, 85, 255, 0.4);
-  font-family: var(--font-serif);
+  box-shadow: 0 0 20px rgba(0, 85, 255, 0.5);
+  font-family: 'Times New Roman', Times, serif;
 }
 
 .btn-glow:hover {
-  background: var(--secondary-color);
-  box-shadow: 0 0 25px rgba(0, 85, 255, 0.7);
+  background: #003bb0; /* --secondary-color */
+  box-shadow: 0 0 30px rgba(0, 85, 255, 0.8);
   transform: scale(1.05);
 }
 
@@ -268,11 +313,11 @@ onMounted(() => {
   .about-page {
     padding-top: 120px;
   }
-  
+
   .main-title {
     font-size: 2rem;
   }
-  
+
   .mission-section {
     margin-top: 20px;
   }

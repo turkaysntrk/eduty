@@ -11,21 +11,20 @@
     <section class="info-section">
       <div class="welcome-text">
         <NuxtLink to="/biz-kimiz" class="clickable-title">
-          <h2>Biz kimiz?</h2>
+          <h2>Biz Kimiz?</h2>
         </NuxtLink>
         <div class="blue-line"></div>
         <p>
-          Biz eğitimdeki imkansızlıkları ortadan kaldırmayı misyon edinmiş bir topluluğuz. Amacımız, her çocuğun kaliteli
-          eğitime erişimini sağlamak ve öğrenme süreçlerini Gazi Mustafa Kemal Atatürk önderliğinde desteklemektir. Yenilikçi çözümlerimizle, eğitimde fırsat
-          eşitliği yaratmayı hedefliyoruz.
+          Biz, eğitimdeki engelleri kaldırmayı misyon edinmiş bir topluluğuz. Gazi Mustafa Kemal Atatürk'ün vizyonuyla,
+          her çocuğun kaliteli eğitime erişmesi için teknoloji ve dayanışmayı bir araya getiriyoruz.
         </p>
-        
+
         <div class="action-area">
           <NuxtLink to="/biz-kimiz" class="btn-about">
             Hikayemizi Oku <span class="arrow">→</span>
           </NuxtLink>
         </div>
-        </div>
+      </div>
     </section>
   </div>
 </template>
@@ -98,9 +97,20 @@ onUnmounted(() => {
 
 /* --- MUM IŞIĞI ANİMASYONU --- */
 @keyframes candle-flicker {
-  0% { opacity: 1; text-shadow: 0 0 10px rgba(255, 255, 255, 0.5); }
-  50% { opacity: 0.95; text-shadow: 0 0 20px rgba(255, 255, 255, 0.6); }
-  100% { opacity: 1; text-shadow: 0 0 10px rgba(255, 255, 255, 0.5); }
+  0% {
+    opacity: 1;
+    text-shadow: 0 0 10px rgba(255, 255, 255, 0.5);
+  }
+
+  50% {
+    opacity: 0.95;
+    text-shadow: 0 0 20px rgba(255, 255, 255, 0.6);
+  }
+
+  100% {
+    opacity: 1;
+    text-shadow: 0 0 10px rgba(255, 255, 255, 0.5);
+  }
 }
 
 .date-badge {
@@ -117,7 +127,7 @@ onUnmounted(() => {
   color: #fff;
   font-weight: 300;
   margin-top: 20px;
-  text-shadow: 1px 1px 5px rgba(0,0,0,0.8);
+  text-shadow: 1px 1px 5px rgba(0, 0, 0, 0.8);
 }
 
 /* --- INFO SECTION (SİYAH ALAN) --- */
@@ -148,7 +158,8 @@ onUnmounted(() => {
 }
 
 .clickable-title:hover h2 {
-  color: #0055ff; /* Logo mavisi */
+  color: #0055ff;
+  /* Logo mavisi */
 }
 
 .blue-line {
@@ -187,7 +198,8 @@ onUnmounted(() => {
 }
 
 .btn-about:hover {
-  background-color: #0055ff; /* Primary Blue */
+  background-color: #0055ff;
+  /* Primary Blue */
   border-color: #0055ff;
   color: white;
   transform: translateY(-3px);
@@ -207,6 +219,7 @@ onUnmounted(() => {
   .motto {
     font-size: 1.5rem;
   }
+
   .info-section {
     padding: 50px 20px;
   }
