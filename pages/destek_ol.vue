@@ -79,6 +79,10 @@
 							<p v-if="viewState === 'register'">
 								Zaten hesabınız var mı? <a href="#" @click.prevent="viewState = 'login'">Giriş Yap</a>
 							</p>
+                            <p class="role-switch">
+                                Öğretmen veya Öğrenci misin? 
+                                <NuxtLink to="/kayit-giris">Giriş Yap</NuxtLink>
+                            </p>
 						</div>
 					</div>
 				</div>
@@ -173,7 +177,6 @@ const customAmount = ref(null);
 
 // --- PAKET SEÇİMİ ---
 const selectPackage = (amount, name) => {
-	// Burada kullanıcı giriş yapmış mı kontrol edebiliriz
 	if (!$auth.currentUser) {
 		alert("Lütfen bir paket seçmeden önce giriş yapın veya kayıt olun.");
 		window.scrollTo({ top: 0, behavior: 'smooth' });
@@ -203,7 +206,6 @@ const handleRegister = async () => {
 		const userCredential = await createUserWithEmailAndPassword($auth, registerForm.email, registerForm.password);
 		const user = userCredential.user;
 
-		// Firestore'a Kaydet (ROL: DONOR)
 		await setDoc(doc(db, "users", user.uid), {
 			firstName: registerForm.firstName,
 			lastName: registerForm.lastName,
@@ -263,7 +265,6 @@ const handleForgot = async () => {
 .hero-split {
 	display: flex;
 	align-items: flex-start;
-	/* Üstten hizalı */
 	gap: 60px;
 	margin-bottom: 120px;
 }
@@ -380,9 +381,18 @@ h1 {
 	cursor: pointer;
 }
 
+.remember-me input {
+	width: 16px !important;
+	height: 16px !important;
+	margin: 0 !important;
+	cursor: pointer;
+}
+
 .forgot-link {
 	color: var(--primary-color);
 	text-decoration: none;
+    font-size: 0.85rem;
+    text-align: right;
 }
 
 .btn-primary {
@@ -416,6 +426,12 @@ h1 {
 	text-align: center;
 	font-size: 0.9rem;
 	color: #666;
+    border-top: 1px solid #222;
+    padding-top: 20px;
+}
+
+.auth-footer p {
+    margin-bottom: 8px;
 }
 
 .auth-footer a {
@@ -423,74 +439,28 @@ h1 {
 	text-decoration: none;
 }
 
+.role-switch {
+    margin-top: 10px;
+    font-size: 0.9rem;
+    color: #888;
+}
+
 /* Başlığı Ortala */
 .section-header {
 	text-align: center;
 	margin-bottom: 60px;
 	width: 100%;
-	/* Tam genişlik kaplamasını sağla */
 }
 
 .section-title {
 	font-size: 2.5rem;
 	margin-bottom: 10px;
 	display: block;
-	/* Blok element yaparak ortalamayı garantiye al */
-}
-
-/* Beni Hatırla Yan Yana (Laptop için) */
-.form-options {
-	display: flex;
-	justify-content: space-between;
-	align-items: center;
-	margin-bottom: 20px;
-	font-size: 0.9rem;
-	color: #ccc;
-	gap: 10px;
-	/* Aradaki boşluk */
-}
-
-.remember-me {
-	display: flex;
-	align-items: center;
-	gap: 8px;
-	/* Checkbox ve yazı arası */
-	cursor: pointer;
-	white-space: nowrap;
-	/* Yazının kırılmasını engelle */
-	flex-shrink: 0;
-	/* Küçülmesini engelle */
-}
-
-.remember-me input {
-	width: 16px !important;
-	/* Checkbox boyutunu sabitle */
-	height: 16px !important;
-	margin: 0 !important;
-	/* Dış boşlukları sıfırla */
-	cursor: pointer;
-}
-
-.forgot-link {
-	color: var(--primary-color);
-	text-decoration: none;
-	font-size: 0.85rem;
-	text-align: right;
 }
 
 /* PAKETLER BÖLÜMÜ */
 .packages-section {
 	padding-bottom: 50px;
-}
-
-.section-header {
-	text-align: center;
-	margin-bottom: 60px;
-}
-
-.section-title {
-	font-size: 2.5rem;
-	margin-bottom: 10px;
 }
 
 .section-desc {
@@ -543,7 +513,6 @@ h1 {
 	margin: 0 0 30px 0;
 	text-align: left;
 	flex-grow: 1;
-	/* Butonu alta itmek için */
 }
 
 .features li {
@@ -644,7 +613,6 @@ h1 {
 	margin: 0;
 }
 
-/* Input number oklarını gizle */
 .custom-input-wrapper input::-webkit-outer-spin-button,
 .custom-input-wrapper input::-webkit-inner-spin-button {
 	-webkit-appearance: none;

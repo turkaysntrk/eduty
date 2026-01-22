@@ -18,7 +18,7 @@
 
         <div class="links" :class="{ 'nav-active': isMenuOpen }">
           <NuxtLink to="/" @click="closeMenu">Ana Sayfa</NuxtLink>
-          <NuxtLink to="/hakkimizda" @click="closeMenu">Hakkımızda</NuxtLink>
+          <NuxtLink to="/biz-kimiz" @click="closeMenu">Biz Kimiz?</NuxtLink>
           <NuxtLink to="/S.S.S." @click="closeMenu">S.S.S.</NuxtLink>
           <NuxtLink to="/iletisim" @click="closeMenu">İletişim</NuxtLink>
 
@@ -45,7 +45,7 @@
         <h3>Eduty - Herkes için eğitim.</h3>
         <p>Eduty, öğrencilere ve genç profesyonellere kaliteli eğitim kaynakları sunmayı amaçlayan bir platformdur.</p>
         <div class="socials">
-          <a href="https://instagram.com/eduty" target="_blank" aria-label="Instagram">
+          <a href="https://instagram.com/eduty.org" target="_blank" aria-label="Instagram">
             <img src="/img/instagram_logo.png" alt="Instagram" />
           </a>
           <a href="mailto:info@eduty.com" aria-label="Email">

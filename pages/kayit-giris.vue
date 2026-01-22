@@ -43,8 +43,8 @@ const teacherForm = reactive({
   email: '',
   password: '',
   passwordConfirm: '',
-  branch: '',          // YENİ: Branş
-  educationLevel: '',  // YENİ: Eğitim Kademesi
+  branch: '',          
+  educationLevel: '',  
   workStatus: '',
   city: '',
   district: '',
@@ -56,7 +56,6 @@ const teacherForm = reactive({
 const resetRegister = () => {
   registerStep.value = 1;
   selectedRole.value = null;
-  // Formları temizle
 };
 
 // --- GİRİŞ İŞLEMLERİ ---
@@ -75,7 +74,6 @@ const handleLogin = async () => {
 const handleRegister = async () => {
   let formToUse = selectedRole.value === 'student' ? studentForm : teacherForm;
 
-  // 1. Basit Doğrulamalar
   if (formToUse.password !== formToUse.passwordConfirm) {
     alert("Parolalar eşleşmiyor!");
     return;
@@ -90,11 +88,9 @@ const handleRegister = async () => {
   }
 
   try {
-    // 2. Kullanıcıyı Firebase Auth'ta oluştur
     const userCredential = await createUserWithEmailAndPassword($auth, formToUse.email, formToUse.password);
     const user = userCredential.user;
     
-    // 3. Verileri Hazırla
     let userData = {
       email: formToUse.email,
       role: selectedRole.value,
@@ -110,8 +106,8 @@ const handleRegister = async () => {
       });
     } else if (selectedRole.value === 'teacher') {
       Object.assign(userData, {
-        branch: teacherForm.branch,                 // YENİ: Firestore'a kaydediliyor
-        educationLevel: teacherForm.educationLevel, // YENİ: Firestore'a kaydediliyor
+        branch: teacherForm.branch,
+        educationLevel: teacherForm.educationLevel,
         workStatus: teacherForm.workStatus,
         city: teacherForm.city || '', 
         district: teacherForm.district || '',
@@ -119,10 +115,7 @@ const handleRegister = async () => {
       });
     }
 
-    // 4. Firestore'a Kaydet
     await setDoc(doc(db, "users", user.uid), userData);
-    
-    console.log("Kayıt başarılı, rol:", selectedRole.value);
     
     await $auth.signOut(); 
     alert("Kayıt başarılı! Giriş ekranına yönlendiriliyorsunuz.");
@@ -187,10 +180,16 @@ const handleForgot = async () => {
           <button type="submit" class="btn-primary">Giriş Yap</button>
         </form>
         
-        <p class="switch-text">
-          Hesabın yok mu?
-          <a href="#" @click.prevent="currentView = 'register'">Hemen kayıt ol</a>
-        </p>
+        <div class="auth-footer">
+          <p class="switch-text">
+            Hesabın yok mu?
+            <a href="#" @click.prevent="currentView = 'register'">Hemen kayıt ol</a>
+          </p>
+          <p class="support-text">
+            Destek mi olmak istiyorsun? 
+            <NuxtLink to="/destek_ol">Bağışçı Ol</NuxtLink>
+          </p>
+        </div>
       </div>
 
       <div v-else-if="currentView === 'register'" class="auth-box register-box">
@@ -217,10 +216,16 @@ const handleForgot = async () => {
             </button>
           </div>
 
-          <p class="switch-text">
-            Zaten hesabın var mı?
-            <a href="#" @click.prevent="currentView = 'login'">Giriş yap</a>
-          </p>
+          <div class="auth-footer">
+            <p class="switch-text">
+              Zaten hesabın var mı?
+              <a href="#" @click.prevent="currentView = 'login'">Giriş yap</a>
+            </p>
+            <p class="support-text">
+              Destek mi olmak istiyorsun? 
+              <NuxtLink to="/destek_ol">Bağışçı Ol</NuxtLink>
+            </p>
+          </div>
         </div>
 
         <div v-else>
@@ -280,7 +285,6 @@ const handleForgot = async () => {
             </div>
 
             <div v-if="selectedRole === 'teacher'">
-              
               <div class="input-row two-col">
                 <select v-model="teacherForm.branch" required>
                   <option value="" disabled selected>Branş Seçiniz</option>
@@ -339,10 +343,12 @@ const handleForgot = async () => {
             <button type="button" class="btn-secondary" @click="registerStep = 1">Geri Dön</button>
           </form>
 
-          <p class="switch-text">
-            Zaten hesabın var mı?
-            <a href="#" @click.prevent="currentView = 'login'">Giriş yap</a>
-          </p>
+          <div class="auth-footer">
+            <p class="switch-text">
+              Zaten hesabın var mı?
+              <a href="#" @click.prevent="currentView = 'login'">Giriş yap</a>
+            </p>
+          </div>
         </div>
       </div>
 
@@ -568,44 +574,24 @@ input:focus, select:focus {
   font-size: 0.9rem;
 }
 
-.divider {
-  display: flex;
-  align-items: center;
-  margin: 25px 0;
-  color: #555;
-  font-size: 0.8rem;
-}
-
-.divider::before, .divider::after {
-  content: "";
-  flex: 1;
-  height: 1px;
-  background: #333;
-}
-
-.divider span { padding: 0 10px; }
-
-.btn-social {
-  width: 100%;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 10px;
-  padding: 10px;
-  border-radius: 8px;
-  border: 1px solid #333;
-  background: #1a1a1a;
-  color: white;
-  cursor: pointer;
-}
-
-.forgot-link, .switch-text a {
+.forgot-link, .switch-text a, .support-text a {
   color: #0055ff;
   text-decoration: none;
 }
 
+.auth-footer {
+  margin-top: 20px;
+  border-top: 1px solid #222;
+  padding-top: 15px;
+}
+
 .switch-text {
-  margin-top: 15px;
+  font-size: 0.9rem;
+  color: #888;
+  margin-bottom: 8px;
+}
+
+.support-text {
   font-size: 0.9rem;
   color: #888;
 }

@@ -10,18 +10,22 @@
 
     <section class="info-section">
       <div class="welcome-text">
-        <h2>Biz kimiz?</h2>
+        <NuxtLink to="/biz-kimiz" class="clickable-title">
+          <h2>Biz kimiz?</h2>
+        </NuxtLink>
         <div class="blue-line"></div>
         <p>
           Biz eğitimdeki imkansızlıkları ortadan kaldırmayı misyon edinmiş bir topluluğuz. Amacımız, her çocuğun kaliteli
           eğitime erişimini sağlamak ve öğrenme süreçlerini Gazi Mustafa Kemal Atatürk önderliğinde desteklemektir. Yenilikçi çözümlerimizle, eğitimde fırsat
           eşitliği yaratmayı hedefliyoruz.
         </p>
-        <div class="sg-sign">
-          <strong>Türkay Şentürk</strong>
-          <span>Eduty Kurucusu</span>
+        
+        <div class="action-area">
+          <NuxtLink to="/biz-kimiz" class="btn-about">
+            Hikayemizi Oku <span class="arrow">→</span>
+          </NuxtLink>
         </div>
-      </div>
+        </div>
     </section>
   </div>
 </template>
@@ -51,10 +55,6 @@ const calculateTime = () => {
   }
 }
 
-const formatTime = (value) => {
-  return value < 10 ? `0${value}` : value
-}
-
 onMounted(() => {
   calculateTime()
   timerInterval = setInterval(calculateTime, 1000)
@@ -67,18 +67,12 @@ onUnmounted(() => {
 
 <style scoped>
 /* --- HERO SECTION --- */
-/* --- HERO SECTION --- */
-/* --- HERO SECTION --- */
 .hero {
-  height: 100vh; /* Tam ekran yüksekliği */
+  height: 100vh;
   background-image: url('/img/ana_sayfa_fotoğrafı.png');
-  
-  /* --- GÜNCELLENEN KISIM --- */
-  background-size: cover; /* Boşluk bırakmadan ekranı tamamen kaplar */
-  background-position: center top; /* Fotoğrafın en üstünü (yazıyı ve başları) merkeze alır */
+  background-size: cover;
+  background-position: center top;
   background-repeat: no-repeat;
-  /* ---------------------- */
-
   display: flex;
   align-items: center;
   justify-content: center;
@@ -92,7 +86,7 @@ onUnmounted(() => {
   left: 0;
   width: 100%;
   height: 100%;
-  background: rgba(0, 0, 0, 0.4); /* Biraz daha şeffaf yaptık ki foto görünsün */
+  background: rgba(0, 0, 0, 0.4);
 }
 
 .hero-content {
@@ -119,7 +113,7 @@ onUnmounted(() => {
 }
 
 .motto {
-  font-size: 2rem; /* Sloganı biraz büyüttük */
+  font-size: 2rem;
   color: #fff;
   font-weight: 300;
   margin-top: 20px;
@@ -128,16 +122,21 @@ onUnmounted(() => {
 
 /* --- INFO SECTION (SİYAH ALAN) --- */
 .info-section {
-  background-color: #000000; /* Simsiyah arka plan */
+  background-color: #000000;
   color: #ffffff;
-  padding: 80px 20px; /* Üstten ve alttan boşluk */
+  padding: 80px 20px;
   display: flex;
   justify-content: center;
   text-align: center;
 }
 
 .welcome-text {
-  max-width: 800px; /* Yazı çok yayılmasın */
+  max-width: 800px;
+}
+
+.clickable-title {
+  text-decoration: none;
+  cursor: pointer;
 }
 
 .welcome-text h2 {
@@ -145,33 +144,62 @@ onUnmounted(() => {
   margin-bottom: 10px;
   font-family: 'Times New Roman', Times, serif;
   color: white;
+  transition: color 0.3s ease;
+}
+
+.clickable-title:hover h2 {
+  color: #0055ff; /* Logo mavisi */
 }
 
 .blue-line {
   width: 60px;
   height: 4px;
-  background: #274a90; /* logo mavisinde çizgi */
+  background: #274a90;
   margin: 0 auto 30px;
 }
 
 .welcome-text p {
   font-size: 1.2rem;
   line-height: 1.8;
-  color: #cccccc; /* Hafif gri metin okunabilirliği artırır */
+  color: #cccccc;
+  margin-bottom: 40px;
 }
 
-.sg-sign {
-  margin-top: 50px;
-  font-style: italic;
-  color: #888;
+/* --- YENİ BUTON STİLİ --- */
+.action-area {
+  margin-top: 30px;
 }
 
-.sg-sign strong {
-  display: block;
+.btn-about {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 35px;
+  border: 1px solid #333;
+  border-radius: 30px;
+  background-color: transparent;
+  color: #fff;
+  font-size: 1rem;
+  font-weight: 600;
+  text-decoration: none;
+  transition: all 0.3s ease;
+  letter-spacing: 1px;
+}
+
+.btn-about:hover {
+  background-color: #0055ff; /* Primary Blue */
+  border-color: #0055ff;
   color: white;
-  font-size: 1.2rem;
-  margin-bottom: 5px;
-  font-style: normal;
+  transform: translateY(-3px);
+  box-shadow: 0 5px 15px rgba(0, 85, 255, 0.3);
+}
+
+.arrow {
+  transition: transform 0.3s ease;
+}
+
+.btn-about:hover .arrow {
+  transform: translateX(5px);
 }
 
 /* Mobil Uyumluluk */

@@ -3,7 +3,7 @@
     
     <div class="container">
       <div class="header-section">
-        <h1 class="main-title">Hakkımızda</h1>
+        <h1 class="main-title">Biz Kimiz?</h1>
         <div class="blue-line"></div>
       </div>
 
