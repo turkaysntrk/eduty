@@ -31,13 +31,17 @@
 
             <div v-else class="user-dropdown-wrapper">
               <button @click="toggleDropdown" class="user-account-btn">
-                Hesap, {{ user.displayName?.split(' ')[0] || 'Öğrenci' }} ▼
+                Hesap, {{ user.displayName?.split(' ')[0] || (userRole === 'teacher' ? 'Öğretmen' : 'Öğrenci') }} ▼
               </button>
 
               <div v-if="isDropdownOpen" class="dropdown-menu">
+
                 <button @click="goToDashboard" class="dropdown-item">
-                  📊 Çalışma Ortamı
+                  <span v-if="userRole === 'teacher'">🎓 Öğretmen Paneli</span>
+                  <span v-else-if="userRole === 'student'">📊 Çalışma Ortamı</span>
+                  <span v-else>📊 Panele Git</span>
                 </button>
+
                 <div class="dropdown-divider"></div>
                 <button @click="handleLogout" class="dropdown-item logout-text">
                   🚪 Çıkış Yap
@@ -74,14 +78,16 @@
 <script setup>
 import { ref, onMounted, onUnmounted, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { onAuthStateChanged, signOut } from "firebase/auth"; 
+import { onAuthStateChanged, signOut } from "firebase/auth";
 
 const isScrolled = ref(false)
 const isMenuOpen = ref(false)
-const isDropdownOpen = ref(false) // Dropdown durumu için yeni state
+const isDropdownOpen = ref(false)
+const userRole = ref(null)
+
 const route = useRoute()
 const router = useRouter()
-const { $auth } = useNuxtApp() 
+const { $auth } = useNuxtApp()
 
 const user = ref(null)
 
@@ -96,27 +102,31 @@ const toggleMenu = () => {
 
 const closeMenu = () => {
   isMenuOpen.value = false
-  isDropdownOpen.value = false // Menü kapanınca dropdown da kapansın
+  isDropdownOpen.value = false
   document.body.style.overflow = ''
 }
 
-// DROPDOWN FONKSİYONLARI
 const toggleDropdown = () => {
   isDropdownOpen.value = !isDropdownOpen.value
 }
 
 const goToDashboard = () => {
-  router.push('/dashboard')
+  if (userRole.value === 'teacher') {
+    router.push('/dashboard-teacher')
+  } else {
+    router.push('/dashboard')
+  }
   isDropdownOpen.value = false
   closeMenu()
 }
 
 const handleLogout = async () => {
   try {
+    localStorage.removeItem('userRole');
     await signOut($auth);
     isDropdownOpen.value = false
     closeMenu();
-    router.push('/'); 
+    router.push('/');
   } catch (error) {
     console.error("Çıkış hatası:", error);
   }
@@ -126,20 +136,38 @@ watch(() => route.path, () => {
   closeMenu()
 })
 
+// GÜNCELLENEN onMounted: Rol bilgisini garantileme
 onMounted(() => {
   window.addEventListener('scroll', handleScroll);
-  onAuthStateChanged($auth, (currentUser) => {
+
+  onAuthStateChanged($auth, async (currentUser) => {
     user.value = currentUser;
-  });
-  
-  // Ekranda boş bir yere tıklayınca dropdown kapansın
-  document.addEventListener('click', (e) => {
-    const wrapper = document.querySelector('.user-dropdown-wrapper')
-    if (wrapper && !wrapper.contains(e.target)) {
-      isDropdownOpen.value = false
+    if (currentUser) {
+      // 1. Önce localStorage'a bak
+      const savedRole = localStorage.getItem('userRole');
+      
+      if (savedRole) {
+        userRole.value = savedRole;
+      } else {
+        // 2. LocalStorage'da yoksa Firestore'dan çek ve kaydet
+        try {
+          const { getFirestore, doc, getDoc } = await import('firebase/firestore');
+          const db = getFirestore();
+          const userDoc = await getDoc(doc(db, "users", currentUser.uid));
+          
+          if (userDoc.exists()) {
+            userRole.value = userDoc.data().role;
+            localStorage.setItem('userRole', userRole.value);
+          }
+        } catch (error) {
+          console.error("Rol bilgisi çekilemedi:", error);
+        }
+      }
+    } else {
+      userRole.value = null;
     }
-  })
-})
+  });
+});
 
 onUnmounted(() => {
   window.removeEventListener('scroll', handleScroll)
@@ -148,15 +176,6 @@ onUnmounted(() => {
 </script>
 
 <style scoped>
-/* Mevcut stillerin aynen korunuyor */
-/* Sadece .logout-btn için küçük bir ekleme yapabilirsin istersen */
-.logout-btn {
-  background-color: transparent;
-  cursor: pointer;
-  /* Apply-btn stillerini miras alır ama istersen kırmızı yapabilirsin: */
-  /* border-color: #ff4444; color: #ff4444; */
-}
-
 /* --- TEMEL AYARLAR --- */
 .layout-container {
   background-color: #050505;
@@ -315,7 +334,7 @@ nav.scrolled {
 .user-account-btn {
   background: transparent;
   color: white;
-  border: 1px solid rgba(255,255,255,0.3);
+  border: 1px solid rgba(255, 255, 255, 0.3);
   padding: 8px 15px;
   border-radius: 20px;
   cursor: pointer;
@@ -328,7 +347,7 @@ nav.scrolled {
 }
 
 .user-account-btn:hover {
-  background: rgba(255,255,255,0.1);
+  background: rgba(255, 255, 255, 0.1);
   border-color: white;
 }
 
@@ -343,7 +362,7 @@ nav.scrolled {
   padding: 10px;
   display: flex;
   flex-direction: column;
-  box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
   z-index: 10005;
 }
 
@@ -385,23 +404,22 @@ nav.scrolled {
     text-align: center;
     margin-top: 20px;
   }
+
   .user-account-btn {
     width: 100%;
     justify-content: center;
     font-size: 1.2rem;
     padding: 15px;
   }
+
   .dropdown-menu {
     position: static;
     width: 100%;
-    background: rgba(255,255,255,0.05);
+    background: rgba(255, 255, 255, 0.05);
     margin-top: 10px;
   }
 }
 
-/* =========================================
-   MASAÜSTÜ GÖRÜNÜM (> 1030px)
-   ========================================= */
 @media (min-width: 1031px) {
   .hamburger-btn {
     display: none !important;
@@ -419,9 +437,6 @@ nav.scrolled {
   }
 }
 
-/* =========================================
-   TABLET VE MOBİL (< 1030px)
-   ========================================= */
 @media (max-width: 1030px) {
   .hamburger-btn {
     display: flex;
@@ -493,9 +508,6 @@ nav.scrolled {
   }
 }
 
-/* =========================================
-   ÇOK KÜÇÜK EKRANLAR (< 480px)
-   ========================================= */
 @media (max-width: 480px) {
   .nav-content {
     padding: 0 15px;

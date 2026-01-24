@@ -1,6 +1,12 @@
 <template>
-	<div class="support-page">
-		<div class="container">
+	<div class="support-page-wrapper">
+		
+		<div class="hero-background-container">
+			<div class="page-bg"></div>
+			<div class="page-gradient"></div>
+		</div>
+
+		<div class="container relative-z">
 
 			<section class="hero-split">
 				<div class="info-side">
@@ -95,8 +101,7 @@
 				</div>
 
 				<div class="packages-grid">
-
-					<div class="package-card">
+                    <div class="package-card">
 						<div class="pkg-header">Başlangıç</div>
 						<div class="price">250 ₺</div>
 						<ul class="features">
@@ -152,7 +157,7 @@
 </template>
 
 <script setup>
-import { ref, reactive } from 'vue'
+import { ref, reactive, onMounted } from 'vue'
 import {
 	createUserWithEmailAndPassword,
 	signInWithEmailAndPassword,
@@ -163,19 +168,18 @@ import {
 } from "firebase/auth";
 import { getFirestore, doc, setDoc } from "firebase/firestore";
 
-const { $auth } = useNuxtApp();
-const db = getFirestore();
+const { $db, $auth } = useNuxtApp();
 
-// Görünüm Durumu
+onMounted(() => {
+    window.scrollTo(0, 0);
+});
+
 const viewState = ref('login');
-
-// Form Verileri
 const loginForm = reactive({ email: '', password: '', rememberMe: false });
 const registerForm = reactive({ firstName: '', lastName: '', email: '', password: '', passwordConfirm: '' });
 const forgotEmail = ref('');
 const customAmount = ref(null);
 
-// --- PAKET SEÇİMİ ---
 const selectPackage = (amount, name) => {
 	if (!$auth.currentUser) {
 		alert("Lütfen bir paket seçmeden önce giriş yapın veya kayıt olun.");
@@ -193,7 +197,6 @@ const handleCustomDonation = () => {
 	selectPackage(customAmount.value, 'Özel Bağış');
 };
 
-// --- AUTH İŞLEMLERİ ---
 const handleRegister = async () => {
 	if (registerForm.password !== registerForm.passwordConfirm) {
 		alert("Parolalar eşleşmiyor!"); return;
@@ -203,6 +206,7 @@ const handleRegister = async () => {
 	}
 
 	try {
+        const db = getFirestore(); // db tanımlandı
 		const userCredential = await createUserWithEmailAndPassword($auth, registerForm.email, registerForm.password);
 		const user = userCredential.user;
 
@@ -246,19 +250,59 @@ const handleForgot = async () => {
 </script>
 
 <style scoped>
-/* GENEL SAYFA */
-.support-page {
-	padding-top: 140px;
-	padding-bottom: 50px;
-	background-color: #050505;
-	color: white;
-	min-height: 100vh;
+/* ANA WRAPPER: Siyah arka plan */
+.support-page-wrapper {
+    background-color: #050505;
+    min-height: 100vh;
+    position: relative;
+    padding-bottom: 50px; /* Footer için boşluk */
+}
+
+/* GÖRSEL ALANI (Absolute ile sadece üst kısma sabitlendi) */
+.hero-background-container {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100vh; /* İlk ekran kadar yükseklik */
+    z-index: 0;
+    overflow: hidden;
+}
+
+.page-bg {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background-image: url('/img/destek-bg.jpg'); 
+    background-size: cover;
+    background-position: center top;
+}
+
+/* GRADIENT GEÇİŞİ: Görselin üstünden başlar, aşağıda tam siyaha döner */
+.page-gradient {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    /* Üst şeffaf, aşağıya doğru tam siyah (#050505) olur */
+    background: linear-gradient(to bottom, rgba(5,5,5,0.4) 0%, rgba(5,5,5,0.8) 60%, #050505 100%);
+    z-index: 1;
+}
+
+/* İÇERİK */
+.relative-z {
+  position: relative;
+  z-index: 2; /* Arka planın üstünde */
 }
 
 .container {
 	max-width: 1200px;
 	margin: 0 auto;
 	padding: 0 20px;
+	padding-top: 140px; /* Navbar boşluğu */
 }
 
 /* HERO BÖLÜMÜ */
@@ -266,7 +310,7 @@ const handleForgot = async () => {
 	display: flex;
 	align-items: flex-start;
 	gap: 60px;
-	margin-bottom: 120px;
+	margin-bottom: 150px; /* Paketlerle arayı aç */
 }
 
 .info-side {
@@ -293,6 +337,7 @@ h1 {
 	font-size: 3.5rem;
 	line-height: 1.1;
 	margin-bottom: 25px;
+    color: white;
 }
 
 .blue {
@@ -323,13 +368,14 @@ h1 {
 
 /* AUTH CARD */
 .auth-card {
-	background: #111;
-	border: 1px solid #222;
+	background: rgba(17, 17, 17, 0.85); /* Biraz daha koyu */
+    backdrop-filter: blur(15px);
+	border: 1px solid rgba(255, 255, 255, 0.1);
 	padding: 35px;
 	border-radius: 16px;
 	width: 100%;
 	max-width: 420px;
-	box-shadow: 0 10px 40px rgba(0, 0, 0, 0.5);
+	box-shadow: 0 20px 60px rgba(0, 0, 0, 0.6);
 }
 
 .auth-card h3 {
@@ -339,7 +385,7 @@ h1 {
 }
 
 .auth-card p {
-	color: #888;
+	color: #aaa;
 	font-size: 0.9rem;
 	margin-bottom: 20px;
 }
@@ -348,8 +394,8 @@ h1 {
 	width: 100%;
 	padding: 14px;
 	margin-bottom: 15px;
-	background: #1a1a1a;
-	border: 1px solid #333;
+	background: rgba(0, 0, 0, 0.5);
+	border: 1px solid #444;
 	color: white;
 	border-radius: 8px;
 	font-size: 1rem;
@@ -415,7 +461,7 @@ h1 {
 .btn-text {
 	background: none;
 	border: none;
-	color: #888;
+	color: #aaa;
 	width: 100%;
 	margin-top: 10px;
 	cursor: pointer;
@@ -425,8 +471,8 @@ h1 {
 	margin-top: 20px;
 	text-align: center;
 	font-size: 0.9rem;
-	color: #666;
-    border-top: 1px solid #222;
+	color: #999;
+    border-top: 1px solid #333;
     padding-top: 20px;
 }
 
@@ -445,7 +491,15 @@ h1 {
     color: #888;
 }
 
-/* Başlığı Ortala */
+/* PAKETLER BÖLÜMÜ (Zemin Siyah) */
+.packages-section {
+    position: relative;
+    /* Hero container 100vh olduğu için bu kısım altta kalır ve siyah zeminle devam eder */
+    background-color: #050505; 
+    z-index: 2;
+    padding-bottom: 50px;
+}
+
 .section-header {
 	text-align: center;
 	margin-bottom: 60px;
@@ -456,15 +510,11 @@ h1 {
 	font-size: 2.5rem;
 	margin-bottom: 10px;
 	display: block;
-}
-
-/* PAKETLER BÖLÜMÜ */
-.packages-section {
-	padding-bottom: 50px;
+    color: white;
 }
 
 .section-desc {
-	color: #888;
+	color: #bbb;
 }
 
 .packages-grid {
@@ -476,8 +526,8 @@ h1 {
 
 /* PAKET KARTI */
 .package-card {
-	background: #111;
-	border: 1px solid #222;
+	background: #111; /* Kartların içi siyahımsı */
+	border: 1px solid #333;
 	padding: 40px 30px;
 	text-align: center;
 	border-radius: 16px;
@@ -490,7 +540,8 @@ h1 {
 
 .package-card:hover {
 	transform: translateY(-10px);
-	border-color: #444;
+	border-color: #555;
+    background: #161616;
 }
 
 .pkg-header {
@@ -538,7 +589,7 @@ h1 {
 
 .btn-select:hover {
 	border-color: white;
-	background: #222;
+	background: rgba(255, 255, 255, 0.1);
 }
 
 /* FEATURED (AVANTAJLI) PAKET */
@@ -546,7 +597,7 @@ h1 {
 	border: 2px solid var(--primary-color);
 	background: #0a0a0a;
 	transform: scale(1.05);
-	z-index: 2;
+	z-index: 3;
 	box-shadow: 0 0 30px rgba(0, 85, 255, 0.15);
 }
 
@@ -579,7 +630,7 @@ h1 {
 
 /* CUSTOM (ÖZEL) PAKET */
 .custom-card .custom-desc {
-	color: #888;
+	color: #aaa;
 	font-size: 0.9rem;
 	margin-bottom: 20px;
 }
@@ -624,41 +675,22 @@ h1 {
 	.hero-split {
 		flex-direction: column;
 	}
-
 	.info-side {
 		text-align: center;
 	}
-
 	.info-side p {
 		margin: 0 auto 30px;
 	}
-
 	.trust-icons {
 		justify-content: center;
 	}
-
 	.login-side {
 		justify-content: center;
 		width: 100%;
 	}
-
 	.package-card.featured {
 		transform: scale(1);
 		margin: 20px 0;
-	}
-
-	.package-card.featured:hover {
-		transform: translateY(-10px);
-	}
-}
-
-@media (max-width: 600px) {
-	h1 {
-		font-size: 2.5rem;
-	}
-
-	.packages-grid {
-		grid-template-columns: 1fr;
 	}
 }
 </style>

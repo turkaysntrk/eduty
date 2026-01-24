@@ -63,8 +63,29 @@ const handleLogin = async () => {
   try {
     const persistenceType = loginForm.rememberMe ? browserLocalPersistence : browserSessionPersistence;
     await setPersistence($auth, persistenceType);
-    await signInWithEmailAndPassword($auth, loginForm.identity, loginForm.password);
-    router.push('/');
+    
+    const userCredential = await signInWithEmailAndPassword($auth, loginForm.identity, loginForm.password);
+    const user = userCredential.user;
+
+    // Firestore'dan kullanıcının rolünü çekiyoruz
+    const { getFirestore, doc, getDoc } = await import("firebase/firestore");
+    const db = getFirestore();
+    const userDoc = await getDoc(doc(db, "users", user.uid));
+
+    if (userDoc.exists()) {
+      const userData = userDoc.data();
+      // Role göre otomatik yönlendirme
+      if (userData.role === 'student') {
+        router.push('/dashboard');
+      } else if (userData.role === 'teacher') {
+        router.push('/dashboard-teacher');
+      } else if (userData.role === 'donor') {
+        // Bağışçı normal girişten girmeye çalışırsa ana sayfaya veya destek sayfasına atabiliriz
+        router.push('/destek_ol');
+      }
+    } else {
+      router.push('/'); // Rol bulunamazsa ana sayfaya
+    }
   } catch (error) {
     alert("Giriş başarısız: " + error.message);
   }

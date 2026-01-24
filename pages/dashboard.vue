@@ -4,7 +4,7 @@
         <p>Veriler yükleniyor...</p>
     </div>
 
-    <div v-else class="dashboard-container">
+    <div v-else-if="isStudent" class="dashboard-container">
 
         <div v-if="isProfileModalOpen" class="modal-overlay">
             <div class="modal-content">
@@ -121,12 +121,26 @@
                 </div>
 
                 <div v-if="activeTab === 'test-solve'" class="animate-fade">
-                    <h2 class="section-title">Ders Seç ve Başla</h2>
-                    <div class="lessons-grid">
-                        <div v-for="lesson in lessons" :key="lesson" class="lesson-card">
-                            <div class="lesson-placeholder">🖼️</div>
-                            <h3>{{ lesson }}</h3>
-                            <button class="btn-start">Testleri Gör</button>
+                    <h2 class="section-title">Test Çöz</h2>
+                    <p style="color:#888; margin-bottom: 20px;">Öğretmenler tarafından yüklenen güncel testler aşağıdadır.</p>
+
+                    <div v-if="availableTests.length === 0" class="empty-state">
+                        <span class="icon-empty">📂</span>
+                        <p>Henüz yüklenmiş bir test bulunmuyor.</p>
+                    </div>
+
+                    <div v-else class="test-grid">
+                        <div v-for="test in availableTests" :key="test.id" class="test-card">
+                            <div class="test-header">
+                                <span class="badge-subject">{{ test.subject }}</span>
+                                <span class="badge-grade">{{ test.grade === 'Mezun' ? 'Mezun' : test.grade + '. Sınıf' }}</span>
+                            </div>
+                            <h3>{{ test.title }}</h3>
+                            <div class="test-meta">
+                                <span>👤 {{ test.uploaderName }}</span>
+                                <span>❓ {{ test.questionCount }} Soru</span>
+                            </div>
+                            <button class="btn-start-test" @click="startTest(test)">Testi Başlat</button>
                         </div>
                     </div>
                 </div>
@@ -210,16 +224,16 @@
 import { ref, computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { onAuthStateChanged, signOut, updateProfile } from 'firebase/auth'
-import { getFirestore, doc, getDoc, updateDoc } from 'firebase/firestore'
+// GÜNCELLENEN IMPORT: collection ve getDocs eklendi
+import { getFirestore, doc, getDoc, updateDoc, collection, getDocs } from 'firebase/firestore'
 
 const router = useRouter()
 const { $auth } = useNuxtApp()
-
-// DÜZELTME: db'yi burada hemen çağırmıyoruz, değişken olarak tanımlıyoruz.
 let db; 
 
 // State
 const isLoading = ref(true)
+const isStudent = ref(false) // Rol Kontrolü
 const activeTab = ref('stats')
 const userDisplayName = ref('')
 const userEmail = ref('')
@@ -227,6 +241,7 @@ const userGrade = ref(null)
 const studentScore = ref(0)
 const completedLessons = ref(0)
 const favoriteTeachers = ref([])
+const availableTests = ref([]) // YENİ: Testleri tutacak dizi
 
 // Filtreler
 const filters = ref({ subject: '', time: '' })
@@ -250,7 +265,7 @@ const lessons = computed(() => {
     if (g >= 4 && g <= 8) list.push("Sosyal Bilgiler")
 
     if (g >= 9) {
-        list.push("Türk Dili ve Edebiyatı") // Edebiyat eklendi
+        list.push("Türk Dili ve Edebiyatı") 
         list.push("Fizik")
         list.push("Kimya")
         list.push("Biyoloji")
@@ -265,6 +280,25 @@ const lessons = computed(() => {
 
     return list
 })
+
+// YENİ: Testleri Veritabanından Çekme Fonksiyonu
+const fetchTests = async () => {
+    if (!db) db = getFirestore();
+    try {
+        const querySnapshot = await getDocs(collection(db, "tests"));
+        availableTests.value = querySnapshot.docs.map(doc => ({
+            id: doc.id,
+            ...doc.data()
+        }));
+    } catch (error) {
+        console.error("Testler çekilirken hata:", error);
+    }
+};
+
+const startTest = (test) => {
+    alert(`"${test.title}" testi başlatılıyor... (Test çözme ekranı entegrasyonu yapılacaktır)`);
+    // Burada test çözme sayfasına yönlendirme yapabilirsin: router.push(`/test-coz/${test.id}`)
+}
 
 // AVATAR VE PROFİL YÖNETİMİ
 const isProfileModalOpen = ref(false)
@@ -334,9 +368,7 @@ const selectPresetAvatar = (url) => {
     tempProfile.value.avatarType = 'preset'
 }
 
-// PROFİL KAYDETME FONKSİYONU
 const saveProfile = async () => {
-    // DB kontrolü: Eğer db tanımlanmadıysa (bazı durumlarda) burada alalım
     if (!db) db = getFirestore();
 
     userDisplayName.value = tempProfile.value.name
@@ -374,7 +406,6 @@ const saveProfile = async () => {
     isProfileModalOpen.value = false
 }
 
-// ÖĞRETMEN VERİLERİ (MOCK)
 const mockTeachers = ref([])
 const filteredTeachers = computed(() => {
     return mockTeachers.value.filter(t => {
@@ -384,9 +415,7 @@ const filteredTeachers = computed(() => {
     })
 })
 
-// AUTH VE VERİ ÇEKME
 onMounted(() => {
-    // DÜZELTME: Tarayıcı tarafındayız, Firestore'u artık güvenle başlatabiliriz.
     db = getFirestore();
 
     onAuthStateChanged($auth, async (user) => {
@@ -400,6 +429,21 @@ onMounted(() => {
 
                 if (docSnap.exists()) {
                     const data = docSnap.data();
+
+                    // ROL KONTROLÜ
+                    if (data.role !== 'student') {
+                        // Eğer öğrenci değilse, öğretmen paneline yolla
+                        if (data.role === 'teacher') {
+                             router.push('/dashboard-teacher');
+                        } else {
+                            router.push('/');
+                        }
+                        return;
+                    }
+                    
+                    isStudent.value = true;
+                    // Rol bilgisini localStorage'a kaydet (Navbar için)
+                    localStorage.setItem('userRole', 'student');
                     
                     if (data.grade) userGrade.value = data.grade;
                     if (data.displayName) userDisplayName.value = data.displayName;
@@ -411,9 +455,9 @@ onMounted(() => {
                             uploadedImage: data.avatar.uploadedImage || null
                         }
                     }
-                } else {
-                    console.log("Kullanıcı verisi henüz yok.");
-                    // Varsayılan bir sınıf atamayın, kullanıcı kendi seçsin
+
+                    // YENİ: Öğrenci giriş yaptıktan sonra testleri çek
+                    await fetchTests();
                 }
             } catch (error) {
                 console.error("Veri çekme hatası:", error);
@@ -429,6 +473,7 @@ onMounted(() => {
 
 const handleLogout = async () => {
     try {
+        localStorage.removeItem('userRole'); // Çıkışta temizle
         await signOut($auth)
         router.push('/')
     } catch (error) {
@@ -720,46 +765,96 @@ const studentRank = computed(() => {
     font-family: 'serif';
 }
 
+/* YENİ TEST KARTLARI STİLİ */
+.test-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+    gap: 20px;
+}
+
+.test-card {
+    background: #161616;
+    padding: 20px;
+    border-radius: 12px;
+    border: 1px solid #333;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    transition: 0.3s;
+}
+
+.test-card:hover {
+    transform: translateY(-5px);
+    border-color: #0055ff;
+    box-shadow: 0 5px 15px rgba(0, 85, 255, 0.15);
+}
+
+.test-header {
+    display: flex;
+    justify-content: space-between;
+    margin-bottom: 10px;
+}
+
+.badge-subject {
+    background: #0055ff;
+    color: white;
+    padding: 4px 10px;
+    border-radius: 4px;
+    font-size: 0.75rem;
+    font-weight: bold;
+}
+
+.badge-grade {
+    background: #333;
+    color: #ccc;
+    padding: 4px 10px;
+    border-radius: 4px;
+    font-size: 0.75rem;
+}
+
+.test-card h3 {
+    margin: 10px 0;
+    font-size: 1.1rem;
+    color: white;
+    flex-grow: 1;
+}
+
+.test-meta {
+    display: flex;
+    justify-content: space-between;
+    color: #888;
+    font-size: 0.85rem;
+    margin-bottom: 15px;
+}
+
+.btn-start-test {
+    background: transparent;
+    border: 1px solid #0055ff;
+    color: #0055ff;
+    padding: 10px;
+    border-radius: 8px;
+    cursor: pointer;
+    font-weight: 600;
+    transition: 0.3s;
+    width: 100%;
+}
+
+.btn-start-test:hover {
+    background: #0055ff;
+    color: white;
+}
+
+.icon-empty {
+    font-size: 3rem;
+    display: block;
+    margin-bottom: 15px;
+}
+
+/* ESKİ DERSLER IZGARASI (Hâlâ filtrelerde kullanılabilir) */
 .lessons-grid {
     display: grid;
     grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
     gap: 20px;
-}
-
-.lesson-card {
-    background: #161616;
-    padding: 20px;
-    border-radius: 12px;
-    text-align: center;
-    border: 1px solid #222;
-    transition: 0.3s;
-}
-
-.lesson-card:hover {
-    transform: translateY(-5px);
-    border-color: #0055ff;
-}
-
-.lesson-placeholder {
-    height: 120px;
-    background: #222;
-    border-radius: 8px;
-    margin-bottom: 15px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    font-size: 2rem;
-}
-
-.btn-start {
-    background: #0055ff;
-    color: white;
-    border: none;
-    padding: 8px 16px;
-    border-radius: 6px;
-    cursor: pointer;
-    width: 100%;
-    font-weight: 600;
 }
 
 .filter-bar {
