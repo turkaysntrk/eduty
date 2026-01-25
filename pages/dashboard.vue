@@ -47,6 +47,74 @@
                 </div>
             </div>
         </div>
+
+        <div v-if="isBookingModalOpen" class="modal-overlay">
+            <div class="modal-content booking-modal">
+                <div class="modal-header">
+                    <h3>Ders Zamanı Seç</h3>
+                    <p>Öğretmen: <span class="highlight-text">{{ selectedTeacherForBooking?.displayName ||
+                            selectedTeacherForBooking?.email }}</span></p>
+                </div>
+
+                <div class="scheduler-grid">
+                    <div v-if="availableSlots.length === 0" class="no-slots">
+                        Bu öğretmen için şu an uygun saat bulunamadı.
+                    </div>
+                    <div v-else v-for="slot in availableSlots" :key="slot.id" class="time-slot-card"
+                        :class="{ 'selected': bookingSlot === slot }" @click="bookingSlot = slot">
+                        <span class="slot-day">{{ slot.day }}</span>
+                        <span class="slot-time">{{ slot.time }}</span>
+                    </div>
+                </div>
+
+                <div class="modal-actions">
+                    <button @click="isBookingModalOpen = false" class="btn-cancel">Vazgeç</button>
+                    <button @click="confirmBooking" class="btn-save" :disabled="!bookingSlot">
+                        {{ bookingSlot ? 'Randevuyu Onayla' : 'Saat Seçiniz' }}
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <div v-if="isTakingTest" class="test-runner-overlay">
+            <div class="test-runner-header">
+                <div class="tr-info">
+                    <h3>{{ currentTest?.title }}</h3>
+                    <span class="tr-badge">{{ currentTest?.subject }}</span>
+                </div>
+                <div class="tr-tools">
+                    <button @click="setTool('pen')" :class="{ active: drawingTool === 'pen' }" title="Kalem">✏️</button>
+                    <button @click="setTool('eraser')" :class="{ active: drawingTool === 'eraser' }"
+                        title="Silgi">🧹</button>
+                    <button @click="clearCanvas" title="Temizle">🗑️</button>
+                    <button class="btn-close-test" @click="confirmExitTest">Çıkış Yap</button>
+                </div>
+            </div>
+
+            <div class="test-runner-body">
+                <div class="pdf-container" ref="pdfContainer">
+                    <iframe :src="currentTest?.pdfUrl || '/sample.pdf'" class="pdf-frame"></iframe>
+                    <canvas ref="drawCanvas" class="drawing-canvas" @mousedown="startDrawing" @mousemove="draw"
+                        @mouseup="stopDrawing" @mouseleave="stopDrawing"></canvas>
+                </div>
+                <div class="optical-form">
+                    <h4>Cevap Anahtarı</h4>
+                    <div class="questions-list">
+                        <div v-for="n in parseInt(currentTest?.questionCount || 0)" :key="n" class="opt-row">
+                            <span class="q-no">{{ n }}.</span>
+                            <div class="opt-options">
+                                <button v-for="opt in ['A', 'B', 'C', 'D', 'E']" :key="opt"
+                                    :class="{ selected: userAnswers[n - 1] === opt }" @click="userAnswers[n - 1] = opt">
+                                    {{ opt }}
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                    <button class="btn-finish-test" @click="finishTest">TESTİ BİTİR</button>
+                </div>
+            </div>
+        </div>
+
         <aside class="sidebar">
             <div class="profile-section">
                 <div class="avatar-wrapper">
@@ -57,7 +125,8 @@
                 </div>
                 <h3 class="user-name">{{ userDisplayName || 'Öğrenci' }}</h3>
                 <p class="user-email">{{ userEmail }}</p>
-                <p v-if="userGrade" class="user-grade-info">{{ userGrade === 'Mezun' || userGrade === 13 ? 'Mezun' : userGrade + '. Sınıf' }}</p>
+                <p v-if="userGrade" class="user-grade-info">{{ userGrade === 'Mezun' || userGrade === 13 ? 'Mezun' :
+                    userGrade + '. Sınıf' }}</p>
             </div>
 
             <nav class="sidebar-nav">
@@ -66,6 +135,9 @@
                 </button>
                 <button @click="activeTab = 'test-solve'" :class="{ active: activeTab === 'test-solve' }">
                     <span class="icon">📝</span> Test Çöz
+                </button>
+                <button @click="activeTab = 'calendar'" :class="{ active: activeTab === 'calendar' }">
+                    <span class="icon">📅</span> Takvimim
                 </button>
                 <button @click="activeTab = 'find-teacher'" :class="{ active: activeTab === 'find-teacher' }">
                     <span class="icon">🔍</span> Öğretmen Ara
@@ -104,15 +176,15 @@
                     <div class="stats-grid" v-if="completedLessons > 0">
                         <div class="stat-box">
                             <h4>Çözülen Test</h4>
-                            <p>24</p>
+                            <p>{{ completedTestCount }}</p>
                         </div>
                         <div class="stat-box">
                             <h4>Başarı Oranı</h4>
-                            <p>%85</p>
+                            <p>%{{ successRate }}</p>
                         </div>
                         <div class="stat-box">
                             <h4>Haftalık Puan</h4>
-                            <p>+450</p>
+                            <p>+{{ studentScore }}</p>
                         </div>
                     </div>
                     <div v-else class="empty-state">
@@ -122,25 +194,81 @@
 
                 <div v-if="activeTab === 'test-solve'" class="animate-fade">
                     <h2 class="section-title">Test Çöz</h2>
-                    <p style="color:#888; margin-bottom: 20px;">Öğretmenler tarafından yüklenen güncel testler aşağıdadır.</p>
 
-                    <div v-if="availableTests.length === 0" class="empty-state">
-                        <span class="icon-empty">📂</span>
-                        <p>Henüz yüklenmiş bir test bulunmuyor.</p>
+                    <div v-if="!selectedTestSubject">
+                        <p style="color:#888; margin-bottom: 20px;">Çözmek istediğiniz dersi seçiniz.</p>
+                        <div class="subjects-grid">
+                            <div v-for="subject in lessons" :key="subject" class="subject-card"
+                                @click="selectSubject(subject)">
+                                <div class="subject-icon">📚</div>
+                                <h3>{{ subject }}</h3>
+                                <span class="test-count-badge">{{ getTestCountForSubject(subject) }} Test</span>
+                            </div>
+                        </div>
                     </div>
 
-                    <div v-else class="test-grid">
-                        <div v-for="test in availableTests" :key="test.id" class="test-card">
-                            <div class="test-header">
-                                <span class="badge-subject">{{ test.subject }}</span>
-                                <span class="badge-grade">{{ test.grade === 'Mezun' ? 'Mezun' : test.grade + '. Sınıf' }}</span>
+                    <div v-else>
+                        <div class="test-list-header">
+                            <button class="btn-back" @click="selectedTestSubject = null">← Derslere Dön</button>
+                            <h3>{{ selectedTestSubject }} Testleri</h3>
+                        </div>
+
+                        <div v-if="testsForSelectedSubject.length === 0" class="empty-state">
+                            <span class="icon-empty">📂</span>
+                            <p>Bu dersten henüz test yüklenmemiş.</p>
+                        </div>
+
+                        <div v-else class="test-grid">
+                            <div v-for="test in testsForSelectedSubject" :key="test.id" class="test-card">
+                                <div class="test-header">
+                                    <span class="badge-subject">{{ test.subject }}</span>
+                                    <span class="badge-grade">{{ test.grade === 'Mezun' ? 'Mezun' : test.grade + '.Sınıf' }}</span>
+                                </div>
+                                <h3>{{ test.title }}</h3>
+                                <div class="test-meta">
+                                    <span>❓ {{ test.questionCount }} Soru</span>
+                                    <span>📅 {{ new Date(test.createdAt).toLocaleDateString('tr-TR') }}</span>
+                                </div>
+
+                                <div class="teacher-actions-mini">
+                                    <span class="t-name">👨‍🏫 {{ test.uploaderName || 'Öğretmen' }}</span>
+                                    <div class="actions">
+                                        <button @click.stop="addToFavoritesById(test.uploaderId)"
+                                            title="Favorilere Ekle" class="btn-icon-action">❤️</button>
+                                        <button @click.stop="bookLessonById(test.uploaderId)" title="Ders Talep Et"
+                                            class="btn-icon-action">📅</button>
+                                    </div>
+                                </div>
+
+                                <button class="btn-start-test" @click="openTestRunner(test)">Testi Başlat</button>
                             </div>
-                            <h3>{{ test.title }}</h3>
-                            <div class="test-meta">
-                                <span>👤 {{ test.uploaderName }}</span>
-                                <span>❓ {{ test.questionCount }} Soru</span>
+                        </div>
+                    </div>
+                </div>
+
+                <div v-if="activeTab === 'calendar'" class="animate-fade">
+                    <h2 class="section-title">Takvimim</h2>
+                    <div class="calendar-container">
+                        <div class="calendar-header-control">
+                            <button @click="changeMonth(-1)">❮</button>
+                            <h3>{{ currentMonthName }} {{ currentYear }}</h3>
+                            <button @click="changeMonth(1)">❯</button>
+                        </div>
+                        <div class="calendar-grid-header">
+                            <div v-for="day in ['Pzt', 'Sal', 'Çar', 'Per', 'Cum', 'Cmt', 'Paz']" :key="day">{{ day }}
                             </div>
-                            <button class="btn-start-test" @click="startTest(test)">Testi Başlat</button>
+                        </div>
+                        <div class="calendar-grid">
+                            <div v-for="blank in firstDayOffset" :key="'blank-' + blank" class="calendar-day empty"></div>
+                            <div v-for="date in daysInMonth" :key="date" class="calendar-day">
+                                <span class="day-number" :class="{ 'today': isToday(date) }">{{ date }}</span>
+                                <div class="day-events">
+                                    <div v-for="booking in getBookingsForDate(date)" :key="booking.id"
+                                        class="event-pill">
+                                        {{ booking.time }} - {{ booking.teacherName }}
+                                    </div>
+                                </div>
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -162,12 +290,17 @@
 
                     <div class="teachers-grid" v-if="filteredTeachers.length > 0">
                         <div v-for="teacher in filteredTeachers" :key="teacher.id" class="teacher-card">
-                            <div class="teacher-img">{{ teacher.avatar }}</div>
+                            <div class="teacher-img">
+                                <img :src="teacher.avatar?.uploadedImage || teacher.avatar?.selectedPreset || 'https://ui-avatars.com/api/?name=' + (teacher.displayName || 'T')"
+                                    style="width:100%; height:100%; border-radius:50%; object-fit:cover;" />
+                            </div>
                             <div class="teacher-info">
-                                <h3>{{ teacher.name }}</h3>
-                                <span class="badge">{{ teacher.subject }}</span>
-                                <p class="t-time">🕒 {{ teacher.time }}</p>
-                                <button class="btn-request">Ders Talep Et</button>
+                                <h3>{{ teacher.displayName || teacher.email || 'İsimsiz Öğretmen' }}</h3>
+                                <span class="badge">{{ teacher.branch || 'Branş Belirtilmedi' }}</span>
+                                <p class="t-time">🕒 Müsaitlik: {{ hasAvailability(teacher) ? 'Müsait' : 'Sorunuz' }}
+                                </p>
+                                <button class="btn-request" @click="openBookingModal(teacher)">Ders Talep Et</button>
+                                <button class="btn-message" @click="startChat(teacher)">💬 Mesaj At</button>
                             </div>
                         </div>
                     </div>
@@ -175,8 +308,6 @@
                     <div v-else class="no-results">
                         <div class="icon-warning">⚠️</div>
                         <p>Aradığınız kriterlere uygun öğretmen şu anda sistemde bulunamadı.</p>
-                        <small>Farklı bir ders veya saat seçmeyi deneyebilirsiniz.</small>
-                        <br>
                         <button @click="filters = { subject: '', time: '' }" class="btn-reset">Filtreleri
                             Temizle</button>
                     </div>
@@ -184,7 +315,20 @@
 
                 <div v-if="activeTab === 'favorites'" class="animate-fade">
                     <h2 class="section-title">Favori Öğretmenlerim</h2>
-                    <div v-if="favoriteTeachers.length > 0" class="teachers-grid"></div>
+                    <div v-if="myFavorites.length > 0" class="teachers-grid">
+                        <div v-for="teacher in myFavorites" :key="teacher.id" class="teacher-card">
+                            <div class="teacher-img">
+                                <img :src="teacher.avatar?.uploadedImage || teacher.avatar?.selectedPreset || 'https://ui-avatars.com/api/?name=' + (teacher.displayName || 'T')"
+                                    style="width:100%; height:100%; border-radius:50%; object-fit:cover;" />
+                            </div>
+                            <div class="teacher-info">
+                                <h3>{{ teacher.displayName || teacher.email }}</h3>
+                                <span class="badge">{{ teacher.branch }}</span>
+                                <button class="btn-request" @click="openBookingModal(teacher)">Ders Talep Et</button>
+                                <button class="btn-message" @click="startChat(teacher)">💬 Mesaj At</button>
+                            </div>
+                        </div>
+                    </div>
                     <div v-else class="empty-favorites">
                         <div class="empty-icon">⭐</div>
                         <p>Henüz favorilere eklediğiniz bir öğretmen yok.</p>
@@ -201,14 +345,47 @@
 
                 <div v-if="activeTab === 'messages'" class="animate-fade messages-container">
                     <div class="chat-sidebar">
-                        <div class="chat-header">Sohbetler</div>
-                        <div class="chat-list empty-chat-list">
-                            <small>Aktif sohbet yok</small>
+                        <div class="chat-header">Mesajlarım</div>
+                        <div class="chat-list">
+                            <div v-for="chat in myChats" :key="chat.id" class="chat-item"
+                                :class="{ active: activeChat?.id === chat.id }" @click="selectChat(chat)">
+                                <div class="chat-avatar">{{ chat.otherUserName?.charAt(0) || '?' }}</div>
+                                <div class="chat-info">
+                                    <h4>{{ chat.otherUserName || 'Kullanıcı' }}</h4>
+                                    <p>{{ chat.lastMessage || 'Mesaj yok' }}</p>
+                                </div>
+                            </div>
+                            <div v-if="myChats.length === 0" class="empty-chat-list">
+                                <small>Henüz mesajınız yok.</small>
+                            </div>
                         </div>
                     </div>
                     <div class="chat-window">
-                        <div class="empty-chat-state">
-                            <span class="icon-msg">💬</span>
+                        <div v-if="activeChat" class="chat-content">
+                            <div class="chat-top-bar">
+                                <h3>
+                                    {{ activeChat.otherUserName }}
+                                    <span v-if="activeChat.typing && activeChat.typing[activeChat.otherUserId]"
+                                        class="typing-indicator">yazıyor...</span>
+                                </h3>
+                            </div>
+                            <div class="messages-area" ref="messagesContainer">
+                                <div v-for="msg in activeMessages" :key="msg.id" class="message-bubble"
+                                    :class="{ 'my-message': msg.senderId === $auth.currentUser.uid }">
+                                    {{ msg.text }}
+                                    <span v-if="msg.senderId === $auth.currentUser.uid" class="read-status">
+                                        {{ isMessageRead(msg) ? '✓✓' : '✓' }}
+                                    </span>
+                                </div>
+                            </div>
+                            <div class="chat-input-area">
+                                <input v-model="newMessage" @keyup.enter="sendMessage" @input="handleTyping"
+                                    placeholder="Bir mesaj yazın..." />
+                                <button @click="sendMessage">Gönder</button>
+                            </div>
+                        </div>
+                        <div v-else class="empty-chat-state">
+                            <span class="icon-msg">📩</span>
                             <h3>Mesaj Bulunamadı</h3>
                             <p>Öğretmenlerinizle yapacağınız görüşmeler burada listelenir.</p>
                         </div>
@@ -221,51 +398,77 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted } from 'vue'
+import { ref, reactive, computed, onMounted, nextTick } from 'vue'
 import { useRouter } from 'vue-router'
 import { onAuthStateChanged, signOut, updateProfile } from 'firebase/auth'
-// GÜNCELLENEN IMPORT: collection ve getDocs eklendi
-import { getFirestore, doc, getDoc, updateDoc, collection, getDocs } from 'firebase/firestore'
+import { getFirestore, doc, getDoc, updateDoc, collection, getDocs, query, where, addDoc, onSnapshot, orderBy, serverTimestamp, deleteField } from 'firebase/firestore'
 
 const router = useRouter()
 const { $auth } = useNuxtApp()
-let db; 
+let db;
 
 // State
 const isLoading = ref(true)
-const isStudent = ref(false) // Rol Kontrolü
+const isStudent = ref(false)
 const activeTab = ref('stats')
 const userDisplayName = ref('')
 const userEmail = ref('')
-const userGrade = ref(null) 
+const userGrade = ref(null)
 const studentScore = ref(0)
 const completedLessons = ref(0)
-const favoriteTeachers = ref([])
-const availableTests = ref([]) // YENİ: Testleri tutacak dizi
+const completedTestCount = ref(0)
+const successRate = ref(0)
 
-// Filtreler
+const availableTests = ref([])
+const realTeachers = ref([])
+const myFavorites = ref([])
 const filters = ref({ subject: '', time: '' })
+const myBookings = ref([]) // Öğrencinin randevuları
 
-// Sınıf Listesi
+// Test Grouping State
+const selectedTestSubject = ref(null)
+
+// Booking State
+const isBookingModalOpen = ref(false)
+const selectedTeacherForBooking = ref(null)
+const bookingSlot = ref(null)
+const availableSlots = ref([]) // Gerçek verilerle dolacak
+
+// Test Runner State
+const isTakingTest = ref(false)
+const currentTest = ref(null)
+const userAnswers = ref([])
+const drawingTool = ref('pen')
+const drawCanvas = ref(null)
+const isDrawing = ref(false)
+let ctx = null
+
+// Calendar State
+const currentMonth = ref(new Date().getMonth())
+const currentYear = ref(new Date().getFullYear())
+
+// Chat State
+const myChats = ref([])
+const activeChat = ref(null)
+const activeMessages = ref([])
+const newMessage = ref('')
+let typingTimeout = null
+
 const availableGrades = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, "Mezun"]
 
 // DİNAMİK DERS LİSTESİ MANTIĞI
 const lessons = computed(() => {
     if (!userGrade.value) return ["Sınıf Bilgisi Yükleniyor..."]
-
     let g = userGrade.value
     if (g === 'Mezun') g = 12
     g = parseInt(g)
-
     const list = []
     list.push("Matematik")
-
     if (g >= 1 && g <= 8) list.push("Türkçe")
     if (g >= 3 && g <= 8) list.push("Fen Bilimleri")
     if (g >= 4 && g <= 8) list.push("Sosyal Bilgiler")
-
     if (g >= 9) {
-        list.push("Türk Dili ve Edebiyatı") 
+        list.push("Türk Dili ve Edebiyatı")
         list.push("Fizik")
         list.push("Kimya")
         list.push("Biyoloji")
@@ -273,66 +476,326 @@ const lessons = computed(() => {
         list.push("Coğrafya")
         list.push("Felsefe")
     }
-
     if (g >= 2) list.push("İngilizce")
     if (g >= 5) list.push("Almanca")
     if (g >= 4) list.push("Din Kültürü")
-
     return list
 })
 
-// YENİ: Testleri Veritabanından Çekme Fonksiyonu
+// FONKSİYONLAR
 const fetchTests = async () => {
     if (!db) db = getFirestore();
-    try {
-        const querySnapshot = await getDocs(collection(db, "tests"));
-        availableTests.value = querySnapshot.docs.map(doc => ({
-            id: doc.id,
-            ...doc.data()
-        }));
-    } catch (error) {
-        console.error("Testler çekilirken hata:", error);
-    }
+    const q = await getDocs(collection(db, "tests"));
+    availableTests.value = q.docs.map(doc => ({ id: doc.id, ...doc.data() }));
 };
 
-const startTest = (test) => {
-    alert(`"${test.title}" testi başlatılıyor... (Test çözme ekranı entegrasyonu yapılacaktır)`);
-    // Burada test çözme sayfasına yönlendirme yapabilirsin: router.push(`/test-coz/${test.id}`)
+const fetchTeachers = async () => {
+    if (!db) db = getFirestore();
+    try {
+        const q = query(collection(db, "users"), where("role", "==", "teacher"));
+        const snapshot = await getDocs(q);
+        realTeachers.value = snapshot.docs
+            .map(doc => ({ id: doc.id, ...doc.data() }))
+            .filter(t => !t.displayName || !t.displayName.toLowerCase().includes('piç'));
+    } catch (e) { console.error(e) }
 }
 
-// AVATAR VE PROFİL YÖNETİMİ
+const filteredTeachers = computed(() => {
+    return realTeachers.value.filter(t => {
+        const matchSubject = filters.value.subject === '' || t.branch === filters.value.subject
+        return matchSubject
+    })
+})
+
+const hasAvailability = (teacher) => {
+    return teacher.availability && Object.keys(teacher.availability).length > 0;
+}
+
+// Randevu İşlemleri
+const openBookingModal = (teacher) => {
+    selectedTeacherForBooking.value = teacher
+    bookingSlot.value = null
+
+    // Öğretmenin müsaitlik verisini işle
+    const slots = [];
+    if (teacher.availability) {
+        Object.keys(teacher.availability).forEach(key => {
+            // key formatı: "Pzt-10:00"
+            const [day, time] = key.split('-');
+            slots.push({ id: key, day, time });
+        });
+    }
+    availableSlots.value = slots;
+    isBookingModalOpen.value = true
+}
+
+const confirmBooking = async () => {
+    if (!db) db = getFirestore();
+    if (!selectedTeacherForBooking.value || !bookingSlot.value) return;
+
+    try {
+        // 1. Randevuyu bookings koleksiyonuna ekle
+        await addDoc(collection(db, "bookings"), {
+            teacherId: selectedTeacherForBooking.value.id,
+            teacherName: selectedTeacherForBooking.value.displayName || selectedTeacherForBooking.value.email,
+            studentId: $auth.currentUser.uid,
+            studentName: userDisplayName.value,
+            day: bookingSlot.value.day,
+            time: bookingSlot.value.time,
+            createdAt: serverTimestamp(),
+            status: 'confirmed'
+        });
+
+        // 2. Öğretmenin müsaitlik listesinden bu saati düş (Opsiyonel ama önerilir)
+        const teacherRef = doc(db, "users", selectedTeacherForBooking.value.id);
+        const slotKey = `${bookingSlot.value.day}-${bookingSlot.value.time}`;
+
+        // deleteField() kullanarak sadece o anahtarı siliyoruz
+        await updateDoc(teacherRef, {
+            [`availability.${slotKey}`]: deleteField()
+        });
+
+        alert(`Tebrikler! ${selectedTeacherForBooking.value.displayName} ile ${bookingSlot.value.day} saat ${bookingSlot.value.time} için dersiniz oluşturuldu.`);
+        isBookingModalOpen.value = false;
+
+        // Listeleri güncelle
+        fetchBookings();
+        fetchTeachers();
+
+    } catch (error) {
+        console.error("Randevu hatası:", error);
+        alert("Randevu oluşturulurken bir hata oluştu.");
+    }
+}
+
+const fetchBookings = async () => {
+    if (!db) db = getFirestore();
+    const q = query(collection(db, "bookings"), where("studentId", "==", $auth.currentUser.uid));
+    const snap = await getDocs(q);
+    myBookings.value = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+}
+
+// Takvim Yardımcıları
+const monthNames = ["Ocak", "Şubat", "Mart", "Nisan", "Mayıs", "Haziran", "Temmuz", "Ağustos", "Eylül", "Ekim", "Kasım", "Aralık"]
+const currentMonthName = computed(() => monthNames[currentMonth.value])
+const daysInMonth = computed(() => new Date(currentYear.value, currentMonth.value + 1, 0).getDate())
+const firstDayOffset = computed(() => {
+    let d = new Date(currentYear.value, currentMonth.value, 1).getDay()
+    return d === 0 ? 6 : d - 1 // Pzt=0 yapmak için
+})
+const changeMonth = (delta) => {
+    currentMonth.value += delta
+    if (currentMonth.value > 11) { currentMonth.value = 0; currentYear.value++ }
+    if (currentMonth.value < 0) { currentMonth.value = 11; currentYear.value-- }
+}
+const isToday = (date) => {
+    const today = new Date()
+    return date === today.getDate() && currentMonth.value === today.getMonth() && currentYear.value === today.getFullYear()
+}
+
+// Basitçe o gün için randevuları filtrele (Gün ismine göre - Örn: "Sal")
+const getBookingsForDate = (date) => {
+    // Gerçek tarihten gün ismini bul (Pzt, Sal...)
+    const d = new Date(currentYear.value, currentMonth.value, date);
+    const dayIndex = d.getDay(); // 0=Paz, 1=Pzt
+    const dayMap = ["Paz", "Pzt", "Sal", "Çar", "Per", "Cum", "Cmt"];
+    const dayName = dayMap[dayIndex];
+
+    // myBookings içinde 'day' alanı 'Pzt', 'Sal' gibi tutuluyor
+    return myBookings.value.filter(b => b.day === dayName);
+}
+
+
+// Mesajlaşma (Chat) Fonksiyonları
+const startChat = async (teacher) => {
+    if (!db) db = getFirestore();
+    const myUid = $auth.currentUser.uid;
+    const teacherUid = teacher.id;
+
+    // 1. Zaten bir sohbet var mı kontrol et
+    // (Firebase'de array-contains ile tek sorguda iki ID'yi kontrol etmek zor, client taraflı filtreliyoruz veya composite key kullanıyoruz.
+    // Basitlik için tüm chatlerimi çekip filter yapacağız - prod için composite key önerilir)
+    const q = query(collection(db, "chats"), where("participants", "array-contains", myUid));
+    const snap = await getDocs(q);
+
+    let existingChat = snap.docs.find(doc => {
+        const data = doc.data();
+        return data.participants.includes(teacherUid);
+    });
+
+    if (existingChat) {
+        // Var olan sohbeti aç
+        activeTab.value = 'messages';
+        const chatData = existingChat.data();
+        selectChat({
+            id: existingChat.id,
+            ...chatData,
+            otherUserName: teacher.displayName || teacher.email,
+            otherUserId: teacherUid
+        });
+    } else {
+        // Yeni sohbet oluştur
+        const newChatRef = await addDoc(collection(db, "chats"), {
+            participants: [myUid, teacherUid],
+            studentId: myUid,
+            teacherId: teacherUid,
+            studentName: userDisplayName.value,
+            teacherName: teacher.displayName || teacher.email,
+            createdAt: serverTimestamp(),
+            lastMessage: '',
+            typing: {}
+        });
+
+        activeTab.value = 'messages';
+        selectChat({
+            id: newChatRef.id,
+            participants: [myUid, teacherUid],
+            otherUserName: teacher.displayName || teacher.email,
+            otherUserId: teacherUid
+        });
+    }
+}
+
+const fetchChats = () => {
+    if (!db) db = getFirestore();
+    const q = query(collection(db, "chats"), where("participants", "array-contains", $auth.currentUser.uid));
+
+    onSnapshot(q, (snapshot) => {
+        myChats.value = snapshot.docs.map(doc => {
+            const data = doc.data();
+            const otherId = data.participants.find(p => p !== $auth.currentUser.uid);
+            // Karşı tarafın adını belirle
+            const otherName = otherId === data.teacherId ? data.teacherName : data.studentName;
+            return { id: doc.id, ...data, otherUserName: otherName, otherUserId: otherId };
+        });
+        if (activeChat.value) {
+            const updated = myChats.value.find(c => c.id === activeChat.value.id);
+            if (updated) activeChat.value = { ...activeChat.value, ...updated };
+        }
+    });
+};
+
+const selectChat = (chat) => {
+    activeChat.value = chat;
+    loadMessages(chat.id);
+    markAsRead(chat.id);
+};
+
+const loadMessages = (chatId) => {
+    if (!db) db = getFirestore();
+    const q = query(collection(db, "chats", chatId, "messages"), orderBy("createdAt", "asc"));
+
+    onSnapshot(q, (snapshot) => {
+        activeMessages.value = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+        setTimeout(() => {
+            const container = document.querySelector('.messages-area');
+            if (container) container.scrollTop = container.scrollHeight;
+        }, 100);
+    });
+};
+
+const sendMessage = async () => {
+    if (!newMessage.value.trim() || !activeChat.value) return;
+
+    const text = newMessage.value;
+    newMessage.value = '';
+
+    const chatRef = doc(db, "chats", activeChat.value.id);
+    await addDoc(collection(chatRef, "messages"), {
+        text,
+        senderId: $auth.currentUser.uid,
+        createdAt: serverTimestamp()
+    });
+
+    await updateDoc(chatRef, {
+        lastMessage: text,
+        updatedAt: serverTimestamp()
+    });
+
+    if (typingTimeout) clearTimeout(typingTimeout);
+    await updateDoc(chatRef, { [`typing.${$auth.currentUser.uid}`]: false });
+};
+
+const handleTyping = async () => {
+    if (!activeChat.value) return;
+    const chatRef = doc(db, "chats", activeChat.value.id);
+    await updateDoc(chatRef, { [`typing.${$auth.currentUser.uid}`]: true });
+
+    if (typingTimeout) clearTimeout(typingTimeout);
+    typingTimeout = setTimeout(async () => {
+        await updateDoc(chatRef, { [`typing.${$auth.currentUser.uid}`]: false });
+    }, 2000);
+};
+
+const markAsRead = async (chatId) => {
+    if (!chatId) return;
+    const chatRef = doc(db, "chats", chatId);
+    await updateDoc(chatRef, {
+        [`lastRead.${$auth.currentUser.uid}`]: serverTimestamp()
+    });
+};
+
+const isMessageRead = (msg) => {
+    if (!activeChat.value || !activeChat.value.lastRead || !msg.createdAt) return false;
+    const otherUserId = activeChat.value.otherUserId;
+    const readTime = activeChat.value.lastRead[otherUserId];
+    if (!readTime) return false;
+    return readTime.seconds >= msg.createdAt.seconds;
+};
+
+// Test Runner
+const selectSubject = (subject) => { selectedTestSubject.value = subject; }
+const getTestCountForSubject = (subject) => { return availableTests.value.filter(t => t.subject === subject).length; }
+const testsForSelectedSubject = computed(() => {
+    if (!selectedTestSubject.value) return [];
+    return availableTests.value
+        .filter(t => t.subject === selectedTestSubject.value)
+        .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+});
+const addToFavoritesById = (teacherId) => {
+    const teacher = findTeacherById(teacherId);
+    if (teacher && !myFavorites.value.find(f => f.id === teacher.id)) {
+        myFavorites.value.push(teacher);
+        alert(`${teacher.displayName || 'Öğretmen'} favorilere eklendi.`);
+    }
+}
+const findTeacherById = (id) => { return realTeachers.value.find(t => t.id === id); }
+const bookLessonById = (teacherId) => {
+    const teacher = findTeacherById(teacherId);
+    if (teacher) openBookingModal(teacher);
+}
+
+const openTestRunner = async (test) => {
+    currentTest.value = test
+    userAnswers.value = new Array(parseInt(test.questionCount)).fill(null)
+    isTakingTest.value = true
+    await nextTick()
+    const canvas = drawCanvas.value
+    canvas.width = canvas.parentElement.clientWidth
+    canvas.height = canvas.parentElement.clientHeight
+    ctx = canvas.getContext('2d')
+    ctx.lineCap = 'round'; ctx.lineJoin = 'round'; ctx.strokeStyle = '#0055ff'; ctx.lineWidth = 2;
+}
+const startDrawing = (e) => { isDrawing.value = true; ctx.beginPath(); ctx.moveTo(e.offsetX, e.offsetY); }
+const draw = (e) => { if (!isDrawing.value) return; ctx.lineTo(e.offsetX, e.offsetY); ctx.stroke(); }
+const stopDrawing = () => { isDrawing.value = false; ctx.closePath(); }
+const setTool = (t) => { drawingTool.value = t; ctx.globalCompositeOperation = t === 'eraser' ? 'destination-out' : 'source-over'; ctx.lineWidth = t === 'eraser' ? 20 : 2; }
+const clearCanvas = () => ctx.clearRect(0, 0, drawCanvas.value.width, drawCanvas.value.height)
+const confirmExitTest = () => {
+    if (confirm("Testten çıkmak istediğine emin misin? İlerlemen kaybolacak.")) { isTakingTest.value = false }
+}
+const finishTest = () => { alert("Test tamamlandı! Sonuçlar hesaplanıyor..."); isTakingTest.value = false; }
+
+// Profil
 const isProfileModalOpen = ref(false)
 const fileInput = ref(null)
-
-const presetAvatars = [
-    "https://api.dicebear.com/7.x/avataaars/svg?seed=Felix",
-    "https://api.dicebear.com/7.x/avataaars/svg?seed=Aneka",
-    "https://api.dicebear.com/7.x/bottts/svg?seed=Bubba",
-    "https://api.dicebear.com/7.x/micah/svg?seed=Callie",
-    "https://api.dicebear.com/7.x/notionists/svg?seed=Cookie"
-]
-
-const profileState = ref({
-    avatarType: 'initials',
-    selectedPreset: '',
-    uploadedImage: null
-})
-
-const tempProfile = ref({
-    name: '',
-    grade: null,
-    avatarType: 'initials',
-    selectedPreset: '',
-    uploadedImage: null
-})
+const profileState = ref({ avatarType: 'initials', selectedPreset: '', uploadedImage: null })
+const tempProfile = ref({ name: '', grade: null, avatarType: 'initials', selectedPreset: '', uploadedImage: null })
+const presetAvatars = ["https://api.dicebear.com/7.x/avataaars/svg?seed=Felix", "https://api.dicebear.com/7.x/avataaars/svg?seed=Aneka", "https://api.dicebear.com/7.x/bottts/svg?seed=Bubba", "https://api.dicebear.com/7.x/micah/svg?seed=Callie", "https://api.dicebear.com/7.x/notionists/svg?seed=Cookie"]
 
 const currentAvatarUrl = computed(() => {
-    if (profileState.value.avatarType === 'upload' && profileState.value.uploadedImage) {
-        return profileState.value.uploadedImage
-    }
-    if (profileState.value.avatarType === 'preset' && profileState.value.selectedPreset) {
-        return profileState.value.selectedPreset
-    }
+    if (profileState.value.avatarType === 'upload' && profileState.value.uploadedImage) return profileState.value.uploadedImage
+    if (profileState.value.avatarType === 'preset' && profileState.value.selectedPreset) return profileState.value.selectedPreset
     return `https://ui-avatars.com/api/?name=${userDisplayName.value || 'O'}&background=0055ff&color=fff`
 })
 
@@ -346,140 +809,37 @@ const openProfileModal = () => {
     }
     isProfileModalOpen.value = true
 }
-
-const triggerFileUpload = () => {
-    fileInput.value.click()
-}
-
+const triggerFileUpload = () => fileInput.value.click()
 const handleFileUpload = (event) => {
     const file = event.target.files[0]
     if (file) {
         const reader = new FileReader()
-        reader.onload = (e) => {
-            tempProfile.value.uploadedImage = e.target.result
-            tempProfile.value.avatarType = 'upload'
-        }
+        reader.onload = (e) => { tempProfile.value.uploadedImage = e.target.result; tempProfile.value.avatarType = 'upload' }
         reader.readAsDataURL(file)
     }
 }
-
-const selectPresetAvatar = (url) => {
-    tempProfile.value.selectedPreset = url
-    tempProfile.value.avatarType = 'preset'
-}
+const selectPresetAvatar = (url) => { tempProfile.value.selectedPreset = url; tempProfile.value.avatarType = 'preset' }
 
 const saveProfile = async () => {
     if (!db) db = getFirestore();
-
     userDisplayName.value = tempProfile.value.name
     userGrade.value = tempProfile.value.grade
-    
-    profileState.value = {
-        avatarType: tempProfile.value.avatarType,
-        selectedPreset: tempProfile.value.selectedPreset,
-        uploadedImage: tempProfile.value.uploadedImage
-    }
-
+    profileState.value = { avatarType: tempProfile.value.avatarType, selectedPreset: tempProfile.value.selectedPreset, uploadedImage: tempProfile.value.uploadedImage }
     if ($auth.currentUser) {
         try {
-            await updateProfile($auth.currentUser, {
-                displayName: tempProfile.value.name
-            })
-
+            await updateProfile($auth.currentUser, { displayName: tempProfile.value.name })
             const userRef = doc(db, "users", $auth.currentUser.uid);
             await updateDoc(userRef, {
                 displayName: tempProfile.value.name,
                 grade: tempProfile.value.grade,
-                avatar: {
-                    type: tempProfile.value.avatarType,
-                    preset: tempProfile.value.selectedPreset,
-                    uploadedImage: tempProfile.value.uploadedImage 
-                }
+                avatar: { type: tempProfile.value.avatarType, preset: tempProfile.value.selectedPreset, uploadedImage: tempProfile.value.uploadedImage }
             })
-            
-        } catch (e) {
-            console.error("Profil güncellenemedi", e)
-            alert("Kaydedilirken bir hata oluştu: " + e.message)
-        }
+        } catch (e) { console.error("Profil güncellenemedi", e) }
     }
-
     isProfileModalOpen.value = false
 }
 
-const mockTeachers = ref([])
-const filteredTeachers = computed(() => {
-    return mockTeachers.value.filter(t => {
-        const matchSubject = filters.value.subject === '' || t.subject === filters.value.subject
-        const matchTime = filters.value.time === '' || t.time === filters.value.time
-        return matchSubject && matchTime
-    })
-})
-
-onMounted(() => {
-    db = getFirestore();
-
-    onAuthStateChanged($auth, async (user) => {
-        if (user) {
-            userEmail.value = user.email
-            userDisplayName.value = user.displayName || '' 
-
-            try {
-                const docRef = doc(db, "users", user.uid);
-                const docSnap = await getDoc(docRef);
-
-                if (docSnap.exists()) {
-                    const data = docSnap.data();
-
-                    // ROL KONTROLÜ
-                    if (data.role !== 'student') {
-                        // Eğer öğrenci değilse, öğretmen paneline yolla
-                        if (data.role === 'teacher') {
-                             router.push('/dashboard-teacher');
-                        } else {
-                            router.push('/');
-                        }
-                        return;
-                    }
-                    
-                    isStudent.value = true;
-                    // Rol bilgisini localStorage'a kaydet (Navbar için)
-                    localStorage.setItem('userRole', 'student');
-                    
-                    if (data.grade) userGrade.value = data.grade;
-                    if (data.displayName) userDisplayName.value = data.displayName;
-
-                    if (data.avatar) {
-                        profileState.value = {
-                            avatarType: data.avatar.type || 'initials',
-                            selectedPreset: data.avatar.preset || '',
-                            uploadedImage: data.avatar.uploadedImage || null
-                        }
-                    }
-
-                    // YENİ: Öğrenci giriş yaptıktan sonra testleri çek
-                    await fetchTests();
-                }
-            } catch (error) {
-                console.error("Veri çekme hatası:", error);
-            } finally {
-                isLoading.value = false
-            }
-
-        } else {
-            router.push('/kayit-giris')
-        }
-    })
-})
-
-const handleLogout = async () => {
-    try {
-        localStorage.removeItem('userRole'); // Çıkışta temizle
-        await signOut($auth)
-        router.push('/')
-    } catch (error) {
-        console.error("Çıkış hatası:", error)
-    }
-}
+const handleLogout = async () => { await signOut($auth); router.push('/'); }
 
 const studentRank = computed(() => {
     const s = studentScore.value
@@ -489,6 +849,38 @@ const studentRank = computed(() => {
     if (s < 2000) return { title: 'Usta', class: 'rank-4' }
     if (s < 5000) return { title: 'Doçent', class: 'rank-5' }
     return { title: 'Profesör', class: 'rank-6' }
+})
+
+// Auth & Init
+onMounted(() => {
+    db = getFirestore();
+    onAuthStateChanged($auth, async (user) => {
+        if (user) {
+            userEmail.value = user.email
+            userDisplayName.value = user.displayName || ''
+            const docRef = doc(db, "users", user.uid);
+            const docSnap = await getDoc(docRef);
+            if (docSnap.exists()) {
+                const data = docSnap.data();
+                if (data.role !== 'student') { router.push(data.role === 'teacher' ? '/dashboard-teacher' : '/'); return; }
+                isStudent.value = true;
+                if (data.grade) userGrade.value = data.grade;
+                if (data.displayName) userDisplayName.value = data.displayName;
+                studentScore.value = data.score || 0;
+                completedTestCount.value = data.completedTestCount || 0;
+                completedLessons.value = data.completedTestCount || 0;
+                if (data.avatar) profileState.value = { avatarType: data.avatar.type || 'initials', selectedPreset: data.avatar.preset || '', uploadedImage: data.avatar.uploadedImage || null }
+
+                try {
+                    await fetchTests();
+                    await fetchTeachers();
+                    await fetchBookings();
+                    fetchChats();
+                } catch (e) { console.error("Veri yükleme hatası:", e); }
+            }
+            isLoading.value = false;
+        } else { router.push('/'); }
+    })
 })
 </script>
 
@@ -652,6 +1044,7 @@ const studentRank = computed(() => {
     color: #666;
     word-break: break-all;
 }
+
 .user-grade-info {
     color: #0055ff;
     font-weight: bold;
@@ -702,7 +1095,6 @@ const studentRank = computed(() => {
     background: #2a1a1a;
 }
 
-/* HEADER */
 .content-header {
     display: flex;
     justify-content: space-between;
@@ -744,7 +1136,7 @@ const studentRank = computed(() => {
     background: #000;
     padding: 15px 25px;
     border-radius: 12px;
-    border: 1px solid #333;
+    border: 1px solid #222;
 }
 
 .q-val {
@@ -765,7 +1157,6 @@ const studentRank = computed(() => {
     font-family: 'serif';
 }
 
-/* YENİ TEST KARTLARI STİLİ */
 .test-grid {
     display: grid;
     grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
@@ -850,13 +1241,6 @@ const studentRank = computed(() => {
     margin-bottom: 15px;
 }
 
-/* ESKİ DERSLER IZGARASI (Hâlâ filtrelerde kullanılabilir) */
-.lessons-grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
-    gap: 20px;
-}
-
 .filter-bar {
     display: flex;
     gap: 15px;
@@ -888,13 +1272,15 @@ const studentRank = computed(() => {
     display: flex;
     align-items: center;
     gap: 15px;
+    flex-direction: column;
+    text-align: center;
 }
 
 .teacher-img {
     font-size: 2.5rem;
     background: #222;
-    width: 60px;
-    height: 60px;
+    width: 80px;
+    height: 80px;
     display: flex;
     align-items: center;
     justify-content: center;
@@ -902,7 +1288,7 @@ const studentRank = computed(() => {
 }
 
 .teacher-info h3 {
-    margin: 0 0 5px 0;
+    margin: 10px 0 5px 0;
     font-size: 1.1rem;
 }
 
@@ -917,11 +1303,10 @@ const studentRank = computed(() => {
 .t-time {
     color: #888;
     font-size: 0.85rem;
-    margin-top: 5px;
+    margin: 10px 0;
 }
 
 .btn-request {
-    margin-top: 10px;
     background: transparent;
     border: 1px solid #0055ff;
     color: #0055ff;
@@ -930,10 +1315,29 @@ const studentRank = computed(() => {
     cursor: pointer;
     font-size: 0.85rem;
     transition: 0.3s;
+    width: 100%;
+    margin-bottom: 5px;
 }
 
 .btn-request:hover {
     background: #0055ff;
+    color: white;
+}
+
+.btn-message {
+    background: #222;
+    border: 1px solid #444;
+    color: #ccc;
+    padding: 5px 10px;
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 0.85rem;
+    transition: 0.3s;
+    width: 100%;
+}
+
+.btn-message:hover {
+    background: #333;
     color: white;
 }
 
@@ -954,7 +1358,6 @@ const studentRank = computed(() => {
     outline: none;
 }
 
-/* BOŞ DURUM VE FAVORİLER */
 .no-results,
 .empty-favorites {
     text-align: center;
@@ -1160,7 +1563,7 @@ const studentRank = computed(() => {
     cursor: pointer;
 }
 
-/* MESAJLAŞMA ARAYÜZÜ (CHAT) */
+/* MESAJLAŞMA */
 .messages-container {
     display: flex;
     height: 600px;
@@ -1218,6 +1621,483 @@ const studentRank = computed(() => {
     opacity: 0.5;
 }
 
+/* CHAT ITEM & BUBBLES */
+.chat-item {
+    display: flex;
+    align-items: center;
+    padding: 15px;
+    border-bottom: 1px solid #222;
+    cursor: pointer;
+    transition: 0.2s;
+}
+
+.chat-item:hover,
+.chat-item.active {
+    background: #1f1f1f;
+}
+
+.chat-avatar {
+    width: 40px;
+    height: 40px;
+    background: #333;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin-right: 10px;
+    font-weight: bold;
+}
+
+.chat-content {
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+    width: 100%;
+}
+
+.chat-top-bar {
+    padding: 15px;
+    border-bottom: 1px solid #222;
+    background: #111;
+}
+
+.messages-area {
+    flex: 1;
+    padding: 20px;
+    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.message-bubble {
+    max-width: 70%;
+    padding: 10px 15px;
+    border-radius: 12px;
+    background: #222;
+    color: #ddd;
+    align-self: flex-start;
+    position: relative;
+}
+
+.message-bubble.my-message {
+    background: #0055ff;
+    color: white;
+    align-self: flex-end;
+}
+
+.chat-input-area {
+    padding: 15px;
+    border-top: 1px solid #222;
+    display: flex;
+    gap: 10px;
+}
+
+.chat-input-area input {
+    flex: 1;
+    background: #111;
+    border: 1px solid #333;
+    padding: 10px;
+    border-radius: 20px;
+    color: white;
+}
+
+.chat-input-area button {
+    background: #0055ff;
+    color: white;
+    border: none;
+    padding: 0 20px;
+    border-radius: 20px;
+    cursor: pointer;
+}
+
+.typing-indicator {
+    font-size: 0.8rem;
+    color: #0055ff;
+    margin-left: 10px;
+    font-weight: normal;
+    animation: pulse 1.5s infinite;
+}
+
+.read-status {
+    font-size: 0.7rem;
+    margin-left: 5px;
+    color: #88ffaa;
+}
+
+/* BOOKING MODAL */
+.highlight-text {
+    color: #0055ff;
+    font-weight: bold;
+}
+
+.scheduler-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 10px;
+    margin: 20px 0;
+}
+
+.no-slots {
+    grid-column: span 3;
+    text-align: center;
+    color: #777;
+    padding: 20px;
+}
+
+.time-slot-card {
+    background: #111;
+    border: 1px solid #333;
+    padding: 15px;
+    text-align: center;
+    border-radius: 8px;
+    cursor: pointer;
+}
+
+.time-slot-card:hover {
+    border-color: #555;
+}
+
+.time-slot-card.selected {
+    background: #0055ff;
+    border-color: #0055ff;
+    color: white;
+}
+
+.btn-save:disabled {
+    background: #333;
+    cursor: not-allowed;
+}
+
+/* Test Runner Overlay */
+.test-runner-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100vw;
+    height: 100vh;
+    background: #000;
+    z-index: 100000;
+    display: flex;
+    flex-direction: column;
+}
+
+.test-runner-header {
+    height: 60px;
+    background: #111;
+    border-bottom: 1px solid #333;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 0 20px;
+}
+
+.test-runner-body {
+    flex: 1;
+    display: flex;
+    overflow: hidden;
+}
+
+.pdf-container {
+    flex: 3;
+    position: relative;
+    background: #222;
+}
+
+.pdf-frame {
+    width: 100%;
+    height: 100%;
+    border: none;
+}
+
+.drawing-canvas {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    z-index: 10;
+    cursor: crosshair;
+}
+
+.optical-form {
+    flex: 1;
+    min-width: 320px;
+    background: #0f0f0f;
+    border-left: 1px solid #333;
+    display: flex;
+    flex-direction: column;
+    padding: 20px;
+}
+
+.questions-list {
+    flex: 1;
+    overflow-y: auto;
+    margin: 20px 0;
+}
+
+.opt-row {
+    display: flex;
+    align-items: center;
+    margin-bottom: 12px;
+}
+
+.q-no {
+    width: 30px;
+    color: #888;
+    font-size: 0.9rem;
+}
+
+.opt-options button {
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    background: #1a1a1a;
+    border: 1px solid #333;
+    color: #aaa;
+    margin-right: 6px;
+    cursor: pointer;
+    transition: 0.2s;
+}
+
+.opt-options button:hover {
+    border-color: #0055ff;
+}
+
+.opt-options button.selected {
+    background: #0055ff;
+    color: white;
+    border-color: #0055ff;
+}
+
+.btn-finish-test {
+    background: #10b981;
+    color: white;
+    border: none;
+    padding: 15px;
+    border-radius: 8px;
+    font-weight: bold;
+    cursor: pointer;
+    width: 100%;
+}
+
+.tr-tools button {
+    background: #222;
+    border: 1px solid #444;
+    color: #ccc;
+    width: 40px;
+    height: 40px;
+    border-radius: 8px;
+    margin-left: 8px;
+    cursor: pointer;
+}
+
+.tr-tools button.active {
+    background: #0055ff;
+    color: white;
+    border-color: #0055ff;
+}
+
+.btn-close-test {
+    width: auto !important;
+    padding: 0 20px;
+    background: #dc2626 !important;
+    border-color: #dc2626 !important;
+    color: white;
+}
+
+/* SUBJECTS & TEST LIST */
+.subjects-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+    gap: 20px;
+}
+
+.subject-card {
+    background: #161616;
+    border: 1px solid #333;
+    border-radius: 12px;
+    padding: 30px 20px;
+    text-align: center;
+    cursor: pointer;
+    transition: 0.3s;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+}
+
+.subject-card:hover {
+    border-color: #0055ff;
+    transform: translateY(-5px);
+    background: #1a1a1a;
+}
+
+.subject-icon {
+    font-size: 3rem;
+    margin-bottom: 15px;
+}
+
+.subject-card h3 {
+    margin: 0 0 10px 0;
+    font-size: 1.2rem;
+    color: white;
+}
+
+.test-count-badge {
+    background: #222;
+    color: #888;
+    padding: 4px 10px;
+    border-radius: 20px;
+    font-size: 0.8rem;
+}
+
+.test-list-header {
+    display: flex;
+    align-items: center;
+    gap: 20px;
+    margin-bottom: 30px;
+}
+
+.btn-back {
+    background: transparent;
+    border: 1px solid #333;
+    color: #ccc;
+    padding: 8px 16px;
+    border-radius: 8px;
+    cursor: pointer;
+    transition: 0.2s;
+}
+
+.btn-back:hover {
+    border-color: white;
+    color: white;
+}
+
+.teacher-actions-mini {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 15px;
+    padding-top: 10px;
+    border-top: 1px solid #222;
+}
+
+.t-name {
+    font-size: 0.85rem;
+    color: #aaa;
+}
+
+.actions {
+    display: flex;
+    gap: 5px;
+}
+
+.btn-icon-action {
+    background: #222;
+    border: 1px solid #333;
+    color: #ccc;
+    width: 32px;
+    height: 32px;
+    border-radius: 6px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: 0.2s;
+}
+
+.btn-icon-action:hover {
+    background: #0055ff;
+    border-color: #0055ff;
+    color: white;
+}
+
+/* CALENDAR STYLES */
+.calendar-container {
+    background: #161616;
+    padding: 20px;
+    border-radius: 12px;
+    border: 1px solid #333;
+}
+
+.calendar-header-control {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 20px;
+}
+
+.calendar-header-control button {
+    background: transparent;
+    border: none;
+    color: white;
+    font-size: 1.5rem;
+    cursor: pointer;
+}
+
+.calendar-header-control h3 {
+    margin: 0;
+}
+
+.calendar-grid-header {
+    display: grid;
+    grid-template-columns: repeat(7, 1fr);
+    text-align: center;
+    font-weight: bold;
+    margin-bottom: 10px;
+    color: #888;
+}
+
+.calendar-grid {
+    display: grid;
+    grid-template-columns: repeat(7, 1fr);
+    gap: 5px;
+}
+
+.calendar-day {
+    min-height: 100px;
+    background: #111;
+    border: 1px solid #222;
+    padding: 5px;
+    font-size: 0.9rem;
+    position: relative;
+}
+
+.calendar-day.empty {
+    background: transparent;
+    border: none;
+}
+
+.day-number {
+    display: block;
+    text-align: right;
+    margin-bottom: 5px;
+    color: #666;
+}
+
+.day-number.today {
+    color: #0055ff;
+    font-weight: bold;
+}
+
+.day-events {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+}
+
+.event-pill {
+    background: #0055ff;
+    color: white;
+    font-size: 0.7rem;
+    padding: 2px 4px;
+    border-radius: 4px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+/* RESPONSIVE */
 @media (max-width: 1024px) {
     .dashboard-container {
         padding-top: 80px;
