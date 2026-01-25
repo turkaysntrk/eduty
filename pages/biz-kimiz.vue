@@ -35,7 +35,7 @@
             <p>
               Günde 3 test hakkın var. Soruları çöz, başarı gösterdikçe <span class="highlight">puan kazan</span>. 
               Biriktirdiğin bu puanlarla dilediğin öğretmenden <span class="highlight">özel ders</span> al veya 
-              ihtiyacın olan <span class="highlight">kaynak kitaplara</span> ücretsiz eriş.
+              ihtiyacın olan <span class="highlight">testlere</span> ücretsiz eriş.
             </p>
           </div>
 
@@ -73,12 +73,43 @@
 </template>
 
 <script setup>
-import { onMounted } from 'vue'
+import { onMounted, onUnmounted } from 'vue'
 
 onMounted(() => {
   window.scrollTo(0, 0)
+  
+  // Footer'ı bul ve görünürlük/ışık efekti için class ekle
+  const footer = document.querySelector('footer') || document.querySelector('.footer')
+  if (footer) {
+    footer.classList.add('biz-kimiz-footer-glow')
+  }
+})
+
+onUnmounted(() => {
+  // Sayfadan çıkarken footer eski haline dönsün
+  const footer = document.querySelector('footer') || document.querySelector('.footer')
+  if (footer) {
+    footer.classList.remove('biz-kimiz-footer-glow')
+  }
 })
 </script>
+
+<style>
+.biz-kimiz-footer-glow {
+  position: relative !important;
+  z-index: 10 !important; /* Arka planın üstüne çıkmasını sağlar */
+  /* Arkadan vuran beyaz ışık efekti */
+  background: radial-gradient(circle at center top, rgba(255, 255, 255, 0.15) 0%, rgba(10, 10, 10, 0.95) 70%) !important;
+  box-shadow: 0 -10px 40px rgba(255, 255, 255, 0.1) !important;
+  border-top: 1px solid rgba(255, 255, 255, 0.1);
+  transition: all 0.5s ease;
+}
+
+/* Footer içindeki yazıların beyaz ışık üstünde okunması için gölge */
+.biz-kimiz-footer-glow * {
+  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.9) !important;
+}
+</style>
 
 <style scoped>
 /* --- ARKA PLAN AYARLARI --- */
@@ -100,7 +131,7 @@ onMounted(() => {
   left: 0;
   width: 100%;
   height: 100%;
-  /* Üstten alta doğru koyulaşan gradient. Üstte %70 koyuluk, altta %95 koyuluk */
+  /* Üstten alta doğru koyulaşan gradient */
   background: linear-gradient(to bottom, rgba(5, 5, 5, 0.75), rgba(0, 0, 0, 0.98));
   z-index: 1;
 }
@@ -112,7 +143,6 @@ onMounted(() => {
 
 /* --- GENEL SAYFA AYARLARI --- */
 .about-page {
-  /* background-color kaldırıldı çünkü görsel kullanıyoruz */
   min-height: 100vh;
   padding-top: 140px;
   padding-bottom: 0;
@@ -163,7 +193,7 @@ onMounted(() => {
   line-height: 1.8;
   color: #dddddd;
   font-size: 1.1rem;
-  text-shadow: 0 1px 2px rgba(0,0,0,0.8); /* Okunabilirlik için gölge */
+  text-shadow: 0 1px 2px rgba(0,0,0,0.8);
 }
 
 .intro-text {
@@ -205,7 +235,7 @@ onMounted(() => {
 }
 
 .info-card {
-  background: rgba(17, 17, 17, 0.8); /* Yarı saydam arka plan */
+  background: rgba(17, 17, 17, 0.8);
   backdrop-filter: blur(5px);
   border: 1px solid #333;
   padding: 35px 30px;
@@ -244,7 +274,6 @@ onMounted(() => {
 .closing-section {
   position: relative;
   height: 400px;
-  /* Burası senin belirttiğin gibi dokunulmadı, kendi görselini kullanıyor */
   background-image: url('/img/ana_sayfa_fotoğrafı.png');
   background-size: cover;
   background-position: center;

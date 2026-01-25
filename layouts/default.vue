@@ -23,7 +23,14 @@
           <NuxtLink to="/iletisim" @click="closeMenu">İletişim</NuxtLink>
 
           <div class="nav-actions">
-            <NuxtLink to="/destek_ol" class="apply-btn support-btn" @click="closeMenu">Destek Ol</NuxtLink>
+            <NuxtLink 
+              v-if="userRole !== 'donor'" 
+              to="/destek_ol" 
+              class="apply-btn support-btn" 
+              @click="closeMenu"
+            >
+              Destek Ol
+            </NuxtLink>
 
             <template v-if="!user">
               <NuxtLink to="/kayit-giris" class="apply-btn" @click="closeMenu">Kayıt / Giriş</NuxtLink>
@@ -31,7 +38,7 @@
 
             <div v-else class="user-dropdown-wrapper">
               <button @click="toggleDropdown" class="user-account-btn">
-                Hesap, {{ user.displayName?.split(' ')[0] || (userRole === 'teacher' ? 'Öğretmen' : 'Öğrenci') }} ▼
+                Hesap, {{ user.customName || user.displayName?.split(' ')[0] || formatRoleName(userRole) }} ▼
               </button>
 
               <div v-if="isDropdownOpen" class="dropdown-menu">
@@ -39,6 +46,7 @@
                 <button @click="goToDashboard" class="dropdown-item">
                   <span v-if="userRole === 'teacher'">🎓 Öğretmen Paneli</span>
                   <span v-else-if="userRole === 'student'">📊 Çalışma Ortamı</span>
+                  <span v-else-if="userRole === 'donor'">❤️ Bağışçı Paneli</span>
                   <span v-else>📊 Panele Git</span>
                 </button>
 
@@ -110,9 +118,20 @@ const toggleDropdown = () => {
   isDropdownOpen.value = !isDropdownOpen.value
 }
 
+// Rol isimlendirme yardımcısı
+const formatRoleName = (role) => {
+  if (role === 'teacher') return 'Öğretmen';
+  if (role === 'student') return 'Öğrenci';
+  if (role === 'donor') return 'Bağışçı';
+  return 'Hesap';
+}
+
 const goToDashboard = () => {
   if (userRole.value === 'teacher') {
     router.push('/dashboard-teacher')
+  } else if (userRole.value === 'donor') {
+    // Bağışçı yönlendirmesi
+    router.push('/dashboard-bagisci')
   } else {
     router.push('/dashboard')
   }
@@ -125,6 +144,8 @@ const handleLogout = async () => {
     localStorage.removeItem('userRole');
     await signOut($auth);
     isDropdownOpen.value = false
+    user.value = null; // User'ı sıfırla
+    userRole.value = null; // Rolü sıfırla
     closeMenu();
     router.push('/');
   } catch (error) {
@@ -136,32 +157,50 @@ watch(() => route.path, () => {
   closeMenu()
 })
 
-// GÜNCELLENEN onMounted: Rol bilgisini garantileme
 onMounted(() => {
   window.addEventListener('scroll', handleScroll);
 
   onAuthStateChanged($auth, async (currentUser) => {
     user.value = currentUser;
     if (currentUser) {
-      // 1. Önce localStorage'a bak
-      const savedRole = localStorage.getItem('userRole');
       
-      if (savedRole) {
-        userRole.value = savedRole;
-      } else {
-        // 2. LocalStorage'da yoksa Firestore'dan çek ve kaydet
-        try {
-          const { getFirestore, doc, getDoc } = await import('firebase/firestore');
-          const db = getFirestore();
-          const userDoc = await getDoc(doc(db, "users", currentUser.uid));
-          
-          if (userDoc.exists()) {
-            userRole.value = userDoc.data().role;
-            localStorage.setItem('userRole', userRole.value);
-          }
-        } catch (error) {
-          console.error("Rol bilgisi çekilemedi:", error);
+      // Firestore import (Code splitting için dynamic import korundu)
+      try {
+        const { getFirestore, doc, getDoc } = await import('firebase/firestore');
+        const db = getFirestore();
+        
+        // Önce localStorage'ı kontrol et (Performans için)
+        const savedRole = localStorage.getItem('userRole');
+        
+        if (savedRole) {
+            userRole.value = savedRole;
+            // Eğer rol bağışçı ise, isim bilgisini çekmek için yine de DB'ye bakmamız gerekebilir
+            // çünkü localStorage'da sadece rol var, isim olmayabilir.
+            if (savedRole === 'donor' && !currentUser.displayName) {
+                const userDoc = await getDoc(doc(db, "users", currentUser.uid));
+                if (userDoc.exists()) {
+                    const data = userDoc.data();
+                    // User objesine geçici bir alan ekliyoruz
+                    user.value.customName = data.firstName + ' ' + data.lastName;
+                }
+            }
+        } else {
+            // LocalStorage boşsa DB'den çek
+            const userDoc = await getDoc(doc(db, "users", currentUser.uid));
+            
+            if (userDoc.exists()) {
+              const data = userDoc.data();
+              userRole.value = data.role;
+              localStorage.setItem('userRole', userRole.value);
+
+              // Eğer bağışçı ise ismini ayarla
+              if (data.role === 'donor') {
+                  user.value.customName = data.firstName + ' ' + data.lastName;
+              }
+            }
         }
+      } catch (error) {
+        console.error("Kullanıcı verisi çekilemedi:", error);
       }
     } else {
       userRole.value = null;

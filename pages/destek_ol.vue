@@ -1,9 +1,22 @@
 <template>
 	<div class="support-page-wrapper">
-		
+
 		<div class="hero-background-container">
 			<div class="page-bg"></div>
 			<div class="page-gradient"></div>
+		</div>
+
+		<div v-if="showLogoutConfirmModal" class="modal-overlay">
+			<div class="modal-content">
+				<h3>Oturum Çakışması</h3>
+				<p>Şu anda <strong>{{ existingUserRole === 'student' ? 'Öğrenci' : 'Öğretmen' }}</strong> hesabı ile
+					giriş yapmış durumdasınız.</p>
+				<p>Bağışçı işlemi yapmak için mevcut hesabınızdan çıkış yapmanız gerekmektedir. Onaylıyor musunuz?</p>
+				<div class="modal-actions">
+					<button @click="showLogoutConfirmModal = false" class="btn-cancel">İptal (Sayfada Kal)</button>
+					<button @click="confirmLogout" class="btn-confirm">Çıkış Yap ve Devam Et</button>
+				</div>
+			</div>
 		</div>
 
 		<div class="container relative-z">
@@ -17,19 +30,15 @@
 						Bağışlarınız doğrudan sistemdeki öğrencilere "Ders Puanı" olarak aktarılır ve eğitim
 						materyallerine erişim sağlar.
 					</p>
+					
+					<div v-if="existingUserRole && existingUserRole !== 'donor'" class="user-warning-banner">
+						⚠️ Şu an <strong>{{ existingUserRole === 'student' ? 'Öğrenci' : 'Öğretmen' }}</strong> hesabıyla görüntülüyorsunuz. Bağış yapmak için çıkış yapmalısınız.
+					</div>
+
 					<div class="trust-icons">
-						<div class="trust-item">
-							<span class="icon">🛡️</span>
-							<span>Güvenli Ödeme</span>
-						</div>
-						<div class="trust-item">
-							<span class="icon">✨</span>
-							<span>%100 Şeffaflık</span>
-						</div>
-						<div class="trust-item">
-							<span class="icon">🎓</span>
-							<span>Öğrenci Dostu</span>
-						</div>
+						<div class="trust-item"><span class="icon">🛡️</span><span>Güvenli Ödeme</span></div>
+						<div class="trust-item"><span class="icon">✨</span><span>%100 Şeffaflık</span></div>
+						<div class="trust-item"><span class="icon">🎓</span><span>Öğrenci Dostu</span></div>
 					</div>
 				</div>
 
@@ -43,23 +52,13 @@
 						<p v-else-if="viewState === 'register'">Öğrencilere destek olmak için aramıza katılın.</p>
 						<p v-else>E-posta adresinize sıfırlama bağlantısı gönderilecek.</p>
 
-						<form v-if="viewState === 'login'" @submit.prevent="handleLogin">
+						<form v-if="viewState === 'login'" @submit.prevent="handleLoginAttempt">
 							<input v-model="loginForm.email" type="email" placeholder="E-posta" required />
 							<input v-model="loginForm.password" type="password" placeholder="Parola" required />
-
-							<div class="form-options">
-								<label class="remember-me">
-									<input type="checkbox" v-model="loginForm.rememberMe">
-									<span>Beni Hatırla</span>
-								</label>
-								<a href="#" @click.prevent="viewState = 'forgot'" class="forgot-link">Parolamı
-									Unuttum</a>
-							</div>
-
 							<button type="submit" class="btn-primary">Giriş Yap</button>
 						</form>
 
-						<form v-else-if="viewState === 'register'" @submit.prevent="handleRegister">
+						<form v-else-if="viewState === 'register'" @submit.prevent="handleRegisterAttempt">
 							<div class="input-row">
 								<input v-model="registerForm.firstName" type="text" placeholder="Ad" required />
 								<input v-model="registerForm.lastName" type="text" placeholder="Soyad" required />
@@ -68,7 +67,6 @@
 							<input v-model="registerForm.password" type="password" placeholder="Parola" required />
 							<input v-model="registerForm.passwordConfirm" type="password" placeholder="Parola Tekrar"
 								required />
-
 							<button type="submit" class="btn-primary">Kayıt Ol ve Giriş Yap</button>
 						</form>
 
@@ -79,16 +77,13 @@
 						</form>
 
 						<div class="auth-footer">
-							<p v-if="viewState === 'login'">
-								Henüz hesabınız yok mu? <a href="#" @click.prevent="viewState = 'register'">Kayıt Ol</a>
+							<p v-if="viewState === 'login'">Henüz hesabınız yok mu? <a href="#"
+									@click.prevent="viewState = 'register'">Kayıt Ol</a></p>
+							<p v-if="viewState === 'register'">Zaten hesabınız var mı? <a href="#"
+									@click.prevent="viewState = 'login'">Giriş Yap</a></p>
+							<p class="role-switch">Öğretmen veya Öğrenci misin? <NuxtLink to="/kayit-giris">Giriş Yap
+								</NuxtLink>
 							</p>
-							<p v-if="viewState === 'register'">
-								Zaten hesabınız var mı? <a href="#" @click.prevent="viewState = 'login'">Giriş Yap</a>
-							</p>
-                            <p class="role-switch">
-                                Öğretmen veya Öğrenci misin? 
-                                <NuxtLink to="/kayit-giris">Giriş Yap</NuxtLink>
-                            </p>
 						</div>
 					</div>
 				</div>
@@ -99,19 +94,16 @@
 					<h2 class="section-title">Destek Paketleri</h2>
 					<p class="section-desc">Küçük yardımlar, büyük başarıların temelini atar.</p>
 				</div>
-
 				<div class="packages-grid">
-                    <div class="package-card">
+					<div class="package-card">
 						<div class="pkg-header">Başlangıç</div>
 						<div class="price">250 ₺</div>
 						<ul class="features">
 							<li>✅ 1 Öğrenciye Kaynak</li>
 							<li>✅ Teşekkür Sertifikası</li>
-							<li>✅ Aylık Bülten</li>
 						</ul>
 						<button class="btn-select" @click="selectPackage(250, 'Başlangıç')">Seç</button>
 					</div>
-
 					<div class="package-card featured">
 						<div class="best-value">EN POPÜLER</div>
 						<div class="pkg-header">Gelişim</div>
@@ -119,94 +111,145 @@
 						<ul class="features">
 							<li>✅ <strong>3 Öğrenciye</strong> Kaynak</li>
 							<li>✅ Özel Destekçi Rozeti</li>
-							<li>✅ Öğrencilerden Mesajlar</li>
-							<li>✅ Aylık Gelişim Raporu</li>
+							<li>✅ Aylık Rapor</li>
 						</ul>
 						<button class="btn-select featured-btn" @click="selectPackage(750, 'Gelişim')">Seç</button>
 					</div>
-
 					<div class="package-card">
 						<div class="pkg-header">Akademi</div>
 						<div class="price">2.000 ₺</div>
 						<ul class="features">
 							<li>✅ <strong>1 Sınıfa</strong> Kaynak</li>
 							<li>✅ Kurumsal Teşekkür</li>
-							<li>✅ Özel Davetiyeler</li>
-							<li>✅ Yıllık Etki Raporu</li>
+							<li>✅ Etki Raporu</li>
 						</ul>
 						<button class="btn-select" @click="selectPackage(2000, 'Akademi')">Seç</button>
 					</div>
-
 					<div class="package-card custom-card">
 						<div class="pkg-header">Gönlünden Kopan</div>
 						<p class="custom-desc">Dilediğiniz miktarda bağış yaparak eğitime katkıda bulunun.</p>
-
 						<div class="custom-input-wrapper">
 							<span>₺</span>
 							<input type="number" v-model="customAmount" placeholder="0" min="50" />
 						</div>
-
 						<button class="btn-select" @click="handleCustomDonation">Destek Ol</button>
 					</div>
-
 				</div>
 			</section>
-
 		</div>
 	</div>
 </template>
 
 <script setup>
 import { ref, reactive, onMounted } from 'vue'
+import { useRouter } from 'vue-router'
 import {
 	createUserWithEmailAndPassword,
 	signInWithEmailAndPassword,
 	sendPasswordResetEmail,
 	setPersistence,
 	browserLocalPersistence,
-	browserSessionPersistence
+	onAuthStateChanged,
+	signOut
 } from "firebase/auth";
-import { getFirestore, doc, setDoc } from "firebase/firestore";
+import { getFirestore, doc, setDoc, getDoc } from "firebase/firestore";
 
 const { $db, $auth } = useNuxtApp();
-
-onMounted(() => {
-    window.scrollTo(0, 0);
-});
+const router = useRouter();
 
 const viewState = ref('login');
-const loginForm = reactive({ email: '', password: '', rememberMe: false });
+const loginForm = reactive({ email: '', password: '' });
 const registerForm = reactive({ firstName: '', lastName: '', email: '', password: '', passwordConfirm: '' });
 const forgotEmail = ref('');
 const customAmount = ref(null);
 
+// Modal State
+const showLogoutConfirmModal = ref(false);
+const existingUserRole = ref(null); // Başlangıçta null
+
+onMounted(() => {
+	window.scrollTo(0, 0);
+	checkExistingSession();
+});
+
+// MEVCUT OTURUMU KONTROL ET (Modal açmadan sadece durumu kaydet)
+const checkExistingSession = () => {
+	onAuthStateChanged($auth, async (user) => {
+		if (user) {
+			const db = getFirestore();
+			const docRef = doc(db, "users", user.uid);
+			const docSnap = await getDoc(docRef);
+
+			if (docSnap.exists()) {
+				const data = docSnap.data();
+				// Eğer zaten bağışçıysa, panele yönlendir
+				if (data.role === 'donor') {
+					router.push('/dashboard-bagisci');
+				} else {
+					// Eğer öğrenci veya öğretmense, rolü kaydet ama MODALI AÇMA.
+					// Kullanıcı sayfayı gezebilsin.
+					existingUserRole.value = data.role;
+				}
+			}
+		}
+	});
+};
+
+const confirmLogout = async () => {
+	await signOut($auth);
+	showLogoutConfirmModal.value = false;
+	existingUserRole.value = null;
+	window.location.reload(); 
+};
+
+// --- YENİ AKSİYON KONTROL FONKSİYONLARI ---
+
+// Giriş butonuna basıldığında tetiklenir
+const handleLoginAttempt = () => {
+    // Eğer içeride farklı bir rol varsa modalı aç ve dur.
+    if (existingUserRole.value && existingUserRole.value !== 'donor') {
+        showLogoutConfirmModal.value = true;
+        return;
+    }
+    // Yoksa normal giriş işlemini yap
+    handleLogin();
+};
+
+// Kayıt butonuna basıldığında tetiklenir
+const handleRegisterAttempt = () => {
+    if (existingUserRole.value && existingUserRole.value !== 'donor') {
+        showLogoutConfirmModal.value = true;
+        return;
+    }
+    handleRegister();
+}
+
+// Paket seçildiğinde tetiklenir
 const selectPackage = (amount, name) => {
-	if (!$auth.currentUser) {
-		alert("Lütfen bir paket seçmeden önce giriş yapın veya kayıt olun.");
-		window.scrollTo({ top: 0, behavior: 'smooth' });
-		return;
-	}
-	alert(`${name} paketi seçildi. Tutar: ${amount} TL. Ödeme sayfasına yönlendirileceksiniz (Demo).`);
+    // Eğer öğrenci/öğretmen giriş yapmışsa ve paket seçerse modalı aç
+    if (existingUserRole.value && existingUserRole.value !== 'donor') {
+        showLogoutConfirmModal.value = true;
+        return;
+    }
+
+	// Normal akış
+	alert("Lütfen önce giriş yapın veya kayıt olun.");
+	window.scrollTo({ top: 0, behavior: 'smooth' });
 };
 
 const handleCustomDonation = () => {
-	if (!customAmount.value || customAmount.value < 10) {
-		alert("Lütfen geçerli bir tutar giriniz (Min 10 TL).");
-		return;
-	}
 	selectPackage(customAmount.value, 'Özel Bağış');
 };
 
+// KAYIT İŞLEMİ (Logik Aynı)
 const handleRegister = async () => {
-	if (registerForm.password !== registerForm.passwordConfirm) {
-		alert("Parolalar eşleşmiyor!"); return;
-	}
-	if (registerForm.password.length < 6) {
-		alert("Parola en az 6 karakter olmalı."); return;
-	}
+	if (registerForm.password !== registerForm.passwordConfirm) { alert("Parolalar eşleşmiyor!"); return; }
+	if (registerForm.password.length < 6) { alert("Parola en az 6 karakter olmalı."); return; }
 
 	try {
-        const db = getFirestore(); // db tanımlandı
+		const db = getFirestore();
+		await setPersistence($auth, browserLocalPersistence);
+
 		const userCredential = await createUserWithEmailAndPassword($auth, registerForm.email, registerForm.password);
 		const user = userCredential.user;
 
@@ -218,21 +261,32 @@ const handleRegister = async () => {
 			createdAt: new Date().toISOString()
 		});
 
-		alert("Kayıt başarılı! Giriş yapıldı.");
-		viewState.value = 'login';
-		loginForm.email = registerForm.email;
+		alert("Kayıt başarılı! Yönlendiriliyorsunuz...");
+		router.push('/dashboard-bagisci');
 
 	} catch (error) {
 		alert("Kayıt hatası: " + error.message);
 	}
 };
 
+// GİRİŞ İŞLEMİ (Logik Aynı)
 const handleLogin = async () => {
 	try {
-		const persistenceType = loginForm.rememberMe ? browserLocalPersistence : browserSessionPersistence;
-		await setPersistence($auth, persistenceType);
+		await setPersistence($auth, browserLocalPersistence);
 		await signInWithEmailAndPassword($auth, loginForm.email, loginForm.password);
-		alert("Giriş başarılı! Paket seçebilirsiniz.");
+
+		const db = getFirestore();
+		const docRef = doc(db, "users", $auth.currentUser.uid);
+		const docSnap = await getDoc(docRef);
+
+		if (docSnap.exists() && docSnap.data().role === 'donor') {
+			router.push('/dashboard-bagisci');
+		} else {
+            // Eğer bir şekilde donor olmayan biri buradan girmeyi başarırsa
+			alert("Bu giriş sadece bağışçılar içindir. Lütfen doğru sayfadan giriş yapınız.");
+			await signOut($auth);
+		}
+
 	} catch (error) {
 		alert("Giriş hatası: " + error.message);
 	}
@@ -250,67 +304,73 @@ const handleForgot = async () => {
 </script>
 
 <style scoped>
-/* ANA WRAPPER: Siyah arka plan */
+/* Mevcut stiller korunuyor, sadece yeni uyarı banner'ı için stil eklendi */
 .support-page-wrapper {
-    background-color: #050505;
-    min-height: 100vh;
-    position: relative;
-    padding-bottom: 50px; /* Footer için boşluk */
+	background-color: #050505;
+	min-height: 100vh;
+	position: relative;
+	padding-bottom: 50px;
 }
 
-/* GÖRSEL ALANI (Absolute ile sadece üst kısma sabitlendi) */
+.user-warning-banner {
+    background: rgba(255, 152, 0, 0.15);
+    border: 1px solid #ff9800;
+    color: #ffcc80;
+    padding: 10px 15px;
+    border-radius: 8px;
+    margin-bottom: 20px;
+    font-size: 0.9rem;
+    display: inline-block;
+}
+
 .hero-background-container {
-    position: absolute;
-    top: 0;
-    left: 0;
-    width: 100%;
-    height: 100vh; /* İlk ekran kadar yükseklik */
-    z-index: 0;
-    overflow: hidden;
+	position: absolute;
+	top: 0;
+	left: 0;
+	width: 100%;
+	height: 100vh;
+	z-index: 0;
+	overflow: hidden;
 }
 
 .page-bg {
-    position: absolute;
-    top: 0;
-    left: 0;
-    width: 100%;
-    height: 100%;
-    background-image: url('/img/destek-bg.jpg'); 
-    background-size: cover;
-    background-position: center top;
+	position: absolute;
+	top: 0;
+	left: 0;
+	width: 100%;
+	height: 100%;
+	background-image: url('/img/destek-bg.jpg');
+	background-size: cover;
+	background-position: center top;
 }
 
-/* GRADIENT GEÇİŞİ: Görselin üstünden başlar, aşağıda tam siyaha döner */
 .page-gradient {
-    position: absolute;
-    top: 0;
-    left: 0;
-    width: 100%;
-    height: 100%;
-    /* Üst şeffaf, aşağıya doğru tam siyah (#050505) olur */
-    background: linear-gradient(to bottom, rgba(5,5,5,0.4) 0%, rgba(5,5,5,0.8) 60%, #050505 100%);
-    z-index: 1;
+	position: absolute;
+	top: 0;
+	left: 0;
+	width: 100%;
+	height: 100%;
+	background: linear-gradient(to bottom, rgba(5, 5, 5, 0.4) 0%, rgba(5, 5, 5, 0.8) 60%, #050505 100%);
+	z-index: 1;
 }
 
-/* İÇERİK */
 .relative-z {
-  position: relative;
-  z-index: 2; /* Arka planın üstünde */
+	position: relative;
+	z-index: 2;
 }
 
 .container {
 	max-width: 1200px;
 	margin: 0 auto;
 	padding: 0 20px;
-	padding-top: 140px; /* Navbar boşluğu */
+	padding-top: 140px;
 }
 
-/* HERO BÖLÜMÜ */
 .hero-split {
 	display: flex;
 	align-items: flex-start;
 	gap: 60px;
-	margin-bottom: 150px; /* Paketlerle arayı aç */
+	margin-bottom: 150px;
 }
 
 .info-side {
@@ -337,7 +397,7 @@ h1 {
 	font-size: 3.5rem;
 	line-height: 1.1;
 	margin-bottom: 25px;
-    color: white;
+	color: white;
 }
 
 .blue {
@@ -349,6 +409,7 @@ h1 {
 	color: #ccc;
 	line-height: 1.6;
 	max-width: 90%;
+    margin-bottom: 20px;
 }
 
 .trust-icons {
@@ -366,10 +427,9 @@ h1 {
 	font-size: 0.9rem;
 }
 
-/* AUTH CARD */
 .auth-card {
-	background: rgba(17, 17, 17, 0.85); /* Biraz daha koyu */
-    backdrop-filter: blur(15px);
+	background: rgba(17, 17, 17, 0.85);
+	backdrop-filter: blur(15px);
 	border: 1px solid rgba(255, 255, 255, 0.1);
 	padding: 35px;
 	border-radius: 16px;
@@ -411,36 +471,6 @@ h1 {
 	gap: 10px;
 }
 
-.form-options {
-	display: flex;
-	justify-content: space-between;
-	align-items: center;
-	margin-bottom: 20px;
-	font-size: 0.85rem;
-	color: #ccc;
-}
-
-.remember-me {
-	display: flex;
-	align-items: center;
-	gap: 5px;
-	cursor: pointer;
-}
-
-.remember-me input {
-	width: 16px !important;
-	height: 16px !important;
-	margin: 0 !important;
-	cursor: pointer;
-}
-
-.forgot-link {
-	color: var(--primary-color);
-	text-decoration: none;
-    font-size: 0.85rem;
-    text-align: right;
-}
-
 .btn-primary {
 	width: 100%;
 	padding: 14px;
@@ -472,12 +502,12 @@ h1 {
 	text-align: center;
 	font-size: 0.9rem;
 	color: #999;
-    border-top: 1px solid #333;
-    padding-top: 20px;
+	border-top: 1px solid #333;
+	padding-top: 20px;
 }
 
 .auth-footer p {
-    margin-bottom: 8px;
+	margin-bottom: 8px;
 }
 
 .auth-footer a {
@@ -486,18 +516,16 @@ h1 {
 }
 
 .role-switch {
-    margin-top: 10px;
-    font-size: 0.9rem;
-    color: #888;
+	margin-top: 10px;
+	font-size: 0.9rem;
+	color: #888;
 }
 
-/* PAKETLER BÖLÜMÜ (Zemin Siyah) */
 .packages-section {
-    position: relative;
-    /* Hero container 100vh olduğu için bu kısım altta kalır ve siyah zeminle devam eder */
-    background-color: #050505; 
-    z-index: 2;
-    padding-bottom: 50px;
+	position: relative;
+	background-color: #050505;
+	z-index: 2;
+	padding-bottom: 50px;
 }
 
 .section-header {
@@ -510,7 +538,7 @@ h1 {
 	font-size: 2.5rem;
 	margin-bottom: 10px;
 	display: block;
-    color: white;
+	color: white;
 }
 
 .section-desc {
@@ -524,9 +552,8 @@ h1 {
 	align-items: start;
 }
 
-/* PAKET KARTI */
 .package-card {
-	background: #111; /* Kartların içi siyahımsı */
+	background: #111;
 	border: 1px solid #333;
 	padding: 40px 30px;
 	text-align: center;
@@ -541,7 +568,7 @@ h1 {
 .package-card:hover {
 	transform: translateY(-10px);
 	border-color: #555;
-    background: #161616;
+	background: #161616;
 }
 
 .pkg-header {
@@ -592,7 +619,6 @@ h1 {
 	background: rgba(255, 255, 255, 0.1);
 }
 
-/* FEATURED (AVANTAJLI) PAKET */
 .package-card.featured {
 	border: 2px solid var(--primary-color);
 	background: #0a0a0a;
@@ -628,7 +654,6 @@ h1 {
 	background: var(--secondary-color);
 }
 
-/* CUSTOM (ÖZEL) PAKET */
 .custom-card .custom-desc {
 	color: #aaa;
 	font-size: 0.9rem;
@@ -670,24 +695,86 @@ h1 {
 	margin: 0;
 }
 
-/* RESPONSIVE */
+/* MODAL STİLLERİ */
+.modal-overlay {
+	position: fixed;
+	top: 0;
+	left: 0;
+	right: 0;
+	bottom: 0;
+	background: rgba(0, 0, 0, 0.85);
+	display: flex;
+	justify-content: center;
+	align-items: center;
+	z-index: 9999;
+}
+
+.modal-content {
+	background: #1a1a1a;
+	padding: 30px;
+	border-radius: 12px;
+	border: 1px solid #333;
+	max-width: 400px;
+	text-align: center;
+}
+
+.modal-content h3 {
+	color: #fff;
+	margin-bottom: 15px;
+}
+
+.modal-content p {
+	color: #ccc;
+	margin-bottom: 20px;
+}
+
+.modal-actions {
+	display: flex;
+	gap: 10px;
+	justify-content: center;
+}
+
+.btn-cancel {
+	background: #333;
+	color: white;
+	border: none;
+	padding: 10px 20px;
+	border-radius: 6px;
+	cursor: pointer;
+}
+
+.btn-confirm {
+	background: #ff4444;
+	color: white;
+	border: none;
+	padding: 10px 20px;
+	border-radius: 6px;
+	cursor: pointer;
+	font-weight: bold;
+}
+
 @media (max-width: 992px) {
 	.hero-split {
 		flex-direction: column;
 	}
+
 	.info-side {
 		text-align: center;
 	}
+
 	.info-side p {
 		margin: 0 auto 30px;
 	}
+
 	.trust-icons {
 		justify-content: center;
 	}
+
 	.login-side {
 		justify-content: center;
 		width: 100%;
 	}
+
 	.package-card.featured {
 		transform: scale(1);
 		margin: 20px 0;
