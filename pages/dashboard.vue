@@ -165,7 +165,7 @@
                 <div class="quick-stats">
                     <div class="q-item">
                         <span class="q-val">{{ completedLessons }}</span>
-                        <span class="q-lab">Bitirilen Ders</span>
+                        <span class="q-lab">Bitirilen Test</span>
                     </div>
                 </div>
             </header>

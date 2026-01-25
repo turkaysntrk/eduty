@@ -2,22 +2,28 @@
     <div v-if="isLoading" class="loading-screen">
         <div class="spinner"></div>
         <p>Yetki kontrolü yapılıyor...</p>
+        <small style="color: #666; margin-top: 5px;">Veriler yükleniyor...</small>
     </div>
 
     <div v-else-if="isTeacher" class="dashboard-container">
 
         <div v-if="isProfileModalOpen" class="modal-overlay">
             <div class="modal-content">
-                <h3>Öğretmen Profili</h3>
+                <h3>Öğretmen Profilini Düzenle</h3>
                 <div class="modal-body">
-                    <label>Adınız Soyadınız:</label>
-                    <input type="text" v-model="tempProfile.name" placeholder="Örn: Ahmet Hoca" />
-                    <label>Branşınız:</label>
-                    <select v-model="tempProfile.branch" class="modal-select">
-                        <option value="" disabled>Seçiniz</option>
-                        <option v-for="b in branches" :key="b" :value="b">{{ b }}</option>
-                    </select>
-                    <label>Profil Fotoğrafı:</label>
+                    <div class="read-only-group">
+                        <label>Adınız Soyadınız:</label>
+                        <div class="read-only-text">{{ userDisplayName }}</div>
+                        <small>İsim değişikliği için yönetimle iletişime geçiniz.</small>
+                    </div>
+
+                    <div class="read-only-group">
+                        <label>Branşınız:</label>
+                        <div class="read-only-text highlight">{{ userBranch }}</div>
+                        <small>Branş bilgisi sabittir.</small>
+                    </div>
+
+                    <label style="margin-top: 15px; display:block;">Profil Fotoğrafı:</label>
                     <div class="avatar-selection">
                         <div class="avatar-option"
                             :class="{ selected: tempProfile.avatarType === 'upload' && tempProfile.uploadedImage }"
@@ -26,6 +32,7 @@
                         </div>
                         <input type="file" ref="fileInput" @change="handleFileUpload" style="display: none"
                             accept="image/*">
+
                         <div v-for="(avatar, index) in presetAvatars" :key="index" class="avatar-option"
                             :class="{ selected: tempProfile.avatarType === 'preset' && tempProfile.selectedPreset === avatar }"
                             @click="selectPresetAvatar(avatar)">
@@ -52,14 +59,14 @@
                         <div class="form-group half">
                             <label>Sınıf</label>
                             <select v-model="editTestForm.grade">
-                                <option v-for="g in grades" :key="g" :value="g">{{ g === 'Mezun' ? 'Mezun' : g + '.Sınıf' }}</option>
+                                <option v-for="g in availableGrades" :key="g" :value="g">
+                                    {{ g === 'Mezun' ? 'Mezun' : g + '.Sınıf' }}
+                                </option>
                             </select>
                         </div>
                         <div class="form-group half">
                             <label>Ders</label>
-                            <select v-model="editTestForm.subject">
-                                <option v-for="b in branches" :key="b" :value="b">{{ b }}</option>
-                            </select>
+                            <input type="text" :value="editTestForm.subject" disabled class="disabled-input" />
                         </div>
                     </div>
                     <p style="font-size:0.8rem; color:#666;">Not: PDF ve Cevap Anahtarı bu ekrandan değiştirilemez.
@@ -161,16 +168,14 @@
                                         <label>Sınıf Seviyesi</label>
                                         <select v-model="testForm.grade">
                                             <option value="" disabled>Seçiniz</option>
-                                            <option v-for="g in grades" :key="g" :value="g">{{ g === 'Mezun' ? 'Mezun' :
-                                                g + '. Sınıf' }}</option>
+                                            <option v-for="g in availableGrades" :key="g" :value="g">
+                                                {{ g === 'Mezun' ? 'Mezun' : g + '. Sınıf' }}
+                                            </option>
                                         </select>
                                     </div>
                                     <div class="form-group half">
                                         <label>Ders</label>
-                                        <select v-model="testForm.subject">
-                                            <option value="" disabled>Seçiniz</option>
-                                            <option v-for="b in branches" :key="b" :value="b">{{ b }}</option>
-                                        </select>
+                                        <input type="text" :value="userBranch" disabled class="disabled-input" />
                                     </div>
                                 </div>
 
@@ -224,7 +229,6 @@
                     <div class="section-block mt-40">
                         <h2 class="section-title">Test Kütüphanem</h2>
                         <div v-if="myTests.length === 0" class="empty-state">
-                            <span class="icon-empty">📂</span>
                             <p>Henüz yüklediğiniz bir test bulunmuyor.</p>
                         </div>
                         <div v-else class="test-grid">
@@ -248,9 +252,8 @@
                 <div v-if="activeTab === 'history'" class="animate-fade">
                     <h2 class="section-title">Geçmiş Ders Kayıtları</h2>
                     <div class="history-list">
-                        <div v-if="pastLessons.length === 0" class="empty-state">
-                            <span class="icon-empty">🕰️</span>
-                            <p>Henüz tamamlanmış bir özel dersiniz bulunmuyor.</p>
+                        <div v-if="pastLessons.length === 0">
+                            <p class="empty-state">Henüz tamamlanmış bir özel dersiniz bulunmuyor.</p>
                         </div>
                     </div>
                 </div>
@@ -312,7 +315,7 @@
 <script setup>
 import { ref, reactive, computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
-import { onAuthStateChanged, signOut } from 'firebase/auth'
+import { onAuthStateChanged, signOut, updateProfile } from 'firebase/auth'
 import { getFirestore, doc, getDoc, updateDoc, collection, addDoc, query, where, getDocs, onSnapshot, orderBy, serverTimestamp, deleteField } from 'firebase/firestore'
 
 const router = useRouter()
@@ -321,10 +324,11 @@ let db;
 
 const isLoading = ref(true)
 const isTeacher = ref(false)
-const activeTab = ref('calendar') // Varsayılan olarak takvim
+const activeTab = ref('calendar')
 const userDisplayName = ref('')
 const userEmail = ref('')
 const userBranch = ref('')
+const userSchoolLevel = ref('') // 'ilkokul', 'ortaokul', 'lise'
 const teacherScore = ref(0)
 const pastLessons = ref([])
 const myTests = ref([])
@@ -339,26 +343,40 @@ let typingTimeout = null
 // Takvim Verileri
 const daysOfWeek = ["Pzt", "Sal", "Çar", "Per", "Cum", "Cmt", "Paz"]
 const timeSlots = ["09:00", "10:00", "11:00", "12:00", "13:00", "14:00", "15:00", "16:00", "17:00", "18:00", "19:00", "20:00"]
-const myAvailability = reactive({}) // { "Pzt-10:00": true, "Cum-15:00": true }
-const myBookings = reactive({}) // { "Sal-14:00": { student: "Ali", id: "..." } } - Artık gerçek veri
+const myAvailability = reactive({})
+const myBookings = reactive({})
 
+// Test Form - Subject artık userBranch'den otomatik gelecek
 const testForm = reactive({ title: '', grade: '', subject: '', questionCount: 0, file: null, answers: [] })
-const branches = ["Matematik", "Fizik", "Kimya", "Biyoloji", "Türkçe", "Edebiyat", "Tarih", "Coğrafya", "Felsefe", "İngilizce", "Almanca"]
-const grades = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, "Mezun"]
+
+// COMPUTED: Öğretmen seviyesine göre sınıf listesi
+const availableGrades = computed(() => {
+    // Eğer seviye bilgisi yoksa veya tanımlı değilse, hepsini göster (fallback)
+    // Ya da branşa göre tahmin de yapılabilir ancak veritabanından 'schoolLevel' gelmesi en sağlıklısıdır.
+    const level = userSchoolLevel.value;
+
+    if (level === 'ilkokul') {
+        return [1, 2, 3, 4];
+    } else if (level === 'ortaokul') {
+        return [5, 6, 7, 8];
+    } else if (level === 'lise') {
+        return [9, 10, 11, 12, 'Mezun'];
+    } else {
+        // Seviye bilgisi yoksa varsayılan tüm sınıflar (Fallback)
+        return [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, "Mezun"];
+    }
+});
+
+// isFormValid: Ders seçimi artık kullanıcıdan gelmiyor, userBranch dolu olmalı
+const isFormValid = computed(() => testForm.title && testForm.grade && userBranch.value && testForm.file && testForm.questionCount > 0 && testForm.answers.length === testForm.questionCount && !testForm.answers.includes(undefined))
 
 // UPDATE MODAL STATE
 const isUpdateModalOpen = ref(false)
 const editTestForm = reactive({ id: null, title: '', grade: '', subject: '' })
 
-const isFormValid = computed(() => testForm.title && testForm.grade && testForm.subject && testForm.file && testForm.questionCount > 0 && testForm.answers.length === testForm.questionCount && !testForm.answers.includes(undefined))
-
 // --- TAKVİM İŞLEMLERİ ---
-const isAvailable = (day, time) => {
-    return myAvailability[`${day}-${time}`] === true
-}
-const isBooked = (day, time) => {
-    return !!myBookings[`${day}-${time}`]
-}
+const isAvailable = (day, time) => myAvailability[`${day}-${time}`] === true
+const isBooked = (day, time) => !!myBookings[`${day}-${time}`]
 const getBookingInfo = (day, time) => {
     const booking = myBookings[`${day}-${time}`];
     return booking ? booking.student : 'Dolu';
@@ -371,22 +389,15 @@ const toggleAvailability = async (day, time) => {
     }
     const key = `${day}-${time}`
 
-    // UI Güncelleme (Geçici)
-    if (myAvailability[key]) {
-        delete myAvailability[key]
-    } else {
-        myAvailability[key] = true
-    }
+    if (myAvailability[key]) delete myAvailability[key]
+    else myAvailability[key] = true
 
-    // Firestore'a kaydet
     if ($auth.currentUser) {
         const userRef = doc(db, "users", $auth.currentUser.uid);
-
-        // Eğer silindiyse deleteField ile sil, eklendiyse true olarak ekle
         if (myAvailability[key]) {
-            await updateDoc(userRef, { [`availability.${key}`]: true }).catch(e => console.error("Müsaitlik kaydedilemedi", e));
+            await updateDoc(userRef, { [`availability.${key}`]: true }).catch(e => console.error(e));
         } else {
-            await updateDoc(userRef, { [`availability.${key}`]: deleteField() }).catch(e => console.error("Müsaitlik silinemedi", e));
+            await updateDoc(userRef, { [`availability.${key}`]: deleteField() }).catch(e => console.error(e));
         }
     }
 }
@@ -430,6 +441,10 @@ const setAnswer = (index, option) => { testForm.answers[index] = option; }
 
 const submitTest = async () => {
     if (!db) db = getFirestore();
+    
+    // Güvenlik: Subject'i her zaman kullanıcının branşından al
+    const finalSubject = userBranch.value;
+
     try {
         const fakePdfUrl = "https://example.com/uploads/sample_test.pdf";
         await addDoc(collection(db, "tests"), {
@@ -437,7 +452,7 @@ const submitTest = async () => {
             uploaderName: userDisplayName.value,
             title: testForm.title,
             grade: testForm.grade,
-            subject: testForm.subject,
+            subject: finalSubject, // Kullanıcının branşı
             questionCount: testForm.questionCount,
             answerKey: testForm.answers,
             pdfUrl: fakePdfUrl,
@@ -453,7 +468,7 @@ const openUpdateModal = (test) => {
     editTestForm.id = test.id
     editTestForm.title = test.title
     editTestForm.grade = test.grade
-    editTestForm.subject = test.subject
+    editTestForm.subject = test.subject // Gösterim amaçlı, düzenlenemez
     isUpdateModalOpen.value = true
 }
 
@@ -464,7 +479,7 @@ const saveTestUpdate = async () => {
         await updateDoc(testRef, {
             title: editTestForm.title,
             grade: editTestForm.grade,
-            subject: editTestForm.subject
+            // Subject güncellenmez, sabittir.
         })
         alert("Test güncellendi.")
         isUpdateModalOpen.value = false
@@ -481,7 +496,6 @@ const fetchChats = () => {
         myChats.value = snapshot.docs.map(doc => {
             const data = doc.data();
             const otherId = data.participants.find(p => p !== $auth.currentUser.uid);
-            // Öğretmensek öğrenci ismini al
             const otherName = otherId === data.studentId ? data.studentName : data.teacherName;
             return { id: doc.id, ...data, otherUserName: otherName, otherUserId: otherId };
         });
@@ -504,7 +518,6 @@ const loadMessages = (chatId) => {
 
     onSnapshot(q, (snapshot) => {
         activeMessages.value = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-        // Scroll to bottom
         setTimeout(() => {
             const container = document.querySelector('.messages-area');
             if (container) container.scrollTop = container.scrollHeight;
@@ -526,9 +539,7 @@ const handleTyping = async () => {
 const markAsRead = async (chatId) => {
     if (!chatId) return;
     const chatRef = doc(db, "chats", chatId);
-    await updateDoc(chatRef, {
-        [`lastRead.${$auth.currentUser.uid}`]: serverTimestamp()
-    });
+    await updateDoc(chatRef, { [`lastRead.${$auth.currentUser.uid}`]: serverTimestamp() });
 };
 
 const isMessageRead = (msg) => {
@@ -541,21 +552,12 @@ const isMessageRead = (msg) => {
 
 const sendMessage = async () => {
     if (!newMessage.value.trim() || !activeChat.value) return;
-
     const text = newMessage.value;
     newMessage.value = '';
 
     const chatRef = doc(db, "chats", activeChat.value.id);
-    await addDoc(collection(chatRef, "messages"), {
-        text,
-        senderId: $auth.currentUser.uid,
-        createdAt: serverTimestamp()
-    });
-
-    await updateDoc(chatRef, {
-        lastMessage: text,
-        updatedAt: serverTimestamp()
-    });
+    await addDoc(collection(chatRef, "messages"), { text, senderId: $auth.currentUser.uid, createdAt: serverTimestamp() });
+    await updateDoc(chatRef, { lastMessage: text, updatedAt: serverTimestamp() });
 
     if (typingTimeout) clearTimeout(typingTimeout);
     await updateDoc(chatRef, { [`typing.${$auth.currentUser.uid}`]: false });
@@ -565,18 +567,70 @@ const sendMessage = async () => {
 const isProfileModalOpen = ref(false)
 const fileInput = ref(null)
 const profileState = ref({ avatarType: 'initials', selectedPreset: '', uploadedImage: null })
-const tempProfile = ref({ name: '', branch: '', avatarType: 'initials', selectedPreset: '', uploadedImage: null })
-const presetAvatars = ["https://api.dicebear.com/7.x/avataaars/svg?seed=Felix", "https://api.dicebear.com/7.x/avataaars/svg?seed=Aneka", "https://api.dicebear.com/7.x/bottts/svg?seed=Bubba"]
+const tempProfile = ref({ avatarType: 'initials', selectedPreset: '', uploadedImage: null }) // Name ve Branch çıkarıldı
+const presetAvatars = ["https://api.dicebear.com/7.x/avataaars/svg?seed=Felix", "https://api.dicebear.com/7.x/avataaars/svg?seed=Aneka", "https://api.dicebear.com/7.x/bottts/svg?seed=Bubba", "https://api.dicebear.com/7.x/micah/svg?seed=Callie", "https://api.dicebear.com/7.x/notionists/svg?seed=Cookie"]
+
 const currentAvatarUrl = computed(() => {
     if (profileState.value.avatarType === 'upload' && profileState.value.uploadedImage) return profileState.value.uploadedImage
     if (profileState.value.avatarType === 'preset' && profileState.value.selectedPreset) return profileState.value.selectedPreset
     return `https://ui-avatars.com/api/?name=${userDisplayName.value || 'T'}&background=0055ff&color=fff`
 })
-const openProfileModal = () => { isProfileModalOpen.value = true }
-const saveProfile = async () => { isProfileModalOpen.value = false }
+
+const openProfileModal = () => {
+    tempProfile.value = {
+        // İsim ve branch tempProfile'a atanmıyor çünkü düzenlenemezler
+        avatarType: profileState.value.avatarType,
+        selectedPreset: profileState.value.selectedPreset,
+        uploadedImage: profileState.value.uploadedImage
+    }
+    isProfileModalOpen.value = true
+}
+
 const triggerFileUpload = () => fileInput.value.click()
-const handleFileUpload = (event) => { /* ... */ }
-const selectPresetAvatar = (url) => { tempProfile.value.selectedPreset = url; tempProfile.value.avatarType = 'preset' }
+
+const handleFileUpload = (event) => {
+    const file = event.target.files[0]
+    if (file) {
+        const reader = new FileReader()
+        reader.onload = (e) => {
+            tempProfile.value.uploadedImage = e.target.result
+            tempProfile.value.avatarType = 'upload'
+        }
+        reader.readAsDataURL(file)
+    }
+}
+
+const selectPresetAvatar = (url) => {
+    tempProfile.value.selectedPreset = url
+    tempProfile.value.avatarType = 'preset'
+}
+
+const saveProfile = async () => {
+    if (!db) db = getFirestore();
+
+    // Sadece Avatar Güncelleniyor
+    profileState.value = {
+        avatarType: tempProfile.value.avatarType,
+        selectedPreset: tempProfile.value.selectedPreset,
+        uploadedImage: tempProfile.value.uploadedImage
+    }
+
+    if ($auth.currentUser) {
+        try {
+            // İsim güncellemesi (updateProfile) kaldırıldı
+            const userRef = doc(db, "users", $auth.currentUser.uid);
+            await updateDoc(userRef, {
+                // DisplayName ve Branch update kaldırıldı
+                avatar: {
+                    type: tempProfile.value.avatarType,
+                    preset: tempProfile.value.selectedPreset,
+                    uploadedImage: tempProfile.value.uploadedImage
+                }
+            })
+        } catch (e) { console.error("Profil güncellenemedi", e) }
+    }
+    isProfileModalOpen.value = false
+}
 
 const handleLogout = async () => {
     localStorage.removeItem('userRole');
@@ -596,9 +650,19 @@ onMounted(() => {
                 const data = docSnap.data();
                 if (data.role !== 'teacher') { router.push(data.role === 'student' ? '/dashboard' : '/'); return; }
                 isTeacher.value = true;
+                
+                // Verileri Çek
                 userBranch.value = data.branch || '';
+                userSchoolLevel.value = data.schoolLevel || ''; // 'ilkokul', 'ortaokul' veya 'lise' beklenir
                 teacherScore.value = data.score || 0;
-                if (data.avatar) profileState.value = data.avatar;
+                
+                if (data.avatar) {
+                    profileState.value = {
+                        avatarType: data.avatar.type || 'initials',
+                        selectedPreset: data.avatar.preset || '',
+                        uploadedImage: data.avatar.uploadedImage || null
+                    }
+                }
                 if (data.availability) Object.assign(myAvailability, data.availability);
                 await fetchMyTests(user.uid);
                 fetchChats();
@@ -619,7 +683,86 @@ onMounted(() => {
     color: white;
     font-family: 'Montserrat', sans-serif;
     padding-top: 0;
-    /* Header overlap fix */
+}
+
+/* YENİ EKLENEN STİLLER (READ-ONLY ALANLAR İÇİN) */
+.read-only-group {
+    margin-bottom: 20px;
+}
+.read-only-text {
+    background: #111;
+    padding: 12px;
+    border-radius: 8px;
+    border: 1px solid #333;
+    color: #aaa;
+    margin-top: 5px;
+    font-size: 0.95rem;
+}
+.read-only-text.highlight {
+    color: #0055ff;
+    font-weight: bold;
+    border-color: #0055ff;
+    background: rgba(0, 85, 255, 0.05);
+}
+.read-only-group small {
+    display: block;
+    color: #555;
+    font-size: 0.75rem;
+    margin-top: 5px;
+}
+.disabled-input {
+    background: #111;
+    color: #777;
+    cursor: not-allowed;
+    border-color: #222;
+}
+
+/* ANIMASYONLAR (DASHBOARD.VUE ILE EŞİTLENDİ) */
+.animate-fade {
+    animation: fadeIn 0.4s ease-in-out;
+}
+
+@keyframes fadeIn {
+    from {
+        opacity: 0;
+        transform: translateY(10px);
+    }
+
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+/* LOADING SCREEN */
+.loading-screen {
+    height: 100vh;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    background: #0a0a0a;
+    color: white;
+}
+
+.spinner {
+    width: 40px;
+    height: 40px;
+    border: 4px solid #333;
+    border-top: 4px solid #0055ff;
+    border-radius: 50%;
+    animation: spin 1s linear infinite;
+    margin-bottom: 20px;
+}
+
+@keyframes spin {
+    0% {
+        transform: rotate(0deg);
+    }
+
+    100% {
+        transform: rotate(360deg);
+    }
 }
 
 /* SIDEBAR */
@@ -630,7 +773,6 @@ onMounted(() => {
     display: flex;
     flex-direction: column;
     padding: 120px 20px 40px 20px;
-    /* Padding top artırıldı */
     position: fixed;
     top: 0;
     left: 0;
@@ -643,7 +785,6 @@ onMounted(() => {
     margin-left: 280px;
     flex-grow: 1;
     padding: 120px 40px 40px 40px;
-    /* Padding top artırıldı */
     width: calc(100% - 280px);
 }
 
@@ -677,6 +818,13 @@ onMounted(() => {
     height: 30px;
     cursor: pointer;
     color: white;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.edit-profile-btn:hover {
+    background: #0055ff;
 }
 
 .user-name {
@@ -736,7 +884,7 @@ onMounted(() => {
     background: #330000;
 }
 
-/* HEADER (GÜNCELLENEN KISIM) */
+/* HEADER */
 .content-header {
     display: flex;
     justify-content: space-between;
@@ -794,7 +942,17 @@ onMounted(() => {
     color: #666;
 }
 
-/* CALENDAR (CAMBLY STYLE) */
+/* EMPTY STATE */
+.empty-state {
+    text-align: center;
+    padding: 100px 0;
+    color: #555;
+    border: 2px dashed #222;
+    border-radius: 16px;
+    width: 100%;
+}
+
+/* CALENDAR */
 .calendar-wrapper {
     background: #161616;
     border-radius: 16px;
@@ -1025,7 +1183,6 @@ select:focus {
     background: #0e0e0e;
 }
 
-/* CHAT STİLLERİ (Öğretmen Paneli İçin) */
 .chat-item {
     display: flex;
     align-items: center;
@@ -1203,11 +1360,11 @@ select:focus {
     left: 0;
     right: 0;
     bottom: 0;
-    background: rgba(0, 0, 0, 0.85);
+    background: rgba(0, 0, 0, 0.8);
     display: flex;
     justify-content: center;
     align-items: center;
-    z-index: 1000;
+    z-index: 5000;
 }
 
 .modal-content {
@@ -1217,6 +1374,63 @@ select:focus {
     width: 90%;
     max-width: 450px;
     border: 1px solid #333;
+    box-shadow: 0 20px 50px rgba(0,0,0,0.5);
+}
+
+.modal-select {
+    width: 100%;
+    padding: 10px;
+    background: #0a0a0a;
+    border: 1px solid #333;
+    color: white;
+    border-radius: 8px;
+    margin-bottom: 20px;
+    box-sizing: border-box;
+}
+
+.avatar-selection {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 10px;
+    margin-bottom: 20px;
+}
+
+.avatar-option {
+    width: 100%;
+    aspect-ratio: 1;
+    border-radius: 50%;
+    overflow: hidden;
+    border: 2px solid transparent;
+    cursor: pointer;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    background: #222;
+}
+
+.avatar-option img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+
+.avatar-option span {
+    font-size: 1.5rem;
+}
+
+.avatar-option small {
+    font-size: 0.6rem;
+    color: #aaa;
+}
+
+.avatar-option.selected {
+    border-color: #0055ff;
+    background: rgba(0, 85, 255, 0.1);
+}
+
+.avatar-option:hover {
+    background: #333;
 }
 
 .modal-actions {
@@ -1243,7 +1457,6 @@ select:focus {
         overflow: hidden;
     }
 
-    /* Mobile Menu gerekir */
     .main-content {
         margin-left: 0;
         width: 100%;
@@ -1256,10 +1469,6 @@ select:focus {
 
     .answer-key-panel {
         width: 100%;
-    }
-
-    .welcome-section {
-        text-align: center;
     }
 
     .cal-day-col,
