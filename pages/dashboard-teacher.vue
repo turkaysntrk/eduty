@@ -7,6 +7,12 @@
 
     <div v-else-if="isTeacher" class="dashboard-container">
 
+        <button class="mobile-toggle-btn" @click="isSidebarOpen = !isSidebarOpen">
+            ☰
+        </button>
+
+        <div v-if="isSidebarOpen" class="sidebar-overlay" @click="isSidebarOpen = false"></div>
+
         <div v-if="isProfileModalOpen" class="modal-overlay">
             <div class="modal-content">
                 <h3>Öğretmen Profilini Düzenle</h3>
@@ -79,7 +85,17 @@
             </div>
         </div>
 
-        <aside class="sidebar">
+        <aside class="sidebar" :class="{ 'open': isSidebarOpen }">
+
+            <div class="sidebar-logo-container">
+                <NuxtLink to="/" class="sidebar-logo-link" @click="isSidebarOpen = false">
+                    <img src="/img/eduty_logo.png" alt="Eduty Logo" class="sidebar-logo-img" />
+                    <div class="eduty-text">
+                        <span>e</span><span>d</span><span>u</span><span>t</span><span>y</span>
+                    </div>
+                </NuxtLink>
+            </div>
+
             <div class="profile-section">
                 <div class="avatar-wrapper">
                     <button class="edit-profile-btn" @click="openProfileModal" title="Profili Düzenle">✏️</button>
@@ -91,25 +107,34 @@
             </div>
 
             <nav class="sidebar-nav">
-                <button @click="activeTab = 'calendar'" :class="{ active: activeTab === 'calendar' }">
+                <button @click="{ activeTab = 'calendar'; isSidebarOpen = false }"
+                    :class="{ active: activeTab === 'calendar' }">
                     <span class="icon">📅</span> Programım
                 </button>
-                <button @click="activeTab = 'test-upload'" :class="{ active: activeTab === 'test-upload' }">
+                <button @click="{ activeTab = 'test-upload'; isSidebarOpen = false }"
+                    :class="{ active: activeTab === 'test-upload' }">
                     <span class="icon">📤</span> Test Yönetimi
                 </button>
-                <button @click="activeTab = 'history'" :class="{ active: activeTab === 'history' }">
+                <button @click="{ activeTab = 'history'; isSidebarOpen = false }"
+                    :class="{ active: activeTab === 'history' }">
                     <span class="icon">📚</span> Geçmiş Derslerim
                 </button>
-                <button @click="activeTab = 'messages'" :class="{ active: activeTab === 'messages' }">
+                <button @click="{ activeTab = 'messages'; isSidebarOpen = false }"
+                    :class="{ active: activeTab === 'messages' }">
                     <span class="icon">💬</span> Mesajlar
                 </button>
+
+                <div class="sidebar-divider"></div>
+
+                <NuxtLink to="/" class="nav-link-home" @click="isSidebarOpen = false">
+                    <span class="icon">🏠</span> Ana Sayfaya Dön
+                </NuxtLink>
             </nav>
 
             <button @click="handleLogout" class="logout-btn">Çıkış Yap</button>
         </aside>
 
         <main class="main-content">
-
             <header class="content-header">
                 <div class="score-card">
                     <span class="score-label">TOPLAM EDUTY PUANI</span>
@@ -124,7 +149,6 @@
             </header>
 
             <section class="tab-content">
-
                 <div v-if="activeTab === 'calendar'" class="animate-fade">
                     <h2 class="section-title">Haftalık Programım</h2>
                     <p class="sub-text">Müsait olduğunuz saatleri yeşil olarak işaretleyiniz. Öğrenciler bu saatlerden
@@ -152,7 +176,6 @@
                 </div>
 
                 <div v-if="activeTab === 'test-upload'" class="animate-fade">
-
                     <div class="section-block">
                         <h2 class="section-title">Yeni Test Yükle</h2>
                         <div class="upload-container">
@@ -306,7 +329,6 @@
                         </div>
                     </div>
                 </div>
-
             </section>
         </main>
     </div>
@@ -318,364 +340,41 @@ import { useRouter } from 'vue-router'
 import { onAuthStateChanged, signOut, updateProfile } from 'firebase/auth'
 import { getFirestore, doc, getDoc, updateDoc, collection, addDoc, query, where, getDocs, onSnapshot, orderBy, serverTimestamp, deleteField } from 'firebase/firestore'
 
-const router = useRouter()
-const { $auth } = useNuxtApp()
-let db;
-
-const isLoading = ref(true)
-const isTeacher = ref(false)
-const activeTab = ref('calendar')
-const userDisplayName = ref('')
-const userEmail = ref('')
-const userBranch = ref('')
-const userSchoolLevel = ref('') // 'ilkokul', 'ortaokul', 'lise'
-const teacherScore = ref(0)
-const pastLessons = ref([])
-const myTests = ref([])
-
-// Chat State
-const myChats = ref([])
-const activeChat = ref(null)
-const activeMessages = ref([])
-const newMessage = ref('')
-let typingTimeout = null
-
-// Takvim Verileri
-const daysOfWeek = ["Pzt", "Sal", "Çar", "Per", "Cum", "Cmt", "Paz"]
-const timeSlots = ["09:00", "10:00", "11:00", "12:00", "13:00", "14:00", "15:00", "16:00", "17:00", "18:00", "19:00", "20:00"]
-const myAvailability = reactive({})
-const myBookings = reactive({})
-
-// Test Form - Subject artık userBranch'den otomatik gelecek
-const testForm = reactive({ title: '', grade: '', subject: '', questionCount: 0, file: null, answers: [] })
-
-// COMPUTED: Öğretmen seviyesine göre sınıf listesi
-const availableGrades = computed(() => {
-    // Eğer seviye bilgisi yoksa veya tanımlı değilse, hepsini göster (fallback)
-    // Ya da branşa göre tahmin de yapılabilir ancak veritabanından 'schoolLevel' gelmesi en sağlıklısıdır.
-    const level = userSchoolLevel.value;
-
-    if (level === 'ilkokul') {
-        return [1, 2, 3, 4];
-    } else if (level === 'ortaokul') {
-        return [5, 6, 7, 8];
-    } else if (level === 'lise') {
-        return [9, 10, 11, 12, 'Mezun'];
-    } else {
-        // Seviye bilgisi yoksa varsayılan tüm sınıflar (Fallback)
-        return [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, "Mezun"];
-    }
-});
-
-// isFormValid: Ders seçimi artık kullanıcıdan gelmiyor, userBranch dolu olmalı
-const isFormValid = computed(() => testForm.title && testForm.grade && userBranch.value && testForm.file && testForm.questionCount > 0 && testForm.answers.length === testForm.questionCount && !testForm.answers.includes(undefined))
-
-// UPDATE MODAL STATE
-const isUpdateModalOpen = ref(false)
-const editTestForm = reactive({ id: null, title: '', grade: '', subject: '' })
-
-// --- TAKVİM İŞLEMLERİ ---
-const isAvailable = (day, time) => myAvailability[`${day}-${time}`] === true
-const isBooked = (day, time) => !!myBookings[`${day}-${time}`]
-const getBookingInfo = (day, time) => {
-    const booking = myBookings[`${day}-${time}`];
-    return booking ? booking.student : 'Dolu';
-}
-
-const toggleAvailability = async (day, time) => {
-    if (isBooked(day, time)) {
-        alert("Bu saatte dersiniz var, iptal edemezsiniz.");
-        return;
-    }
-    const key = `${day}-${time}`
-
-    if (myAvailability[key]) delete myAvailability[key]
-    else myAvailability[key] = true
-
-    if ($auth.currentUser) {
-        const userRef = doc(db, "users", $auth.currentUser.uid);
-        if (myAvailability[key]) {
-            await updateDoc(userRef, { [`availability.${key}`]: true }).catch(e => console.error(e));
-        } else {
-            await updateDoc(userRef, { [`availability.${key}`]: deleteField() }).catch(e => console.error(e));
-        }
-    }
-}
-
-const fetchTeacherBookings = async () => {
-    if (!db) db = getFirestore();
-    const q = query(collection(db, "bookings"), where("teacherId", "==", $auth.currentUser.uid));
-    const snap = await getDocs(q);
-    snap.forEach(doc => {
-        const data = doc.data();
-        const key = `${data.day}-${data.time}`;
-        myBookings[key] = { student: data.studentName || 'Öğrenci', id: doc.id };
-    });
-}
-
-// --- TEST İŞLEMLERİ ---
-const fetchMyTests = async (uid) => {
-    if (!db) db = getFirestore();
-    try {
-        const q = query(collection(db, "tests"), where("uploaderId", "==", uid));
-        const querySnapshot = await getDocs(q);
-        const tests = querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-        myTests.value = tests.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
-    } catch (error) { console.error("Testler çekilemedi:", error); }
-}
-
-const handlePdfUpload = (e) => {
-    const file = e.target.files[0];
-    if (file && file.type === "application/pdf") testForm.file = file;
-    else alert("Lütfen geçerli bir PDF dosyası seçin.");
-}
-
-const generateAnswerKeyInputs = () => {
-    const count = parseInt(testForm.questionCount);
-    if (!count || count < 0) { testForm.answers = []; return; }
-    const newAnswers = new Array(count).fill(null);
-    for (let i = 0; i < Math.min(count, testForm.answers.length); i++) newAnswers[i] = testForm.answers[i];
-    testForm.answers = newAnswers;
-}
+const router = useRouter(); const { $auth } = useNuxtApp(); let db;
+const isSidebarOpen = ref(false); const isLoading = ref(true); const isTeacher = ref(false); const activeTab = ref('calendar'); const userDisplayName = ref(''); const userEmail = ref(''); const userBranch = ref(''); const userSchoolLevel = ref(''); const teacherScore = ref(0); const pastLessons = ref([]); const myTests = ref([]);
+const myChats = ref([]); const activeChat = ref(null); const activeMessages = ref([]); const newMessage = ref(''); let typingTimeout = null;
+const daysOfWeek = ["Pzt", "Sal", "Çar", "Per", "Cum", "Cmt", "Paz"]; const timeSlots = ["09:00", "10:00", "11:00", "12:00", "13:00", "14:00", "15:00", "16:00", "17:00", "18:00", "19:00", "20:00"]; const myAvailability = reactive({}); const myBookings = reactive({});
+const testForm = reactive({ title: '', grade: '', subject: '', questionCount: 0, file: null, answers: [] });
+const availableGrades = computed(() => { const level = userSchoolLevel.value; if (level === 'ilkokul') return [1, 2, 3, 4]; else if (level === 'ortaokul') return [5, 6, 7, 8]; else if (level === 'lise') return [9, 10, 11, 12, 'Mezun']; else return [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, "Mezun"]; });
+const isFormValid = computed(() => testForm.title && testForm.grade && userBranch.value && testForm.file && testForm.questionCount > 0 && testForm.answers.length === testForm.questionCount && !testForm.answers.includes(undefined));
+const isUpdateModalOpen = ref(false); const editTestForm = reactive({ id: null, title: '', grade: '', subject: '' });
+const isAvailable = (day, time) => myAvailability[`${day}-${time}`] === true;
+const isBooked = (day, time) => !!myBookings[`${day}-${time}`];
+const getBookingInfo = (day, time) => { const booking = myBookings[`${day}-${time}`]; return booking ? booking.student : 'Dolu'; }
+const toggleAvailability = async (day, time) => { if (isBooked(day, time)) { alert("Bu saatte dersiniz var, iptal edemezsiniz."); return; } const key = `${day}-${time}`; if (myAvailability[key]) delete myAvailability[key]; else myAvailability[key] = true; if ($auth.currentUser) { const userRef = doc(db, "users", $auth.currentUser.uid); if (myAvailability[key]) await updateDoc(userRef, { [`availability.${key}`]: true }).catch(e => console.error(e)); else await updateDoc(userRef, { [`availability.${key}`]: deleteField() }).catch(e => console.error(e)); } }
+const fetchTeacherBookings = async () => { if (!db) db = getFirestore(); const q = query(collection(db, "bookings"), where("teacherId", "==", $auth.currentUser.uid)); const snap = await getDocs(q); snap.forEach(doc => { const data = doc.data(); const key = `${data.day}-${data.time}`; myBookings[key] = { student: data.studentName || 'Öğrenci', id: doc.id }; }); }
+const fetchMyTests = async (uid) => { if (!db) db = getFirestore(); try { const q = query(collection(db, "tests"), where("uploaderId", "==", uid)); const querySnapshot = await getDocs(q); const tests = querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })); myTests.value = tests.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt)); } catch (error) { console.error("Testler çekilemedi:", error); } }
+const handlePdfUpload = (e) => { const file = e.target.files[0]; if (file && file.type === "application/pdf") testForm.file = file; else alert("Lütfen geçerli bir PDF dosyası seçin."); }
+const generateAnswerKeyInputs = () => { const count = parseInt(testForm.questionCount); if (!count || count < 0) { testForm.answers = []; return; } const newAnswers = new Array(count).fill(null); for (let i = 0; i < Math.min(count, testForm.answers.length); i++) newAnswers[i] = testForm.answers[i]; testForm.answers = newAnswers; }
 const setAnswer = (index, option) => { testForm.answers[index] = option; }
-
-const submitTest = async () => {
-    if (!db) db = getFirestore();
-    
-    // Güvenlik: Subject'i her zaman kullanıcının branşından al
-    const finalSubject = userBranch.value;
-
-    try {
-        const fakePdfUrl = "https://example.com/uploads/sample_test.pdf";
-        await addDoc(collection(db, "tests"), {
-            uploaderId: $auth.currentUser.uid,
-            uploaderName: userDisplayName.value,
-            title: testForm.title,
-            grade: testForm.grade,
-            subject: finalSubject, // Kullanıcının branşı
-            questionCount: testForm.questionCount,
-            answerKey: testForm.answers,
-            pdfUrl: fakePdfUrl,
-            createdAt: new Date().toISOString()
-        });
-        alert("Test başarıyla yüklendi!");
-        await fetchMyTests($auth.currentUser.uid);
-        Object.assign(testForm, { title: '', questionCount: 0, file: null, answers: [] })
-    } catch (error) { alert("Hata: " + error.message); }
-}
-
-const openUpdateModal = (test) => {
-    editTestForm.id = test.id
-    editTestForm.title = test.title
-    editTestForm.grade = test.grade
-    editTestForm.subject = test.subject // Gösterim amaçlı, düzenlenemez
-    isUpdateModalOpen.value = true
-}
-
-const saveTestUpdate = async () => {
-    if (!db) db = getFirestore()
-    try {
-        const testRef = doc(db, "tests", editTestForm.id)
-        await updateDoc(testRef, {
-            title: editTestForm.title,
-            grade: editTestForm.grade,
-            // Subject güncellenmez, sabittir.
-        })
-        alert("Test güncellendi.")
-        isUpdateModalOpen.value = false
-        await fetchMyTests($auth.currentUser.uid)
-    } catch (e) { alert("Güncelleme hatası: " + e.message) }
-}
-
-// --- MESAJLAŞMA (CHAT) ---
-const fetchChats = () => {
-    if (!db) db = getFirestore();
-    const q = query(collection(db, "chats"), where("participants", "array-contains", $auth.currentUser.uid));
-
-    onSnapshot(q, (snapshot) => {
-        myChats.value = snapshot.docs.map(doc => {
-            const data = doc.data();
-            const otherId = data.participants.find(p => p !== $auth.currentUser.uid);
-            const otherName = otherId === data.studentId ? data.studentName : data.teacherName;
-            return { id: doc.id, ...data, otherUserName: otherName, otherUserId: otherId };
-        });
-        if (activeChat.value) {
-            const updated = myChats.value.find(c => c.id === activeChat.value.id);
-            if (updated) activeChat.value = { ...activeChat.value, ...updated };
-        }
-    });
-};
-
-const selectChat = (chat) => {
-    activeChat.value = chat;
-    loadMessages(chat.id);
-    markAsRead(chat.id);
-};
-
-const loadMessages = (chatId) => {
-    if (!db) db = getFirestore();
-    const q = query(collection(db, "chats", chatId, "messages"), orderBy("createdAt", "asc"));
-
-    onSnapshot(q, (snapshot) => {
-        activeMessages.value = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-        setTimeout(() => {
-            const container = document.querySelector('.messages-area');
-            if (container) container.scrollTop = container.scrollHeight;
-        }, 100);
-    });
-};
-
-const handleTyping = async () => {
-    if (!activeChat.value) return;
-    const chatRef = doc(db, "chats", activeChat.value.id);
-    await updateDoc(chatRef, { [`typing.${$auth.currentUser.uid}`]: true });
-
-    if (typingTimeout) clearTimeout(typingTimeout);
-    typingTimeout = setTimeout(async () => {
-        await updateDoc(chatRef, { [`typing.${$auth.currentUser.uid}`]: false });
-    }, 2000);
-};
-
-const markAsRead = async (chatId) => {
-    if (!chatId) return;
-    const chatRef = doc(db, "chats", chatId);
-    await updateDoc(chatRef, { [`lastRead.${$auth.currentUser.uid}`]: serverTimestamp() });
-};
-
-const isMessageRead = (msg) => {
-    if (!activeChat.value || !activeChat.value.lastRead || !msg.createdAt) return false;
-    const otherUserId = activeChat.value.otherUserId;
-    const readTime = activeChat.value.lastRead[otherUserId];
-    if (!readTime) return false;
-    return readTime.seconds >= msg.createdAt.seconds;
-};
-
-const sendMessage = async () => {
-    if (!newMessage.value.trim() || !activeChat.value) return;
-    const text = newMessage.value;
-    newMessage.value = '';
-
-    const chatRef = doc(db, "chats", activeChat.value.id);
-    await addDoc(collection(chatRef, "messages"), { text, senderId: $auth.currentUser.uid, createdAt: serverTimestamp() });
-    await updateDoc(chatRef, { lastMessage: text, updatedAt: serverTimestamp() });
-
-    if (typingTimeout) clearTimeout(typingTimeout);
-    await updateDoc(chatRef, { [`typing.${$auth.currentUser.uid}`]: false });
-};
-
-// --- PROFİL & AUTH ---
-const isProfileModalOpen = ref(false)
-const fileInput = ref(null)
-const profileState = ref({ avatarType: 'initials', selectedPreset: '', uploadedImage: null })
-const tempProfile = ref({ avatarType: 'initials', selectedPreset: '', uploadedImage: null }) // Name ve Branch çıkarıldı
-const presetAvatars = ["https://api.dicebear.com/7.x/avataaars/svg?seed=Felix", "https://api.dicebear.com/7.x/avataaars/svg?seed=Aneka", "https://api.dicebear.com/7.x/bottts/svg?seed=Bubba", "https://api.dicebear.com/7.x/micah/svg?seed=Callie", "https://api.dicebear.com/7.x/notionists/svg?seed=Cookie"]
-
-const currentAvatarUrl = computed(() => {
-    if (profileState.value.avatarType === 'upload' && profileState.value.uploadedImage) return profileState.value.uploadedImage
-    if (profileState.value.avatarType === 'preset' && profileState.value.selectedPreset) return profileState.value.selectedPreset
-    return `https://ui-avatars.com/api/?name=${userDisplayName.value || 'T'}&background=0055ff&color=fff`
-})
-
-const openProfileModal = () => {
-    tempProfile.value = {
-        // İsim ve branch tempProfile'a atanmıyor çünkü düzenlenemezler
-        avatarType: profileState.value.avatarType,
-        selectedPreset: profileState.value.selectedPreset,
-        uploadedImage: profileState.value.uploadedImage
-    }
-    isProfileModalOpen.value = true
-}
-
-const triggerFileUpload = () => fileInput.value.click()
-
-const handleFileUpload = (event) => {
-    const file = event.target.files[0]
-    if (file) {
-        const reader = new FileReader()
-        reader.onload = (e) => {
-            tempProfile.value.uploadedImage = e.target.result
-            tempProfile.value.avatarType = 'upload'
-        }
-        reader.readAsDataURL(file)
-    }
-}
-
-const selectPresetAvatar = (url) => {
-    tempProfile.value.selectedPreset = url
-    tempProfile.value.avatarType = 'preset'
-}
-
-const saveProfile = async () => {
-    if (!db) db = getFirestore();
-
-    // Sadece Avatar Güncelleniyor
-    profileState.value = {
-        avatarType: tempProfile.value.avatarType,
-        selectedPreset: tempProfile.value.selectedPreset,
-        uploadedImage: tempProfile.value.uploadedImage
-    }
-
-    if ($auth.currentUser) {
-        try {
-            // İsim güncellemesi (updateProfile) kaldırıldı
-            const userRef = doc(db, "users", $auth.currentUser.uid);
-            await updateDoc(userRef, {
-                // DisplayName ve Branch update kaldırıldı
-                avatar: {
-                    type: tempProfile.value.avatarType,
-                    preset: tempProfile.value.selectedPreset,
-                    uploadedImage: tempProfile.value.uploadedImage
-                }
-            })
-        } catch (e) { console.error("Profil güncellenemedi", e) }
-    }
-    isProfileModalOpen.value = false
-}
-
-const handleLogout = async () => {
-    localStorage.removeItem('userRole');
-    await signOut($auth);
-    router.push('/');
-}
-
-onMounted(() => {
-    db = getFirestore();
-    onAuthStateChanged($auth, async (user) => {
-        if (user) {
-            userEmail.value = user.email
-            userDisplayName.value = user.displayName || ''
-            const docRef = doc(db, "users", user.uid);
-            const docSnap = await getDoc(docRef);
-            if (docSnap.exists()) {
-                const data = docSnap.data();
-                if (data.role !== 'teacher') { router.push(data.role === 'student' ? '/dashboard' : '/'); return; }
-                isTeacher.value = true;
-                
-                // Verileri Çek
-                userBranch.value = data.branch || '';
-                userSchoolLevel.value = data.schoolLevel || ''; // 'ilkokul', 'ortaokul' veya 'lise' beklenir
-                teacherScore.value = data.score || 0;
-                
-                if (data.avatar) {
-                    profileState.value = {
-                        avatarType: data.avatar.type || 'initials',
-                        selectedPreset: data.avatar.preset || '',
-                        uploadedImage: data.avatar.uploadedImage || null
-                    }
-                }
-                if (data.availability) Object.assign(myAvailability, data.availability);
-                await fetchMyTests(user.uid);
-                fetchChats();
-                fetchTeacherBookings();
-            }
-        } else { router.push('/kayit-giris') }
-        isLoading.value = false
-    })
-})
+const submitTest = async () => { if (!db) db = getFirestore(); const finalSubject = userBranch.value; try { const fakePdfUrl = "https://example.com/uploads/sample_test.pdf"; await addDoc(collection(db, "tests"), { uploaderId: $auth.currentUser.uid, uploaderName: userDisplayName.value, title: testForm.title, grade: testForm.grade, subject: finalSubject, questionCount: testForm.questionCount, answerKey: testForm.answers, pdfUrl: fakePdfUrl, createdAt: new Date().toISOString() }); alert("Test başarıyla yüklendi!"); await fetchMyTests($auth.currentUser.uid); Object.assign(testForm, { title: '', questionCount: 0, file: null, answers: [] }) } catch (error) { alert("Hata: " + error.message); } }
+const openUpdateModal = (test) => { editTestForm.id = test.id; editTestForm.title = test.title; editTestForm.grade = test.grade; editTestForm.subject = test.subject; isUpdateModalOpen.value = true }
+const saveTestUpdate = async () => { if (!db) db = getFirestore(); try { const testRef = doc(db, "tests", editTestForm.id); await updateDoc(testRef, { title: editTestForm.title, grade: editTestForm.grade, }); alert("Test güncellendi."); isUpdateModalOpen.value = false; await fetchMyTests($auth.currentUser.uid) } catch (e) { alert("Güncelleme hatası: " + e.message) } }
+const fetchChats = () => { if (!db) db = getFirestore(); const q = query(collection(db, "chats"), where("participants", "array-contains", $auth.currentUser.uid)); onSnapshot(q, (snapshot) => { myChats.value = snapshot.docs.map(doc => { const data = doc.data(); const otherId = data.participants.find(p => p !== $auth.currentUser.uid); const otherName = otherId === data.studentId ? data.studentName : data.teacherName; return { id: doc.id, ...data, otherUserName: otherName, otherUserId: otherId }; }); if (activeChat.value) { const updated = myChats.value.find(c => c.id === activeChat.value.id); if (updated) activeChat.value = { ...activeChat.value, ...updated }; } }); };
+const selectChat = (chat) => { activeChat.value = chat; loadMessages(chat.id); markAsRead(chat.id); };
+const loadMessages = (chatId) => { if (!db) db = getFirestore(); const q = query(collection(db, "chats", chatId, "messages"), orderBy("createdAt", "asc")); onSnapshot(q, (snapshot) => { activeMessages.value = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })); setTimeout(() => { const container = document.querySelector('.messages-area'); if (container) container.scrollTop = container.scrollHeight; }, 100); }); };
+const handleTyping = async () => { if (!activeChat.value) return; const chatRef = doc(db, "chats", activeChat.value.id); await updateDoc(chatRef, { [`typing.${$auth.currentUser.uid}`]: true }); if (typingTimeout) clearTimeout(typingTimeout); typingTimeout = setTimeout(async () => { await updateDoc(chatRef, { [`typing.${$auth.currentUser.uid}`]: false }); }, 2000); };
+const markAsRead = async (chatId) => { if (!chatId) return; const chatRef = doc(db, "chats", chatId); await updateDoc(chatRef, { [`lastRead.${$auth.currentUser.uid}`]: serverTimestamp() }); };
+const isMessageRead = (msg) => { if (!activeChat.value || !activeChat.value.lastRead || !msg.createdAt) return false; const otherUserId = activeChat.value.otherUserId; const readTime = activeChat.value.lastRead[otherUserId]; if (!readTime) return false; return readTime.seconds >= msg.createdAt.seconds; };
+const sendMessage = async () => { if (!newMessage.value.trim() || !activeChat.value) return; const text = newMessage.value; newMessage.value = ''; const chatRef = doc(db, "chats", activeChat.value.id); await addDoc(collection(chatRef, "messages"), { text, senderId: $auth.currentUser.uid, createdAt: serverTimestamp() }); await updateDoc(chatRef, { lastMessage: text, updatedAt: serverTimestamp() }); if (typingTimeout) clearTimeout(typingTimeout); await updateDoc(chatRef, { [`typing.${$auth.currentUser.uid}`]: false }); };
+const isProfileModalOpen = ref(false); const fileInput = ref(null); const profileState = ref({ avatarType: 'initials', selectedPreset: '', uploadedImage: null }); const tempProfile = ref({ avatarType: 'initials', selectedPreset: '', uploadedImage: null }); const presetAvatars = ["https://api.dicebear.com/7.x/avataaars/svg?seed=Felix", "https://api.dicebear.com/7.x/avataaars/svg?seed=Aneka", "https://api.dicebear.com/7.x/bottts/svg?seed=Bubba", "https://api.dicebear.com/7.x/micah/svg?seed=Callie", "https://api.dicebear.com/7.x/notionists/svg?seed=Cookie"];
+const currentAvatarUrl = computed(() => { if (profileState.value.avatarType === 'upload' && profileState.value.uploadedImage) return profileState.value.uploadedImage; if (profileState.value.avatarType === 'preset' && profileState.value.selectedPreset) return profileState.value.selectedPreset; return `https://ui-avatars.com/api/?name=${userDisplayName.value || 'T'}&background=0055ff&color=fff` });
+const openProfileModal = () => { tempProfile.value = { avatarType: profileState.value.avatarType, selectedPreset: profileState.value.selectedPreset, uploadedImage: profileState.value.uploadedImage }; isProfileModalOpen.value = true }; const triggerFileUpload = () => fileInput.value.click(); const handleFileUpload = (event) => { const file = event.target.files[0]; if (file) { const reader = new FileReader(); reader.onload = (e) => { tempProfile.value.uploadedImage = e.target.result; tempProfile.value.avatarType = 'upload' }; reader.readAsDataURL(file) } }; const selectPresetAvatar = (url) => { tempProfile.value.selectedPreset = url; tempProfile.value.avatarType = 'preset' }; const saveProfile = async () => { if (!db) db = getFirestore(); profileState.value = { avatarType: tempProfile.value.avatarType, selectedPreset: tempProfile.value.selectedPreset, uploadedImage: tempProfile.value.uploadedImage }; if ($auth.currentUser) { try { const userRef = doc(db, "users", $auth.currentUser.uid); await updateDoc(userRef, { avatar: { type: tempProfile.value.avatarType, preset: tempProfile.value.selectedPreset, uploadedImage: tempProfile.value.uploadedImage } }) } catch (e) { console.error("Profil güncellenemedi", e) } } isProfileModalOpen.value = false }; const handleLogout = async () => { localStorage.removeItem('userRole'); await signOut($auth); router.push('/'); };
+onMounted(() => { db = getFirestore(); onAuthStateChanged($auth, async (user) => { if (user) { userEmail.value = user.email; userDisplayName.value = user.displayName || ''; const docRef = doc(db, "users", user.uid); const docSnap = await getDoc(docRef); if (docSnap.exists()) { const data = docSnap.data(); if (data.role !== 'teacher') { router.push(data.role === 'student' ? '/dashboard' : '/'); return; } isTeacher.value = true; userBranch.value = data.branch || ''; userSchoolLevel.value = data.schoolLevel || ''; teacherScore.value = data.score || 0; if (data.avatar) { profileState.value = { avatarType: data.avatar.type || 'initials', selectedPreset: data.avatar.preset || '', uploadedImage: data.avatar.uploadedImage || null } } if (data.availability) Object.assign(myAvailability, data.availability); await fetchMyTests(user.uid); fetchChats(); fetchTeacherBookings(); } } else { router.push('/kayit-giris') } isLoading.value = false }) })
 </script>
 
 <style scoped>
-/* TEMEL DÜZEN */
+/* GENEL LAYOUT */
 .dashboard-container {
     display: flex;
     min-height: 100vh;
@@ -683,12 +382,237 @@ onMounted(() => {
     color: white;
     font-family: 'Montserrat', sans-serif;
     padding-top: 0;
+    /* Mobilde padding sıfırlandı */
 }
 
-/* YENİ EKLENEN STİLLER (READ-ONLY ALANLAR İÇİN) */
+/* Sidebar Logo */
+.sidebar-logo-container {
+    padding: 0 10px 30px 10px;
+    display: flex;
+    justify-content: center;
+}
+
+.sidebar-logo-link {
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    text-decoration: none;
+    gap: 15px;
+}
+
+.sidebar-logo-img {
+    height: 40px;
+    width: auto;
+}
+
+.eduty-text {
+    font-size: 1.8rem;
+    font-weight: 800;
+    letter-spacing: 1px;
+    display: flex;
+    gap: 1px;
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+}
+
+.eduty-text span:nth-child(1),
+.eduty-text span:nth-child(2) {
+    color: #0055ff;
+    text-shadow: 0 0 10px rgb(0, 85, 255, 0.3);
+}
+
+.eduty-text span:nth-child(3),
+.eduty-text span:nth-child(4),
+.eduty-text span:nth-child(5) {
+    color: #003bb0;
+    text-shadow: 0 0 10px rgb(0, 59, 176, 0.3);
+}
+
+/* Mobil Toggle Button */
+.mobile-toggle-btn {
+    display: none;
+    position: fixed;
+    top: 15px;
+    left: 15px;
+    z-index: 10002;
+    background: #222;
+    border: 1px solid #333;
+    color: white;
+    font-size: 1.5rem;
+    padding: 8px 12px;
+    border-radius: 8px;
+    cursor: pointer;
+    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.5);
+}
+
+.sidebar-overlay {
+    display: none;
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100vw;
+    height: 100vh;
+    background: rgba(0, 0, 0, 0.8);
+    z-index: 9998;
+    backdrop-filter: blur(2px);
+}
+
+/* SIDEBAR STYLES */
+.sidebar {
+    width: 280px;
+    background-color: #121212;
+    border-right: 1px solid #222;
+    display: flex;
+    flex-direction: column;
+    padding: 40px 20px;
+    height: 100vh;
+    position: sticky;
+    top: 0;
+    overflow-y: auto;
+    z-index: 100;
+    flex-shrink: 0;
+    scrollbar-width: thin;
+    scrollbar-color: #333 #121212;
+}
+
+.main-content {
+    flex-grow: 1;
+    padding: 20px 40px 40px 40px;
+    width: calc(100% - 280px);
+}
+
+/* Sidebar Navigasyon */
+.sidebar-nav {
+    display: flex;
+    flex-direction: column;
+    margin-bottom: 20px;
+}
+
+.sidebar-nav button,
+.nav-link-home {
+    background: transparent;
+    border: none;
+    color: #aaa;
+    text-align: left;
+    padding: 14px 15px;
+    border-radius: 12px;
+    cursor: pointer;
+    transition: 0.3s;
+    font-size: 0.95rem;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    width: 100%;
+    margin-bottom: 8px;
+    text-decoration: none;
+    font-family: inherit;
+}
+
+.sidebar-nav button:hover,
+.sidebar-nav button.active {
+    background: #0055ff;
+    color: white;
+}
+
+.nav-link-home:hover {
+    color: white;
+    background: #222;
+}
+
+.sidebar-divider {
+    height: 1px;
+    background: #222;
+    margin: 10px 0;
+}
+
+/* Logout Button */
+.logout-btn {
+    margin-top: auto;
+    padding: 12px;
+    background: #1a1a1a;
+    border: 1px solid #333;
+    color: #ff4444;
+    border-radius: 12px;
+    cursor: pointer;
+    transition: 0.2s;
+}
+
+.logout-btn:hover {
+    background: #330000;
+}
+
+/* Content Header */
+.content-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 40px;
+    background: linear-gradient(90deg, #111, #1a1a1a);
+    padding: 30px;
+    border-radius: 16px;
+    border: 1px solid #222;
+    flex-wrap: wrap;
+    gap: 20px;
+    position: relative;
+    z-index: 10;
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
+}
+
+/* RESPONSIVE AYARLAR */
+@media (max-width: 1024px) {
+    .mobile-toggle-btn {
+        display: block;
+    }
+
+    .sidebar {
+        position: fixed;
+        left: 0;
+        top: 0;
+        bottom: 0;
+        width: 280px;
+        z-index: 9999;
+        transform: translateX(-100%);
+        transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        box-shadow: 5px 0 15px rgba(0, 0, 0, 0.5);
+        height: 100%;
+        overflow-y: auto;
+        background: #121212;
+    }
+
+    .sidebar.open {
+        transform: translateX(0);
+    }
+
+    .sidebar-overlay {
+        display: block;
+        z-index: 9998;
+    }
+
+    .main-content {
+        margin-left: 0;
+        width: 100%;
+        padding: 70px 20px 20px 20px;
+    }
+
+    .upload-container {
+        flex-direction: column;
+    }
+
+    .answer-key-panel {
+        width: 100%;
+    }
+
+    .cal-day-col,
+    .cal-cell {
+        font-size: 0.7rem;
+        padding: 5px;
+    }
+}
+
+/* Diğer mevcut CSS stilleri */
 .read-only-group {
     margin-bottom: 20px;
 }
+
 .read-only-text {
     background: #111;
     padding: 12px;
@@ -698,18 +622,21 @@ onMounted(() => {
     margin-top: 5px;
     font-size: 0.95rem;
 }
+
 .read-only-text.highlight {
     color: #0055ff;
     font-weight: bold;
     border-color: #0055ff;
     background: rgba(0, 85, 255, 0.05);
 }
+
 .read-only-group small {
     display: block;
     color: #555;
     font-size: 0.75rem;
     margin-top: 5px;
 }
+
 .disabled-input {
     background: #111;
     color: #777;
@@ -717,7 +644,6 @@ onMounted(() => {
     border-color: #222;
 }
 
-/* ANIMASYONLAR (DASHBOARD.VUE ILE EŞİTLENDİ) */
 .animate-fade {
     animation: fadeIn 0.4s ease-in-out;
 }
@@ -734,7 +660,6 @@ onMounted(() => {
     }
 }
 
-/* LOADING SCREEN */
 .loading-screen {
     height: 100vh;
     display: flex;
@@ -763,29 +688,6 @@ onMounted(() => {
     100% {
         transform: rotate(360deg);
     }
-}
-
-/* SIDEBAR */
-.sidebar {
-    width: 280px;
-    background-color: #121212;
-    border-right: 1px solid #222;
-    display: flex;
-    flex-direction: column;
-    padding: 120px 20px 40px 20px;
-    position: fixed;
-    top: 0;
-    left: 0;
-    bottom: 0;
-    overflow-y: auto;
-    z-index: 100;
-}
-
-.main-content {
-    margin-left: 280px;
-    flex-grow: 1;
-    padding: 120px 40px 40px 40px;
-    width: calc(100% - 280px);
 }
 
 .profile-section {
@@ -846,60 +748,6 @@ onMounted(() => {
     margin-top: 5px;
 }
 
-.sidebar-nav button {
-    background: transparent;
-    border: none;
-    color: #aaa;
-    text-align: left;
-    padding: 14px 15px;
-    border-radius: 12px;
-    cursor: pointer;
-    transition: 0.3s;
-    font-size: 0.95rem;
-    display: flex;
-    align-items: center;
-    gap: 12px;
-    width: 100%;
-    margin-bottom: 8px;
-}
-
-.sidebar-nav button:hover,
-.sidebar-nav button.active {
-    background: #0055ff;
-    color: white;
-}
-
-.logout-btn {
-    margin-top: auto;
-    padding: 12px;
-    background: #1a1a1a;
-    border: 1px solid #333;
-    color: #ff4444;
-    border-radius: 12px;
-    cursor: pointer;
-    transition: 0.2s;
-}
-
-.logout-btn:hover {
-    background: #330000;
-}
-
-/* HEADER */
-.content-header {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    margin-bottom: 40px;
-    background: linear-gradient(90deg, #111, #1a1a1a);
-    padding: 30px;
-    border-radius: 16px;
-    border: 1px solid #222;
-    flex-wrap: wrap;
-    gap: 20px;
-    position: relative;
-    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
-}
-
 .score-card {
     display: flex;
     flex-direction: column;
@@ -942,7 +790,6 @@ onMounted(() => {
     color: #666;
 }
 
-/* EMPTY STATE */
 .empty-state {
     text-align: center;
     padding: 100px 0;
@@ -952,7 +799,6 @@ onMounted(() => {
     width: 100%;
 }
 
-/* CALENDAR */
 .calendar-wrapper {
     background: #161616;
     border-radius: 16px;
@@ -1052,7 +898,6 @@ onMounted(() => {
     opacity: 1;
 }
 
-/* FORM */
 .section-block {
     background: #161616;
     padding: 30px;
@@ -1154,7 +999,6 @@ select:focus {
     cursor: not-allowed;
 }
 
-/* MESSAGES */
 .messages-container {
     display: flex;
     height: 600px;
@@ -1300,7 +1144,6 @@ select:focus {
     }
 }
 
-/* TEST CARD */
 .test-grid {
     display: grid;
     grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
@@ -1353,7 +1196,6 @@ select:focus {
     color: black;
 }
 
-/* MODAL */
 .modal-overlay {
     position: fixed;
     top: 0;
@@ -1374,7 +1216,7 @@ select:focus {
     width: 90%;
     max-width: 450px;
     border: 1px solid #333;
-    box-shadow: 0 20px 50px rgba(0,0,0,0.5);
+    box-shadow: 0 20px 50px rgba(0, 0, 0, 0.5);
 }
 
 .modal-select {
@@ -1447,34 +1289,5 @@ select:focus {
     padding: 10px 20px;
     border-radius: 8px;
     cursor: pointer;
-}
-
-/* RESPONSIVE */
-@media (max-width: 1024px) {
-    .sidebar {
-        width: 0;
-        padding: 0;
-        overflow: hidden;
-    }
-
-    .main-content {
-        margin-left: 0;
-        width: 100%;
-        padding: 100px 20px;
-    }
-
-    .upload-container {
-        flex-direction: column;
-    }
-
-    .answer-key-panel {
-        width: 100%;
-    }
-
-    .cal-day-col,
-    .cal-cell {
-        font-size: 0.7rem;
-        padding: 5px;
-    }
 }
 </style>

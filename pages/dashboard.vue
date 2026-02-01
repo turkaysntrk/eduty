@@ -6,10 +6,15 @@
 
     <div v-else-if="isStudent" class="dashboard-container">
 
+        <button class="mobile-toggle-btn" @click="isSidebarOpen = !isSidebarOpen">
+            ☰
+        </button>
+
+        <div v-if="isSidebarOpen" class="sidebar-overlay" @click="isSidebarOpen = false"></div>
+
         <div v-if="isProfileModalOpen" class="modal-overlay">
             <div class="modal-content">
                 <h3>Profili Düzenle</h3>
-
                 <div class="modal-body">
                     <label>Adınız Soyadınız:</label>
                     <input type="text" v-model="tempProfile.name" placeholder="Örn: Ali Yılmaz" />
@@ -40,7 +45,6 @@
                         </div>
                     </div>
                 </div>
-
                 <div class="modal-actions">
                     <button @click="isProfileModalOpen = false" class="btn-cancel">İptal</button>
                     <button @click="saveProfile" class="btn-save">Kaydet</button>
@@ -53,9 +57,8 @@
                 <div class="modal-header">
                     <h3>Ders Zamanı Seç</h3>
                     <p>Öğretmen: <span class="highlight-text">{{ selectedTeacherForBooking?.displayName ||
-                            selectedTeacherForBooking?.email }}</span></p>
+                        selectedTeacherForBooking?.email }}</span></p>
                 </div>
-
                 <div class="scheduler-grid">
                     <div v-if="availableSlots.length === 0" class="no-slots">
                         Bu öğretmen için şu an uygun saat bulunamadı.
@@ -66,7 +69,6 @@
                         <span class="slot-time">{{ slot.time }}</span>
                     </div>
                 </div>
-
                 <div class="modal-actions">
                     <button @click="isBookingModalOpen = false" class="btn-cancel">Vazgeç</button>
                     <button @click="confirmBooking" class="btn-save" :disabled="!bookingSlot">
@@ -90,7 +92,6 @@
                     <button class="btn-close-test" @click="confirmExitTest">Çıkış Yap</button>
                 </div>
             </div>
-
             <div class="test-runner-body">
                 <div class="pdf-container" ref="pdfContainer">
                     <iframe :src="currentTest?.pdfUrl || '/sample.pdf'" class="pdf-frame"></iframe>
@@ -115,11 +116,20 @@
             </div>
         </div>
 
-        <aside class="sidebar">
+        <aside class="sidebar" :class="{ 'open': isSidebarOpen }">
+
+            <div class="sidebar-logo-container">
+                <NuxtLink to="/" class="sidebar-logo-link" @click="isSidebarOpen = false">
+                    <img src="/img/eduty_logo.png" alt="Eduty Logo" class="sidebar-logo-img" />
+                    <div class="eduty-text">
+                        <span>e</span><span>d</span><span>u</span><span>t</span><span>y</span>
+                    </div>
+                </NuxtLink>
+            </div>
+
             <div class="profile-section">
                 <div class="avatar-wrapper">
                     <button class="edit-profile-btn" @click="openProfileModal" title="Profili Düzenle">✏️</button>
-
                     <img :src="currentAvatarUrl" alt="Profil" class="avatar" />
                     <div class="rank-badge" :class="studentRank.class">{{ studentRank.title }}</div>
                 </div>
@@ -130,27 +140,40 @@
             </div>
 
             <nav class="sidebar-nav">
-                <button @click="activeTab = 'stats'" :class="{ active: activeTab === 'stats' }">
+                <button @click="{ activeTab = 'stats'; isSidebarOpen = false }"
+                    :class="{ active: activeTab === 'stats' }">
                     <span class="icon">📊</span> İstatistiklerim
                 </button>
-                <button @click="activeTab = 'test-solve'" :class="{ active: activeTab === 'test-solve' }">
+                <button @click="{ activeTab = 'test-solve'; isSidebarOpen = false }"
+                    :class="{ active: activeTab === 'test-solve' }">
                     <span class="icon">📝</span> Test Çöz
                 </button>
-                <button @click="activeTab = 'calendar'" :class="{ active: activeTab === 'calendar' }">
+                <button @click="{ activeTab = 'calendar'; isSidebarOpen = false }"
+                    :class="{ active: activeTab === 'calendar' }">
                     <span class="icon">📅</span> Takvimim
                 </button>
-                <button @click="activeTab = 'find-teacher'" :class="{ active: activeTab === 'find-teacher' }">
+                <button @click="{ activeTab = 'find-teacher'; isSidebarOpen = false }"
+                    :class="{ active: activeTab === 'find-teacher' }">
                     <span class="icon">🔍</span> Öğretmen Ara
                 </button>
-                <button @click="activeTab = 'favorites'" :class="{ active: activeTab === 'favorites' }">
+                <button @click="{ activeTab = 'favorites'; isSidebarOpen = false }"
+                    :class="{ active: activeTab === 'favorites' }">
                     <span class="icon">⭐</span> Favori Öğretmenlerim
                 </button>
-                <button @click="activeTab = 'history'" :class="{ active: activeTab === 'history' }">
+                <button @click="{ activeTab = 'history'; isSidebarOpen = false }"
+                    :class="{ active: activeTab === 'history' }">
                     <span class="icon">📚</span> Geçmiş Derslerim
                 </button>
-                <button @click="activeTab = 'messages'" :class="{ active: activeTab === 'messages' }">
+                <button @click="{ activeTab = 'messages'; isSidebarOpen = false }"
+                    :class="{ active: activeTab === 'messages' }">
                     <span class="icon">💬</span> Mesajlar
                 </button>
+
+                <div class="sidebar-divider"></div>
+
+                <NuxtLink to="/" class="nav-link-home" @click="isSidebarOpen = false">
+                    <span class="icon">🏠</span> Ana Sayfaya Dön
+                </NuxtLink>
             </nav>
 
             <button @click="handleLogout" class="logout-btn">Çıkış Yap</button>
@@ -222,7 +245,8 @@
                             <div v-for="test in testsForSelectedSubject" :key="test.id" class="test-card">
                                 <div class="test-header">
                                     <span class="badge-subject">{{ test.subject }}</span>
-                                    <span class="badge-grade">{{ test.grade === 'Mezun' ? 'Mezun' : test.grade + '.Sınıf' }}</span>
+                                    <span class="badge-grade">{{ test.grade === 'Mezun' ? 'Mezun' : test.grade +
+                                        '.Sınıf' }}</span>
                                 </div>
                                 <h3>{{ test.title }}</h3>
                                 <div class="test-meta">
@@ -259,7 +283,8 @@
                             </div>
                         </div>
                         <div class="calendar-grid">
-                            <div v-for="blank in firstDayOffset" :key="'blank-' + blank" class="calendar-day empty"></div>
+                            <div v-for="blank in firstDayOffset" :key="'blank-' + blank" class="calendar-day empty">
+                            </div>
                             <div v-for="date in daysInMonth" :key="date" class="calendar-day">
                                 <span class="day-number" :class="{ 'today': isToday(date) }">{{ date }}</span>
                                 <div class="day-events">
@@ -410,6 +435,7 @@ let db;
 // State
 const isLoading = ref(true)
 const isStudent = ref(false)
+const isSidebarOpen = ref(false) // Mobil menü durumu
 const activeTab = ref('stats')
 const userDisplayName = ref('')
 const userEmail = ref('')
@@ -423,7 +449,7 @@ const availableTests = ref([])
 const realTeachers = ref([])
 const myFavorites = ref([])
 const filters = ref({ subject: '', time: '' })
-const myBookings = ref([]) // Öğrencinin randevuları
+const myBookings = ref([])
 
 // Test Grouping State
 const selectedTestSubject = ref(null)
@@ -432,7 +458,7 @@ const selectedTestSubject = ref(null)
 const isBookingModalOpen = ref(false)
 const selectedTeacherForBooking = ref(null)
 const bookingSlot = ref(null)
-const availableSlots = ref([]) // Gerçek verilerle dolacak
+const availableSlots = ref([])
 
 // Test Runner State
 const isTakingTest = ref(false)
@@ -482,418 +508,239 @@ const lessons = computed(() => {
     return list
 })
 
-// FONKSİYONLAR
-const fetchTests = async () => {
-    if (!db) db = getFirestore();
-    const q = await getDocs(collection(db, "tests"));
-    availableTests.value = q.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-};
-
-const fetchTeachers = async () => {
-    if (!db) db = getFirestore();
-    try {
-        const q = query(collection(db, "users"), where("role", "==", "teacher"));
-        const snapshot = await getDocs(q);
-        realTeachers.value = snapshot.docs
-            .map(doc => ({ id: doc.id, ...doc.data() }))
-            .filter(t => !t.displayName || !t.displayName.toLowerCase().includes('piç'));
-    } catch (e) { console.error(e) }
-}
-
-const filteredTeachers = computed(() => {
-    return realTeachers.value.filter(t => {
-        const matchSubject = filters.value.subject === '' || t.branch === filters.value.subject
-        return matchSubject
-    })
-})
-
-const hasAvailability = (teacher) => {
-    return teacher.availability && Object.keys(teacher.availability).length > 0;
-}
-
-// Randevu İşlemleri
-const openBookingModal = (teacher) => {
-    selectedTeacherForBooking.value = teacher
-    bookingSlot.value = null
-
-    // Öğretmenin müsaitlik verisini işle
-    const slots = [];
-    if (teacher.availability) {
-        Object.keys(teacher.availability).forEach(key => {
-            // key formatı: "Pzt-10:00"
-            const [day, time] = key.split('-');
-            slots.push({ id: key, day, time });
-        });
-    }
-    availableSlots.value = slots;
-    isBookingModalOpen.value = true
-}
-
-const confirmBooking = async () => {
-    if (!db) db = getFirestore();
-    if (!selectedTeacherForBooking.value || !bookingSlot.value) return;
-
-    try {
-        // 1. Randevuyu bookings koleksiyonuna ekle
-        await addDoc(collection(db, "bookings"), {
-            teacherId: selectedTeacherForBooking.value.id,
-            teacherName: selectedTeacherForBooking.value.displayName || selectedTeacherForBooking.value.email,
-            studentId: $auth.currentUser.uid,
-            studentName: userDisplayName.value,
-            day: bookingSlot.value.day,
-            time: bookingSlot.value.time,
-            createdAt: serverTimestamp(),
-            status: 'confirmed'
-        });
-
-        // 2. Öğretmenin müsaitlik listesinden bu saati düş (Opsiyonel ama önerilir)
-        const teacherRef = doc(db, "users", selectedTeacherForBooking.value.id);
-        const slotKey = `${bookingSlot.value.day}-${bookingSlot.value.time}`;
-
-        // deleteField() kullanarak sadece o anahtarı siliyoruz
-        await updateDoc(teacherRef, {
-            [`availability.${slotKey}`]: deleteField()
-        });
-
-        alert(`Tebrikler! ${selectedTeacherForBooking.value.displayName} ile ${bookingSlot.value.day} saat ${bookingSlot.value.time} için dersiniz oluşturuldu.`);
-        isBookingModalOpen.value = false;
-
-        // Listeleri güncelle
-        fetchBookings();
-        fetchTeachers();
-
-    } catch (error) {
-        console.error("Randevu hatası:", error);
-        alert("Randevu oluşturulurken bir hata oluştu.");
-    }
-}
-
-const fetchBookings = async () => {
-    if (!db) db = getFirestore();
-    const q = query(collection(db, "bookings"), where("studentId", "==", $auth.currentUser.uid));
-    const snap = await getDocs(q);
-    myBookings.value = snap.docs.map(d => ({ id: d.id, ...d.data() }));
-}
-
-// Takvim Yardımcıları
-const monthNames = ["Ocak", "Şubat", "Mart", "Nisan", "Mayıs", "Haziran", "Temmuz", "Ağustos", "Eylül", "Ekim", "Kasım", "Aralık"]
-const currentMonthName = computed(() => monthNames[currentMonth.value])
-const daysInMonth = computed(() => new Date(currentYear.value, currentMonth.value + 1, 0).getDate())
-const firstDayOffset = computed(() => {
-    let d = new Date(currentYear.value, currentMonth.value, 1).getDay()
-    return d === 0 ? 6 : d - 1 // Pzt=0 yapmak için
-})
-const changeMonth = (delta) => {
-    currentMonth.value += delta
-    if (currentMonth.value > 11) { currentMonth.value = 0; currentYear.value++ }
-    if (currentMonth.value < 0) { currentMonth.value = 11; currentYear.value-- }
-}
-const isToday = (date) => {
-    const today = new Date()
-    return date === today.getDate() && currentMonth.value === today.getMonth() && currentYear.value === today.getFullYear()
-}
-
-// Basitçe o gün için randevuları filtrele (Gün ismine göre - Örn: "Sal")
-const getBookingsForDate = (date) => {
-    // Gerçek tarihten gün ismini bul (Pzt, Sal...)
-    const d = new Date(currentYear.value, currentMonth.value, date);
-    const dayIndex = d.getDay(); // 0=Paz, 1=Pzt
-    const dayMap = ["Paz", "Pzt", "Sal", "Çar", "Per", "Cum", "Cmt"];
-    const dayName = dayMap[dayIndex];
-
-    // myBookings içinde 'day' alanı 'Pzt', 'Sal' gibi tutuluyor
-    return myBookings.value.filter(b => b.day === dayName);
-}
-
-
-// Mesajlaşma (Chat) Fonksiyonları
-const startChat = async (teacher) => {
-    if (!db) db = getFirestore();
-    const myUid = $auth.currentUser.uid;
-    const teacherUid = teacher.id;
-
-    // 1. Zaten bir sohbet var mı kontrol et
-    // (Firebase'de array-contains ile tek sorguda iki ID'yi kontrol etmek zor, client taraflı filtreliyoruz veya composite key kullanıyoruz.
-    // Basitlik için tüm chatlerimi çekip filter yapacağız - prod için composite key önerilir)
-    const q = query(collection(db, "chats"), where("participants", "array-contains", myUid));
-    const snap = await getDocs(q);
-
-    let existingChat = snap.docs.find(doc => {
-        const data = doc.data();
-        return data.participants.includes(teacherUid);
-    });
-
-    if (existingChat) {
-        // Var olan sohbeti aç
-        activeTab.value = 'messages';
-        const chatData = existingChat.data();
-        selectChat({
-            id: existingChat.id,
-            ...chatData,
-            otherUserName: teacher.displayName || teacher.email,
-            otherUserId: teacherUid
-        });
-    } else {
-        // Yeni sohbet oluştur
-        const newChatRef = await addDoc(collection(db, "chats"), {
-            participants: [myUid, teacherUid],
-            studentId: myUid,
-            teacherId: teacherUid,
-            studentName: userDisplayName.value,
-            teacherName: teacher.displayName || teacher.email,
-            createdAt: serverTimestamp(),
-            lastMessage: '',
-            typing: {}
-        });
-
-        activeTab.value = 'messages';
-        selectChat({
-            id: newChatRef.id,
-            participants: [myUid, teacherUid],
-            otherUserName: teacher.displayName || teacher.email,
-            otherUserId: teacherUid
-        });
-    }
-}
-
-const fetchChats = () => {
-    if (!db) db = getFirestore();
-    const q = query(collection(db, "chats"), where("participants", "array-contains", $auth.currentUser.uid));
-
-    onSnapshot(q, (snapshot) => {
-        myChats.value = snapshot.docs.map(doc => {
-            const data = doc.data();
-            const otherId = data.participants.find(p => p !== $auth.currentUser.uid);
-            // Karşı tarafın adını belirle
-            const otherName = otherId === data.teacherId ? data.teacherName : data.studentName;
-            return { id: doc.id, ...data, otherUserName: otherName, otherUserId: otherId };
-        });
-        if (activeChat.value) {
-            const updated = myChats.value.find(c => c.id === activeChat.value.id);
-            if (updated) activeChat.value = { ...activeChat.value, ...updated };
-        }
-    });
-};
-
-const selectChat = (chat) => {
-    activeChat.value = chat;
-    loadMessages(chat.id);
-    markAsRead(chat.id);
-};
-
-const loadMessages = (chatId) => {
-    if (!db) db = getFirestore();
-    const q = query(collection(db, "chats", chatId, "messages"), orderBy("createdAt", "asc"));
-
-    onSnapshot(q, (snapshot) => {
-        activeMessages.value = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-        setTimeout(() => {
-            const container = document.querySelector('.messages-area');
-            if (container) container.scrollTop = container.scrollHeight;
-        }, 100);
-    });
-};
-
-const sendMessage = async () => {
-    if (!newMessage.value.trim() || !activeChat.value) return;
-
-    const text = newMessage.value;
-    newMessage.value = '';
-
-    const chatRef = doc(db, "chats", activeChat.value.id);
-    await addDoc(collection(chatRef, "messages"), {
-        text,
-        senderId: $auth.currentUser.uid,
-        createdAt: serverTimestamp()
-    });
-
-    await updateDoc(chatRef, {
-        lastMessage: text,
-        updatedAt: serverTimestamp()
-    });
-
-    if (typingTimeout) clearTimeout(typingTimeout);
-    await updateDoc(chatRef, { [`typing.${$auth.currentUser.uid}`]: false });
-};
-
-const handleTyping = async () => {
-    if (!activeChat.value) return;
-    const chatRef = doc(db, "chats", activeChat.value.id);
-    await updateDoc(chatRef, { [`typing.${$auth.currentUser.uid}`]: true });
-
-    if (typingTimeout) clearTimeout(typingTimeout);
-    typingTimeout = setTimeout(async () => {
-        await updateDoc(chatRef, { [`typing.${$auth.currentUser.uid}`]: false });
-    }, 2000);
-};
-
-const markAsRead = async (chatId) => {
-    if (!chatId) return;
-    const chatRef = doc(db, "chats", chatId);
-    await updateDoc(chatRef, {
-        [`lastRead.${$auth.currentUser.uid}`]: serverTimestamp()
-    });
-};
-
-const isMessageRead = (msg) => {
-    if (!activeChat.value || !activeChat.value.lastRead || !msg.createdAt) return false;
-    const otherUserId = activeChat.value.otherUserId;
-    const readTime = activeChat.value.lastRead[otherUserId];
-    if (!readTime) return false;
-    return readTime.seconds >= msg.createdAt.seconds;
-};
-
-// Test Runner
+const fetchTests = async () => { if (!db) db = getFirestore(); const q = await getDocs(collection(db, "tests")); availableTests.value = q.docs.map(doc => ({ id: doc.id, ...doc.data() })); };
+const fetchTeachers = async () => { if (!db) db = getFirestore(); try { const q = query(collection(db, "users"), where("role", "==", "teacher")); const snapshot = await getDocs(q); realTeachers.value = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })).filter(t => !t.displayName || !t.displayName.toLowerCase().includes('piç')); } catch (e) { console.error(e) } }
+const filteredTeachers = computed(() => { return realTeachers.value.filter(t => { const matchSubject = filters.value.subject === '' || t.branch === filters.value.subject; return matchSubject }) })
+const hasAvailability = (teacher) => { return teacher.availability && Object.keys(teacher.availability).length > 0; }
+const openBookingModal = (teacher) => { selectedTeacherForBooking.value = teacher; bookingSlot.value = null; const slots = []; if (teacher.availability) { Object.keys(teacher.availability).forEach(key => { const [day, time] = key.split('-'); slots.push({ id: key, day, time }); }); } availableSlots.value = slots; isBookingModalOpen.value = true }
+const confirmBooking = async () => { if (!db) db = getFirestore(); if (!selectedTeacherForBooking.value || !bookingSlot.value) return; try { await addDoc(collection(db, "bookings"), { teacherId: selectedTeacherForBooking.value.id, teacherName: selectedTeacherForBooking.value.displayName || selectedTeacherForBooking.value.email, studentId: $auth.currentUser.uid, studentName: userDisplayName.value, day: bookingSlot.value.day, time: bookingSlot.value.time, createdAt: serverTimestamp(), status: 'confirmed' }); const teacherRef = doc(db, "users", selectedTeacherForBooking.value.id); const slotKey = `${bookingSlot.value.day}-${bookingSlot.value.time}`; await updateDoc(teacherRef, { [`availability.${slotKey}`]: deleteField() }); alert(`Randevu oluşturuldu.`); isBookingModalOpen.value = false; fetchBookings(); fetchTeachers(); } catch (error) { console.error(error); alert("Hata oluştu."); } }
+const fetchBookings = async () => { if (!db) db = getFirestore(); const q = query(collection(db, "bookings"), where("studentId", "==", $auth.currentUser.uid)); const snap = await getDocs(q); myBookings.value = snap.docs.map(d => ({ id: d.id, ...d.data() })); }
+const monthNames = ["Ocak", "Şubat", "Mart", "Nisan", "Mayıs", "Haziran", "Temmuz", "Ağustos", "Eylül", "Ekim", "Kasım", "Aralık"]; const currentMonthName = computed(() => monthNames[currentMonth.value]); const daysInMonth = computed(() => new Date(currentYear.value, currentMonth.value + 1, 0).getDate()); const firstDayOffset = computed(() => { let d = new Date(currentYear.value, currentMonth.value, 1).getDay(); return d === 0 ? 6 : d - 1 }); const changeMonth = (delta) => { currentMonth.value += delta; if (currentMonth.value > 11) { currentMonth.value = 0; currentYear.value++ } if (currentMonth.value < 0) { currentMonth.value = 11; currentYear.value-- } }; const isToday = (date) => { const today = new Date(); return date === today.getDate() && currentMonth.value === today.getMonth() && currentYear.value === today.getFullYear() }; const getBookingsForDate = (date) => { const d = new Date(currentYear.value, currentMonth.value, date); const dayIndex = d.getDay(); const dayMap = ["Paz", "Pzt", "Sal", "Çar", "Per", "Cum", "Cmt"]; const dayName = dayMap[dayIndex]; return myBookings.value.filter(b => b.day === dayName); }
+const startChat = async (teacher) => { if (!db) db = getFirestore(); const myUid = $auth.currentUser.uid; const teacherUid = teacher.id; const q = query(collection(db, "chats"), where("participants", "array-contains", myUid)); const snap = await getDocs(q); let existingChat = snap.docs.find(doc => { const data = doc.data(); return data.participants.includes(teacherUid); }); if (existingChat) { activeTab.value = 'messages'; const chatData = existingChat.data(); selectChat({ id: existingChat.id, ...chatData, otherUserName: teacher.displayName || teacher.email, otherUserId: teacherUid }); } else { const newChatRef = await addDoc(collection(db, "chats"), { participants: [myUid, teacherUid], studentId: myUid, teacherId: teacherUid, studentName: userDisplayName.value, teacherName: teacher.displayName || teacher.email, createdAt: serverTimestamp(), lastMessage: '', typing: {} }); activeTab.value = 'messages'; selectChat({ id: newChatRef.id, participants: [myUid, teacherUid], otherUserName: teacher.displayName || teacher.email, otherUserId: teacherUid }); } }
+const fetchChats = () => { if (!db) db = getFirestore(); const q = query(collection(db, "chats"), where("participants", "array-contains", $auth.currentUser.uid)); onSnapshot(q, (snapshot) => { myChats.value = snapshot.docs.map(doc => { const data = doc.data(); const otherId = data.participants.find(p => p !== $auth.currentUser.uid); const otherName = otherId === data.teacherId ? data.teacherName : data.studentName; return { id: doc.id, ...data, otherUserName: otherName, otherUserId: otherId }; }); if (activeChat.value) { const updated = myChats.value.find(c => c.id === activeChat.value.id); if (updated) activeChat.value = { ...activeChat.value, ...updated }; } }); };
+const selectChat = (chat) => { activeChat.value = chat; loadMessages(chat.id); markAsRead(chat.id); }; const loadMessages = (chatId) => { if (!db) db = getFirestore(); const q = query(collection(db, "chats", chatId, "messages"), orderBy("createdAt", "asc")); onSnapshot(q, (snapshot) => { activeMessages.value = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })); setTimeout(() => { const container = document.querySelector('.messages-area'); if (container) container.scrollTop = container.scrollHeight; }, 100); }); }; const sendMessage = async () => { if (!newMessage.value.trim() || !activeChat.value) return; const text = newMessage.value; newMessage.value = ''; const chatRef = doc(db, "chats", activeChat.value.id); await addDoc(collection(chatRef, "messages"), { text, senderId: $auth.currentUser.uid, createdAt: serverTimestamp() }); await updateDoc(chatRef, { lastMessage: text, updatedAt: serverTimestamp() }); if (typingTimeout) clearTimeout(typingTimeout); await updateDoc(chatRef, { [`typing.${$auth.currentUser.uid}`]: false }); }; const handleTyping = async () => { if (!activeChat.value) return; const chatRef = doc(db, "chats", activeChat.value.id); await updateDoc(chatRef, { [`typing.${$auth.currentUser.uid}`]: true }); if (typingTimeout) clearTimeout(typingTimeout); typingTimeout = setTimeout(async () => { await updateDoc(chatRef, { [`typing.${$auth.currentUser.uid}`]: false }); }, 2000); }; const markAsRead = async (chatId) => { if (!chatId) return; const chatRef = doc(db, "chats", chatId); await updateDoc(chatRef, { [`lastRead.${$auth.currentUser.uid}`]: serverTimestamp() }); }; const isMessageRead = (msg) => { if (!activeChat.value || !activeChat.value.lastRead || !msg.createdAt) return false; const otherUserId = activeChat.value.otherUserId; const readTime = activeChat.value.lastRead[otherUserId]; if (!readTime) return false; return readTime.seconds >= msg.createdAt.seconds; };
 const selectSubject = (subject) => { selectedTestSubject.value = subject; }
 const getTestCountForSubject = (subject) => { return availableTests.value.filter(t => t.subject === subject).length; }
-const testsForSelectedSubject = computed(() => {
-    if (!selectedTestSubject.value) return [];
-    return availableTests.value
-        .filter(t => t.subject === selectedTestSubject.value)
-        .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
-});
-const addToFavoritesById = (teacherId) => {
-    const teacher = findTeacherById(teacherId);
-    if (teacher && !myFavorites.value.find(f => f.id === teacher.id)) {
-        myFavorites.value.push(teacher);
-        alert(`${teacher.displayName || 'Öğretmen'} favorilere eklendi.`);
-    }
-}
+const testsForSelectedSubject = computed(() => { if (!selectedTestSubject.value) return []; return availableTests.value.filter(t => t.subject === selectedTestSubject.value).sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt)); });
+const addToFavoritesById = (teacherId) => { const teacher = findTeacherById(teacherId); if (teacher && !myFavorites.value.find(f => f.id === teacher.id)) { myFavorites.value.push(teacher); alert(`${teacher.displayName || 'Öğretmen'} favorilere eklendi.`); } }
 const findTeacherById = (id) => { return realTeachers.value.find(t => t.id === id); }
-const bookLessonById = (teacherId) => {
-    const teacher = findTeacherById(teacherId);
-    if (teacher) openBookingModal(teacher);
-}
-
-const openTestRunner = async (test) => {
-    currentTest.value = test
-    userAnswers.value = new Array(parseInt(test.questionCount)).fill(null)
-    isTakingTest.value = true
-    await nextTick()
-    const canvas = drawCanvas.value
-    canvas.width = canvas.parentElement.clientWidth
-    canvas.height = canvas.parentElement.clientHeight
-    ctx = canvas.getContext('2d')
-    ctx.lineCap = 'round'; ctx.lineJoin = 'round'; ctx.strokeStyle = '#0055ff'; ctx.lineWidth = 2;
-}
+const bookLessonById = (teacherId) => { const teacher = findTeacherById(teacherId); if (teacher) openBookingModal(teacher); }
+const openTestRunner = async (test) => { currentTest.value = test; userAnswers.value = new Array(parseInt(test.questionCount)).fill(null); isTakingTest.value = true; await nextTick(); const canvas = drawCanvas.value; canvas.width = canvas.parentElement.clientWidth; canvas.height = canvas.parentElement.clientHeight; ctx = canvas.getContext('2d'); ctx.lineCap = 'round'; ctx.lineJoin = 'round'; ctx.strokeStyle = '#0055ff'; ctx.lineWidth = 2; }
 const startDrawing = (e) => { isDrawing.value = true; ctx.beginPath(); ctx.moveTo(e.offsetX, e.offsetY); }
 const draw = (e) => { if (!isDrawing.value) return; ctx.lineTo(e.offsetX, e.offsetY); ctx.stroke(); }
 const stopDrawing = () => { isDrawing.value = false; ctx.closePath(); }
 const setTool = (t) => { drawingTool.value = t; ctx.globalCompositeOperation = t === 'eraser' ? 'destination-out' : 'source-over'; ctx.lineWidth = t === 'eraser' ? 20 : 2; }
 const clearCanvas = () => ctx.clearRect(0, 0, drawCanvas.value.width, drawCanvas.value.height)
-const confirmExitTest = () => {
-    if (confirm("Testten çıkmak istediğine emin misin? İlerlemen kaybolacak.")) { isTakingTest.value = false }
-}
+const confirmExitTest = () => { if (confirm("Testten çıkmak istediğine emin misin? İlerlemen kaybolacak.")) { isTakingTest.value = false } }
 const finishTest = () => { alert("Test tamamlandı! Sonuçlar hesaplanıyor..."); isTakingTest.value = false; }
-
-// Profil
-const isProfileModalOpen = ref(false)
-const fileInput = ref(null)
-const profileState = ref({ avatarType: 'initials', selectedPreset: '', uploadedImage: null })
-const tempProfile = ref({ name: '', grade: null, avatarType: 'initials', selectedPreset: '', uploadedImage: null })
-const presetAvatars = ["https://api.dicebear.com/7.x/avataaars/svg?seed=Felix", "https://api.dicebear.com/7.x/avataaars/svg?seed=Aneka", "https://api.dicebear.com/7.x/bottts/svg?seed=Bubba", "https://api.dicebear.com/7.x/micah/svg?seed=Callie", "https://api.dicebear.com/7.x/notionists/svg?seed=Cookie"]
-
-const currentAvatarUrl = computed(() => {
-    if (profileState.value.avatarType === 'upload' && profileState.value.uploadedImage) return profileState.value.uploadedImage
-    if (profileState.value.avatarType === 'preset' && profileState.value.selectedPreset) return profileState.value.selectedPreset
-    return `https://ui-avatars.com/api/?name=${userDisplayName.value || 'O'}&background=0055ff&color=fff`
-})
-
-const openProfileModal = () => {
-    tempProfile.value = {
-        name: userDisplayName.value,
-        grade: userGrade.value,
-        avatarType: profileState.value.avatarType,
-        selectedPreset: profileState.value.selectedPreset,
-        uploadedImage: profileState.value.uploadedImage
-    }
-    isProfileModalOpen.value = true
-}
-const triggerFileUpload = () => fileInput.value.click()
-const handleFileUpload = (event) => {
-    const file = event.target.files[0]
-    if (file) {
-        const reader = new FileReader()
-        reader.onload = (e) => { tempProfile.value.uploadedImage = e.target.result; tempProfile.value.avatarType = 'upload' }
-        reader.readAsDataURL(file)
-    }
-}
-const selectPresetAvatar = (url) => { tempProfile.value.selectedPreset = url; tempProfile.value.avatarType = 'preset' }
-
-const saveProfile = async () => {
-    if (!db) db = getFirestore();
-    userDisplayName.value = tempProfile.value.name
-    userGrade.value = tempProfile.value.grade
-    profileState.value = { avatarType: tempProfile.value.avatarType, selectedPreset: tempProfile.value.selectedPreset, uploadedImage: tempProfile.value.uploadedImage }
-    if ($auth.currentUser) {
-        try {
-            await updateProfile($auth.currentUser, { displayName: tempProfile.value.name })
-            const userRef = doc(db, "users", $auth.currentUser.uid);
-            await updateDoc(userRef, {
-                displayName: tempProfile.value.name,
-                grade: tempProfile.value.grade,
-                avatar: { type: tempProfile.value.avatarType, preset: tempProfile.value.selectedPreset, uploadedImage: tempProfile.value.uploadedImage }
-            })
-        } catch (e) { console.error("Profil güncellenemedi", e) }
-    }
-    isProfileModalOpen.value = false
-}
-
-const handleLogout = async () => { await signOut($auth); router.push('/'); }
-
-const studentRank = computed(() => {
-    const s = studentScore.value
-    if (s < 100) return { title: 'Acemi', class: 'rank-1' }
-    if (s < 500) return { title: 'Hırslı', class: 'rank-2' }
-    if (s < 1000) return { title: 'Kalfa', class: 'rank-3' }
-    if (s < 2000) return { title: 'Usta', class: 'rank-4' }
-    if (s < 5000) return { title: 'Doçent', class: 'rank-5' }
-    return { title: 'Profesör', class: 'rank-6' }
-})
-
-// Auth & Init
-onMounted(() => {
-    db = getFirestore();
-    onAuthStateChanged($auth, async (user) => {
-        if (user) {
-            userEmail.value = user.email
-            userDisplayName.value = user.displayName || ''
-            const docRef = doc(db, "users", user.uid);
-            const docSnap = await getDoc(docRef);
-            if (docSnap.exists()) {
-                const data = docSnap.data();
-                if (data.role !== 'student') { router.push(data.role === 'teacher' ? '/dashboard-teacher' : '/'); return; }
-                isStudent.value = true;
-                if (data.grade) userGrade.value = data.grade;
-                if (data.displayName) userDisplayName.value = data.displayName;
-                studentScore.value = data.score || 0;
-                completedTestCount.value = data.completedTestCount || 0;
-                completedLessons.value = data.completedTestCount || 0;
-                if (data.avatar) profileState.value = { avatarType: data.avatar.type || 'initials', selectedPreset: data.avatar.preset || '', uploadedImage: data.avatar.uploadedImage || null }
-
-                try {
-                    await fetchTests();
-                    await fetchTeachers();
-                    await fetchBookings();
-                    fetchChats();
-                } catch (e) { console.error("Veri yükleme hatası:", e); }
-            }
-            isLoading.value = false;
-        } else { router.push('/'); }
-    })
-})
+const isProfileModalOpen = ref(false); const fileInput = ref(null); const profileState = ref({ avatarType: 'initials', selectedPreset: '', uploadedImage: null }); const tempProfile = ref({ name: '', grade: null, avatarType: 'initials', selectedPreset: '', uploadedImage: null }); const presetAvatars = ["https://api.dicebear.com/7.x/avataaars/svg?seed=Felix", "https://api.dicebear.com/7.x/avataaars/svg?seed=Aneka", "https://api.dicebear.com/7.x/bottts/svg?seed=Bubba", "https://api.dicebear.com/7.x/micah/svg?seed=Callie", "https://api.dicebear.com/7.x/notionists/svg?seed=Cookie"]; const currentAvatarUrl = computed(() => { if (profileState.value.avatarType === 'upload' && profileState.value.uploadedImage) return profileState.value.uploadedImage; if (profileState.value.avatarType === 'preset' && profileState.value.selectedPreset) return profileState.value.selectedPreset; return `https://ui-avatars.com/api/?name=${userDisplayName.value || 'O'}&background=0055ff&color=fff` }); const openProfileModal = () => { tempProfile.value = { name: userDisplayName.value, grade: userGrade.value, avatarType: profileState.value.avatarType, selectedPreset: profileState.value.selectedPreset, uploadedImage: profileState.value.uploadedImage }; isProfileModalOpen.value = true }; const triggerFileUpload = () => fileInput.value.click(); const handleFileUpload = (event) => { const file = event.target.files[0]; if (file) { const reader = new FileReader(); reader.onload = (e) => { tempProfile.value.uploadedImage = e.target.result; tempProfile.value.avatarType = 'upload' }; reader.readAsDataURL(file) } }; const selectPresetAvatar = (url) => { tempProfile.value.selectedPreset = url; tempProfile.value.avatarType = 'preset' }; const saveProfile = async () => { if (!db) db = getFirestore(); userDisplayName.value = tempProfile.value.name; userGrade.value = tempProfile.value.grade; profileState.value = { avatarType: tempProfile.value.avatarType, selectedPreset: tempProfile.value.selectedPreset, uploadedImage: tempProfile.value.uploadedImage }; if ($auth.currentUser) { try { await updateProfile($auth.currentUser, { displayName: tempProfile.value.name }); const userRef = doc(db, "users", $auth.currentUser.uid); await updateDoc(userRef, { displayName: tempProfile.value.name, grade: tempProfile.value.grade, avatar: { type: tempProfile.value.avatarType, preset: tempProfile.value.selectedPreset, uploadedImage: tempProfile.value.uploadedImage } }) } catch (e) { console.error("Profil güncellenemedi", e) } } isProfileModalOpen.value = false }; const handleLogout = async () => { await signOut($auth); router.push('/'); }; const studentRank = computed(() => { const s = studentScore.value; if (s < 100) return { title: 'Acemi', class: 'rank-1' }; if (s < 500) return { title: 'Hırslı', class: 'rank-2' }; if (s < 1000) return { title: 'Kalfa', class: 'rank-3' }; if (s < 2000) return { title: 'Usta', class: 'rank-4' }; if (s < 5000) return { title: 'Doçent', class: 'rank-5' }; return { title: 'Profesör', class: 'rank-6' } });
+onMounted(() => { db = getFirestore(); onAuthStateChanged($auth, async (user) => { if (user) { userEmail.value = user.email; userDisplayName.value = user.displayName || ''; const docRef = doc(db, "users", user.uid); const docSnap = await getDoc(docRef); if (docSnap.exists()) { const data = docSnap.data(); if (data.role !== 'student') { router.push(data.role === 'teacher' ? '/dashboard-teacher' : '/'); return; } isStudent.value = true; if (data.grade) userGrade.value = data.grade; if (data.displayName) userDisplayName.value = data.displayName; studentScore.value = data.score || 0; completedTestCount.value = data.completedTestCount || 0; completedLessons.value = data.completedTestCount || 0; if (data.avatar) profileState.value = { avatarType: data.avatar.type || 'initials', selectedPreset: data.avatar.preset || '', uploadedImage: data.avatar.uploadedImage || null }; try { await fetchTests(); await fetchTeachers(); await fetchBookings(); fetchChats(); } catch (e) { console.error("Veri yükleme hatası:", e); } } isLoading.value = false; } else { router.push('/'); } }) });
 </script>
 
 <style scoped>
+/* GENEL LAYOUT */
 .dashboard-container {
     display: flex;
     min-height: 100vh;
     background-color: #0a0a0a;
     color: white;
     font-family: 'Montserrat', sans-serif;
-    padding-top: 110px;
+    padding-top: 0;
+    /* Padding kaldırıldı, mobil uyumu için */
 }
 
+/* SIDEBAR LOGO */
+.sidebar-logo-container {
+    padding: 0 10px 30px 10px;
+    display: flex;
+    justify-content: center;
+}
+
+.sidebar-logo-link {
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    text-decoration: none;
+    gap: 15px;
+}
+
+.sidebar-logo-img {
+    height: 40px;
+    width: auto;
+}
+
+.eduty-text {
+    font-size: 1.8rem;
+    font-weight: 800;
+    letter-spacing: 1px;
+    display: flex;
+    gap: 1px;
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+}
+
+.eduty-text span:nth-child(1),
+.eduty-text span:nth-child(2) {
+    color: #0055ff;
+    text-shadow: 0 0 10px rgb(0, 85, 255, 0.3);
+}
+
+.eduty-text span:nth-child(3),
+.eduty-text span:nth-child(4),
+.eduty-text span:nth-child(5) {
+    color: #003bb0;
+    text-shadow: 0 0 10px rgb(0, 59, 176, 0.3);
+}
+
+/* MOBİL BUTON VE OVERLAY */
+.mobile-toggle-btn {
+    display: none;
+    position: fixed;
+    top: 15px;
+    left: 15px;
+    z-index: 10002;
+    background: #222;
+    border: 1px solid #333;
+    color: white;
+    font-size: 1.5rem;
+    padding: 8px 12px;
+    border-radius: 8px;
+    cursor: pointer;
+    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.5);
+}
+
+.sidebar-overlay {
+    display: none;
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100vw;
+    height: 100vh;
+    background: rgba(0, 0, 0, 0.8);
+    z-index: 9998;
+    backdrop-filter: blur(2px);
+}
+
+/* SIDEBAR STİLLERİ */
+.sidebar {
+    width: 280px;
+    background-color: #121212;
+    border-right: 1px solid #222;
+    display: flex;
+    flex-direction: column;
+    padding: 40px 20px;
+    position: sticky;
+    top: 0;
+    height: 100vh;
+    overflow-y: auto;
+    z-index: 100;
+    flex-shrink: 0;
+    /* Scrollbar düzenlemesi */
+    scrollbar-width: thin;
+    scrollbar-color: #333 #121212;
+}
+
+/* Sidebar Navigation */
+.sidebar-nav {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    flex-grow: 1;
+    margin-bottom: 20px;
+}
+
+.sidebar-nav button,
+.nav-link-home {
+    background: transparent;
+    border: none;
+    color: #aaa;
+    text-align: left;
+    padding: 12px 15px;
+    border-radius: 8px;
+    cursor: pointer;
+    transition: 0.3s;
+    font-size: 1rem;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    text-decoration: none;
+    font-family: inherit;
+}
+
+.sidebar-nav button:hover,
+.sidebar-nav button.active {
+    background: rgba(0, 85, 255, 0.1);
+    color: #0055ff;
+}
+
+.nav-link-home:hover {
+    color: white;
+    background: #222;
+}
+
+.sidebar-divider {
+    height: 1px;
+    background: #222;
+    margin: 10px 0;
+}
+
+.main-content {
+    flex-grow: 1;
+    padding: 20px 40px 40px 40px;
+    width: calc(100% - 280px);
+    position: relative;
+    z-index: 1;
+}
+
+/* --- Responsive Sidebar (Hamburger Menü) --- */
+@media (max-width: 1024px) {
+    .mobile-toggle-btn {
+        display: block;
+    }
+
+    .sidebar {
+        position: fixed;
+        left: 0;
+        top: 0;
+        bottom: 0;
+        width: 280px;
+        z-index: 9999;
+        /* Overlay'in üstünde */
+        transform: translateX(-100%);
+        transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        box-shadow: 5px 0 15px rgba(0, 0, 0, 0.5);
+        height: 100%;
+        overflow-y: auto;
+        /* İçerik taşarsa scroll olsun */
+        background: #121212;
+        /* Arkaplan rengini garantiye al */
+    }
+
+    .sidebar.open {
+        transform: translateX(0);
+    }
+
+    .sidebar-overlay {
+        display: block;
+    }
+
+    .main-content {
+        margin-left: 0;
+        width: 100%;
+        padding: 70px 20px 20px 20px;
+        /* Header için üst boşluk */
+    }
+
+    /* Mobilde chat sidebar */
+    .chat-sidebar {
+        width: 70px;
+    }
+
+    .chat-header {
+        display: none;
+    }
+}
+
+/* Loading Screen */
 .loading-screen {
     height: 100vh;
     display: flex;
@@ -924,34 +771,10 @@ onMounted(() => {
     }
 }
 
-/* SIDEBAR */
-.sidebar {
-    width: 280px;
-    background-color: #121212;
-    border-right: 1px solid #222;
-    display: flex;
-    flex-direction: column;
-    padding: 40px 20px;
-    position: fixed;
-    top: 80px;
-    bottom: 0;
-    height: auto;
-    z-index: 90;
-    overflow-y: auto;
-}
-
-.main-content {
-    margin-left: 280px;
-    flex-grow: 1;
-    padding: 40px;
-    width: calc(100% - 280px);
-    position: relative;
-    z-index: 1;
-}
-
+/* Profil Bölümü */
 .profile-section {
     text-align: center;
-    margin-bottom: 40px;
+    margin-bottom: 30px;
 }
 
 .avatar-wrapper {
@@ -1052,49 +875,25 @@ onMounted(() => {
     margin-top: 5px;
 }
 
-.sidebar-nav {
-    display: flex;
-    flex-direction: column;
-    gap: 10px;
-    flex-grow: 1;
-}
-
-.sidebar-nav button {
-    background: transparent;
-    border: none;
-    color: #aaa;
-    text-align: left;
-    padding: 12px 15px;
-    border-radius: 8px;
-    cursor: pointer;
-    transition: 0.3s;
-    font-size: 1rem;
-    display: flex;
-    align-items: center;
-    gap: 10px;
-}
-
-.sidebar-nav button:hover,
-.sidebar-nav button.active {
-    background: rgba(0, 85, 255, 0.1);
-    color: #0055ff;
-}
-
+/* Logout */
 .logout-btn {
-    margin-top: 20px;
-    padding: 10px;
+    margin-top: auto;
+    padding: 12px;
     background: #1a1a1a;
     border: 1px solid #333;
     color: #ff4444;
     border-radius: 8px;
     cursor: pointer;
     transition: 0.3s;
+    width: 100%;
+    text-align: center;
 }
 
 .logout-btn:hover {
     background: #2a1a1a;
 }
 
+/* Content Header */
 .content-header {
     display: flex;
     justify-content: space-between;
@@ -1151,6 +950,7 @@ onMounted(() => {
     color: #666;
 }
 
+/* Diğer Bileşenler */
 .section-title {
     font-size: 1.8rem;
     margin-bottom: 30px;
@@ -1241,6 +1041,7 @@ onMounted(() => {
     margin-bottom: 15px;
 }
 
+/* Filtre ve Öğretmenler */
 .filter-bar {
     display: flex;
     gap: 15px;
@@ -1341,7 +1142,9 @@ onMounted(() => {
     color: white;
 }
 
-.modal-select {
+/* Modals & Inputs */
+.modal-select,
+.modal-body input[type="text"] {
     width: 100%;
     padding: 10px;
     background: #0a0a0a;
@@ -1350,12 +1153,6 @@ onMounted(() => {
     border-radius: 8px;
     margin-bottom: 20px;
     box-sizing: border-box;
-    cursor: pointer;
-}
-
-.modal-select:focus {
-    border-color: #0055ff;
-    outline: none;
 }
 
 .no-results,
@@ -1410,6 +1207,7 @@ onMounted(() => {
     border-radius: 16px;
 }
 
+/* Stats */
 .stats-grid {
     display: flex;
     gap: 20px;
@@ -1454,7 +1252,7 @@ onMounted(() => {
     }
 }
 
-/* MODAL */
+/* Modals Overlay & Content */
 .modal-overlay {
     position: fixed;
     top: 0;
@@ -1482,17 +1280,6 @@ onMounted(() => {
     margin-bottom: 20px;
     color: white;
     text-align: center;
-}
-
-.modal-body input[type="text"] {
-    width: 100%;
-    padding: 10px;
-    background: #0a0a0a;
-    border: 1px solid #333;
-    color: white;
-    border-radius: 8px;
-    margin-bottom: 20px;
-    box-sizing: border-box;
 }
 
 .avatar-selection {
@@ -1536,10 +1323,6 @@ onMounted(() => {
     background: rgba(0, 85, 255, 0.1);
 }
 
-.avatar-option:hover {
-    background: #333;
-}
-
 .modal-actions {
     display: flex;
     gap: 10px;
@@ -1563,7 +1346,7 @@ onMounted(() => {
     cursor: pointer;
 }
 
-/* MESAJLAŞMA */
+/* Chat */
 .messages-container {
     display: flex;
     height: 600px;
@@ -1621,7 +1404,6 @@ onMounted(() => {
     opacity: 0.5;
 }
 
-/* CHAT ITEM & BUBBLES */
 .chat-item {
     display: flex;
     align-items: center;
@@ -1725,7 +1507,7 @@ onMounted(() => {
     color: #88ffaa;
 }
 
-/* BOOKING MODAL */
+/* Booking Modal */
 .highlight-text {
     color: #0055ff;
     font-weight: bold;
@@ -1906,7 +1688,7 @@ onMounted(() => {
     color: white;
 }
 
-/* SUBJECTS & TEST LIST */
+/* Dersler */
 .subjects-grid {
     display: grid;
     grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
@@ -1973,46 +1755,7 @@ onMounted(() => {
     color: white;
 }
 
-.teacher-actions-mini {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    margin-bottom: 15px;
-    padding-top: 10px;
-    border-top: 1px solid #222;
-}
-
-.t-name {
-    font-size: 0.85rem;
-    color: #aaa;
-}
-
-.actions {
-    display: flex;
-    gap: 5px;
-}
-
-.btn-icon-action {
-    background: #222;
-    border: 1px solid #333;
-    color: #ccc;
-    width: 32px;
-    height: 32px;
-    border-radius: 6px;
-    cursor: pointer;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    transition: 0.2s;
-}
-
-.btn-icon-action:hover {
-    background: #0055ff;
-    border-color: #0055ff;
-    color: white;
-}
-
-/* CALENDAR STYLES */
+/* Takvim */
 .calendar-container {
     background: #161616;
     padding: 20px;
@@ -2097,56 +1840,42 @@ onMounted(() => {
     text-overflow: ellipsis;
 }
 
-/* RESPONSIVE */
-@media (max-width: 1024px) {
-    .dashboard-container {
-        padding-top: 80px;
-    }
+.teacher-actions-mini {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 15px;
+    padding-top: 10px;
+    border-top: 1px solid #222;
+}
 
-    .sidebar {
-        width: 80px;
-        padding: 20px 10px;
-        top: 60px;
-    }
+.t-name {
+    font-size: 0.85rem;
+    color: #aaa;
+}
 
-    .user-name,
-    .user-email,
-    .user-grade-info,
-    .sidebar-nav button span:not(.icon) {
-        display: none;
-    }
+.actions {
+    display: flex;
+    gap: 5px;
+}
 
-    .main-content {
-        margin-left: 80px;
-        width: calc(100% - 80px);
-        padding: 20px;
-    }
+.btn-icon-action {
+    background: #222;
+    border: 1px solid #333;
+    color: #ccc;
+    width: 32px;
+    height: 32px;
+    border-radius: 6px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: 0.2s;
+}
 
-    .profile-section {
-        margin-bottom: 20px;
-    }
-
-    .avatar {
-        width: 50px;
-        height: 50px;
-    }
-
-    .rank-badge {
-        display: none;
-    }
-
-    .edit-profile-btn {
-        width: 20px;
-        height: 20px;
-        font-size: 12px;
-    }
-
-    .chat-sidebar {
-        width: 80px;
-    }
-
-    .chat-header {
-        display: none;
-    }
+.btn-icon-action:hover {
+    background: #0055ff;
+    border-color: #0055ff;
+    color: white;
 }
 </style>

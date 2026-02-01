@@ -6,7 +6,23 @@
 
     <div v-else class="dashboard-container">
 
-        <aside class="sidebar">
+        <button class="mobile-toggle-btn" @click="isSidebarOpen = !isSidebarOpen">
+            ☰
+        </button>
+
+        <div v-if="isSidebarOpen" class="sidebar-overlay" @click="isSidebarOpen = false"></div>
+
+        <aside class="sidebar" :class="{ 'open': isSidebarOpen }">
+
+            <div class="sidebar-logo-container">
+                <NuxtLink to="/" class="sidebar-logo-link" @click="isSidebarOpen = false">
+                    <img src="/img/eduty_logo.png" alt="Eduty Logo" class="sidebar-logo-img" />
+                    <div class="eduty-text">
+                        <span>e</span><span>d</span><span>u</span><span>t</span><span>y</span>
+                    </div>
+                </NuxtLink>
+            </div>
+
             <div class="profile-section">
                 <div class="avatar-wrapper">
                     <img :src="currentAvatarUrl" alt="Profil" class="avatar" />
@@ -18,15 +34,24 @@
             </div>
 
             <nav class="sidebar-nav">
-                <button @click="activeTab = 'stats'" :class="{ active: activeTab === 'stats' }">
+                <button @click="{ activeTab = 'stats'; isSidebarOpen = false }"
+                    :class="{ active: activeTab === 'stats' }">
                     <span class="icon">📊</span> Genel İstatistikler
                 </button>
-                <button @click="activeTab = 'donate'" :class="{ active: activeTab === 'donate' }">
+                <button @click="{ activeTab = 'donate'; isSidebarOpen = false }"
+                    :class="{ active: activeTab === 'donate' }">
                     <span class="icon">💙</span> Bağış Yap
                 </button>
-                <button @click="activeTab = 'history'" :class="{ active: activeTab === 'history' }">
+                <button @click="{ activeTab = 'history'; isSidebarOpen = false }"
+                    :class="{ active: activeTab === 'history' }">
                     <span class="icon">📜</span> Bağış Geçmişi
                 </button>
+
+                <div class="sidebar-divider"></div>
+
+                <NuxtLink to="/" class="nav-link-home" @click="isSidebarOpen = false">
+                    <span class="icon">🏠</span> Ana Sayfaya Dön
+                </NuxtLink>
             </nav>
 
             <button @click="handleLogout" class="logout-btn">Çıkış Yap</button>
@@ -47,7 +72,6 @@
             </header>
 
             <section class="tab-content">
-
                 <div v-if="activeTab === 'stats'" class="animate-fade">
                     <h2 class="section-title">Etki Raporu</h2>
                     <div class="stats-grid">
@@ -142,6 +166,7 @@ const router = useRouter()
 const { $auth } = useNuxtApp()
 let db;
 
+const isSidebarOpen = ref(false)
 const isLoading = ref(true)
 const activeTab = ref('stats')
 const userDisplayName = ref('')
@@ -155,8 +180,8 @@ const donationHistory = ref([])
 const customAmount = ref(null)
 
 // Stats (Mocked or Calculated)
-const distributedPoints = computed(() => Math.floor(totalDonatedPoints.value * 0.9)) // %90'ı dağıtıldı varsayalım
-const usedPoints = computed(() => Math.floor(distributedPoints.value * 0.75)) // %75'i kullanıldı
+const distributedPoints = computed(() => Math.floor(totalDonatedPoints.value * 0.9))
+const usedPoints = computed(() => Math.floor(distributedPoints.value * 0.75))
 const usageRate = computed(() => totalDonatedPoints.value > 0 ? Math.floor((usedPoints.value / totalDonatedPoints.value) * 100) : 0)
 
 const packages = [
@@ -169,20 +194,19 @@ const processDonation = async (amount, packageName) => {
     if (!confirm(`${packageName} paketi için ${amount} TL bağış yapmak üzeresiniz. Onaylıyor musunuz? (Demo)`)) return;
 
     if (!db) db = getFirestore();
-    const points = amount * 10; // 1 TL = 10 Puan varsayımı
+    const points = amount * 10;
 
     try {
-        // Bağış kaydı ekle
         await addDoc(collection(db, "donations"), {
             donorId: $auth.currentUser.uid,
             amount: parseInt(amount),
             points: points,
             packageName: packageName,
-            createdAt: new Date().toISOString() // Sıralama için ISO string veya timestamp
+            createdAt: new Date().toISOString()
         });
 
         alert("Bağışınız başarıyla alındı! Teşekkür ederiz.");
-        fetchDonationHistory(); // Listeyi güncelle
+        fetchDonationHistory();
     } catch (error) {
         console.error("Bağış hatası:", error);
     }
@@ -202,7 +226,6 @@ const fetchDonationHistory = async () => {
     const snap = await getDocs(q);
 
     let history = snap.docs.map(d => ({ id: d.id, ...d.data() }));
-    // Tarihe göre sırala (Yeni en üstte)
     history.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
 
     donationHistory.value = history;
@@ -225,7 +248,6 @@ onMounted(() => {
             if (docSnap.exists()) {
                 const data = docSnap.data();
                 if (data.role !== 'donor') {
-                    // Eğer bağışçı değilse kendi paneline yönlendir
                     if (data.role === 'student') router.push('/dashboard');
                     else if (data.role === 'teacher') router.push('/dashboard-teacher');
                     return;
@@ -254,7 +276,79 @@ onMounted(() => {
     background-color: #0a0a0a;
     color: white;
     font-family: 'Montserrat', sans-serif;
-    padding-top: 110px;
+    padding-top: 0;
+    /* Mobilde padding sıfırlandı */
+}
+
+/* Sidebar Logo */
+.sidebar-logo-container {
+    padding: 0 10px 30px 10px;
+    display: flex;
+    justify-content: center;
+}
+
+.sidebar-logo-link {
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    text-decoration: none;
+    gap: 15px;
+}
+
+.sidebar-logo-img {
+    height: 40px;
+    width: auto;
+}
+
+.eduty-text {
+    font-size: 1.8rem;
+    font-weight: 800;
+    letter-spacing: 1px;
+    display: flex;
+    gap: 1px;
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+}
+
+.eduty-text span:nth-child(1),
+.eduty-text span:nth-child(2) {
+    color: #0055ff;
+    text-shadow: 0 0 10px rgb(0, 85, 255, 0.3);
+}
+
+.eduty-text span:nth-child(3),
+.eduty-text span:nth-child(4),
+.eduty-text span:nth-child(5) {
+    color: #003bb0;
+    text-shadow: 0 0 10px rgb(0, 59, 176, 0.3);
+}
+
+/* Mobil Toggle Button */
+.mobile-toggle-btn {
+    display: none;
+    position: fixed;
+    top: 15px;
+    left: 15px;
+    z-index: 10002;
+    background: #222;
+    border: 1px solid #333;
+    color: white;
+    font-size: 1.5rem;
+    padding: 8px 12px;
+    border-radius: 8px;
+    cursor: pointer;
+    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.5);
+}
+
+.sidebar-overlay {
+    display: none;
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100vw;
+    height: 100vh;
+    background: rgba(0, 0, 0, 0.8);
+    z-index: 9998;
+    backdrop-filter: blur(2px);
 }
 
 .loading-screen {
@@ -278,8 +372,13 @@ onMounted(() => {
 }
 
 @keyframes spin {
-    0% { transform: rotate(0deg); }
-    100% { transform: rotate(360deg); }
+    0% {
+        transform: rotate(0deg);
+    }
+
+    100% {
+        transform: rotate(360deg);
+    }
 }
 
 /* Sidebar */
@@ -290,17 +389,19 @@ onMounted(() => {
     display: flex;
     flex-direction: column;
     padding: 40px 20px;
-    position: fixed;
-    top: 80px;
-    bottom: 0;
+    position: sticky;
+    top: 0;
+    height: 100vh;
     overflow-y: auto;
-    z-index: 90;
+    z-index: 100;
+    flex-shrink: 0;
+    scrollbar-width: thin;
+    scrollbar-color: #333 #121212;
 }
 
 .main-content {
-    margin-left: 280px;
     flex-grow: 1;
-    padding: 40px;
+    padding: 20px 40px 40px 40px;
     width: calc(100% - 280px);
     position: relative;
     z-index: 1;
@@ -349,27 +450,48 @@ onMounted(() => {
     margin-top: 5px;
 }
 
-.sidebar-nav button {
+/* Navigasyon */
+.sidebar-nav {
+    display: flex;
+    flex-direction: column;
+    margin-bottom: 20px;
+}
+
+.sidebar-nav button,
+.nav-link-home {
     background: transparent;
     border: none;
     color: #aaa;
     text-align: left;
-    padding: 12px 15px;
-    border-radius: 8px;
+    padding: 14px 15px;
+    border-radius: 12px;
     cursor: pointer;
     transition: 0.3s;
-    font-size: 1rem;
+    font-size: 0.95rem;
     display: flex;
     align-items: center;
-    gap: 10px;
+    gap: 12px;
     width: 100%;
     margin-bottom: 5px;
+    text-decoration: none;
+    font-family: inherit;
 }
 
 .sidebar-nav button:hover,
 .sidebar-nav button.active {
     background: rgba(0, 200, 83, 0.1);
     color: #00c853;
+}
+
+.nav-link-home:hover {
+    color: white;
+    background: #222;
+}
+
+.sidebar-divider {
+    height: 1px;
+    background: #222;
+    margin: 10px 0;
 }
 
 .logout-btn {
@@ -387,7 +509,7 @@ onMounted(() => {
     background: #2a1a1a;
 }
 
-/* HEADER - GÜNCELLENMİŞ KISIM (Student Dashboard ile Eşitlendi) */
+/* Content Header */
 .content-header {
     display: flex;
     justify-content: space-between;
@@ -399,7 +521,8 @@ onMounted(() => {
     border: 1px solid #222;
     flex-wrap: wrap;
     gap: 20px;
-    position: relative; /* Bu özellik diğer elementlerin altında kalmasını engeller */
+    position: relative;
+    z-index: 10;
 }
 
 .score-card {
@@ -416,7 +539,7 @@ onMounted(() => {
 .score-value {
     font-size: 2.5rem;
     font-weight: 800;
-    color: #00c853; /* Bağışçı teması için Yeşil (Student'ta maviydi) */
+    color: #00c853;
 }
 
 .score-value span {
@@ -441,7 +564,7 @@ onMounted(() => {
     display: block;
     font-size: 1.5rem;
     font-weight: 700;
-    color: #00c853; /* Bağışçı rengi */
+    color: #00c853;
 }
 
 .q-lab {
@@ -449,7 +572,44 @@ onMounted(() => {
     color: #666;
 }
 
-/* Content Styles */
+/* RESPONSIVE GÜNCELLEMELER */
+@media (max-width: 1024px) {
+    .mobile-toggle-btn {
+        display: block;
+    }
+
+    .sidebar {
+        position: fixed;
+        left: 0;
+        top: 0;
+        bottom: 0;
+        width: 280px;
+        z-index: 9999;
+        transform: translateX(-100%);
+        transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        box-shadow: 5px 0 15px rgba(0, 0, 0, 0.5);
+        height: 100%;
+        overflow-y: auto;
+        background: #121212;
+    }
+
+    .sidebar.open {
+        transform: translateX(0);
+    }
+
+    .sidebar-overlay {
+        display: block;
+        z-index: 9998;
+    }
+
+    .main-content {
+        margin-left: 0;
+        width: 100%;
+        padding: 70px 20px 20px 20px;
+    }
+}
+
+/* Diğer mevcut stiller */
 .section-title {
     font-size: 1.8rem;
     margin-bottom: 20px;
@@ -488,8 +648,13 @@ onMounted(() => {
     font-size: 0.8rem;
 }
 
-.highlight-green { color: #00c853; }
-.highlight-blue { color: #2979ff; }
+.highlight-green {
+    color: #00c853;
+}
+
+.highlight-blue {
+    color: #2979ff;
+}
 
 .impact-message {
     background: linear-gradient(45deg, #161616, #1a1a1a);
@@ -510,7 +675,6 @@ onMounted(() => {
     font-size: 1.1rem;
 }
 
-/* History List */
 .history-list {
     display: flex;
     flex-direction: column;
@@ -578,7 +742,6 @@ onMounted(() => {
     border-radius: 12px;
 }
 
-/* Packages */
 .packages-grid {
     display: grid;
     grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
@@ -699,23 +862,14 @@ onMounted(() => {
 }
 
 @keyframes fadeIn {
-    from { opacity: 0; transform: translateY(10px); }
-    to { opacity: 1; transform: translateY(0); }
-}
+    from {
+        opacity: 0;
+        transform: translateY(10px);
+    }
 
-/* Responsive */
-@media (max-width: 1024px) {
-    .dashboard-container {
-        padding-top: 80px;
-    }
-    .sidebar {
-        width: 0;
-        padding: 0;
-        overflow: hidden;
-    }
-    .main-content {
-        margin-left: 0;
-        width: 100%;
+    to {
+        opacity: 1;
+        transform: translateY(0);
     }
 }
 </style>

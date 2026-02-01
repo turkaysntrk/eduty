@@ -1,6 +1,6 @@
 <template>
   <div class="layout-container">
-    <nav :class="{ 'scrolled': isScrolled, 'mobile-menu-open': isMenuOpen }">
+    <nav v-if="!isDashboard" :class="{ 'scrolled': isScrolled, 'mobile-menu-open': isMenuOpen }">
       <div class="nav-content">
 
         <div class="logo">
@@ -23,12 +23,7 @@
           <NuxtLink to="/iletisim" @click="closeMenu">İletişim</NuxtLink>
 
           <div class="nav-actions">
-            <NuxtLink 
-              v-if="userRole !== 'donor'" 
-              to="/destek_ol" 
-              class="apply-btn support-btn" 
-              @click="closeMenu"
-            >
+            <NuxtLink v-if="userRole !== 'donor'" to="/destek_ol" class="apply-btn support-btn" @click="closeMenu">
               Destek Ol
             </NuxtLink>
 
@@ -42,14 +37,12 @@
               </button>
 
               <div v-if="isDropdownOpen" class="dropdown-menu">
-
                 <button @click="goToDashboard" class="dropdown-item">
                   <span v-if="userRole === 'teacher'">🎓 Öğretmen Paneli</span>
                   <span v-else-if="userRole === 'student'">📊 Çalışma Ortamı</span>
                   <span v-else-if="userRole === 'donor'">❤️ Bağışçı Paneli</span>
                   <span v-else>📊 Panele Git</span>
                 </button>
-
                 <div class="dropdown-divider"></div>
                 <button @click="handleLogout" class="dropdown-item logout-text">
                   🚪 Çıkış Yap
@@ -84,7 +77,7 @@
 </template>
 
 <script setup>
-import { ref, onMounted, onUnmounted, watch } from 'vue'
+import { ref, onMounted, onUnmounted, watch, computed } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { onAuthStateChanged, signOut } from "firebase/auth";
 
@@ -98,6 +91,12 @@ const router = useRouter()
 const { $auth } = useNuxtApp()
 
 const user = ref(null)
+
+// --- YENİ EKLENEN KISIM: Dashboard kontrolü ---
+const isDashboard = computed(() => {
+  return route.path.includes('/dashboard');
+});
+// ----------------------------------------------
 
 const handleScroll = () => {
   isScrolled.value = window.scrollY > 50
@@ -118,7 +117,6 @@ const toggleDropdown = () => {
   isDropdownOpen.value = !isDropdownOpen.value
 }
 
-// Rol isimlendirme yardımcısı
 const formatRoleName = (role) => {
   if (role === 'teacher') return 'Öğretmen';
   if (role === 'student') return 'Öğrenci';
@@ -130,7 +128,6 @@ const goToDashboard = () => {
   if (userRole.value === 'teacher') {
     router.push('/dashboard-teacher')
   } else if (userRole.value === 'donor') {
-    // Bağışçı yönlendirmesi
     router.push('/dashboard-bagisci')
   } else {
     router.push('/dashboard')
@@ -144,8 +141,8 @@ const handleLogout = async () => {
     localStorage.removeItem('userRole');
     await signOut($auth);
     isDropdownOpen.value = false
-    user.value = null; // User'ı sıfırla
-    userRole.value = null; // Rolü sıfırla
+    user.value = null;
+    userRole.value = null;
     closeMenu();
     router.push('/');
   } catch (error) {
@@ -163,41 +160,31 @@ onMounted(() => {
   onAuthStateChanged($auth, async (currentUser) => {
     user.value = currentUser;
     if (currentUser) {
-      
-      // Firestore import (Code splitting için dynamic import korundu)
       try {
         const { getFirestore, doc, getDoc } = await import('firebase/firestore');
         const db = getFirestore();
-        
-        // Önce localStorage'ı kontrol et (Performans için)
+
         const savedRole = localStorage.getItem('userRole');
-        
+
         if (savedRole) {
-            userRole.value = savedRole;
-            // Eğer rol bağışçı ise, isim bilgisini çekmek için yine de DB'ye bakmamız gerekebilir
-            // çünkü localStorage'da sadece rol var, isim olmayabilir.
-            if (savedRole === 'donor' && !currentUser.displayName) {
-                const userDoc = await getDoc(doc(db, "users", currentUser.uid));
-                if (userDoc.exists()) {
-                    const data = userDoc.data();
-                    // User objesine geçici bir alan ekliyoruz
-                    user.value.customName = data.firstName + ' ' + data.lastName;
-                }
-            }
-        } else {
-            // LocalStorage boşsa DB'den çek
+          userRole.value = savedRole;
+          if (savedRole === 'donor' && !currentUser.displayName) {
             const userDoc = await getDoc(doc(db, "users", currentUser.uid));
-            
             if (userDoc.exists()) {
               const data = userDoc.data();
-              userRole.value = data.role;
-              localStorage.setItem('userRole', userRole.value);
-
-              // Eğer bağışçı ise ismini ayarla
-              if (data.role === 'donor') {
-                  user.value.customName = data.firstName + ' ' + data.lastName;
-              }
+              user.value.customName = data.firstName + ' ' + data.lastName;
             }
+          }
+        } else {
+          const userDoc = await getDoc(doc(db, "users", currentUser.uid));
+          if (userDoc.exists()) {
+            const data = userDoc.data();
+            userRole.value = data.role;
+            localStorage.setItem('userRole', userRole.value);
+            if (data.role === 'donor') {
+              user.value.customName = data.firstName + ' ' + data.lastName;
+            }
+          }
         }
       } catch (error) {
         console.error("Kullanıcı verisi çekilemedi:", error);
@@ -215,7 +202,7 @@ onUnmounted(() => {
 </script>
 
 <style scoped>
-/* --- TEMEL AYARLAR --- */
+/* --- MEVCUT STİLLER KORUNDU --- */
 .layout-container {
   background-color: #050505;
   color: #ffffff;
@@ -224,7 +211,6 @@ onUnmounted(() => {
   overflow-x: hidden;
 }
 
-/* --- NAVBAR --- */
 nav {
   position: fixed;
   top: 0;
@@ -234,7 +220,6 @@ nav {
   padding: 20px 0;
   transition: all 0.4s ease;
   background: linear-gradient(to bottom, rgba(0, 0, 0, 0.8), transparent);
-
   clip-path: none !important;
   visibility: visible !important;
   opacity: 1 !important;
@@ -257,7 +242,7 @@ nav.scrolled {
   align-items: center;
 }
 
-/* --- LOGO --- */
+/* Logo Stilleri */
 .logo a {
   display: flex;
   align-items: center;
@@ -332,7 +317,6 @@ nav.scrolled {
   }
 }
 
-/* --- LINK STİLLERİ --- */
 .links a,
 .links button {
   text-decoration: none;
@@ -364,7 +348,6 @@ nav.scrolled {
   color: black !important;
 }
 
-/* USER DROPDOWN STYLES */
 .user-dropdown-wrapper {
   position: relative;
   display: inline-block;
@@ -436,7 +419,6 @@ nav.scrolled {
   background: rgba(255, 68, 68, 0.1);
 }
 
-/* Mobilde dropdown düzgün görünsün */
 @media (max-width: 1030px) {
   .user-dropdown-wrapper {
     width: 100%;
@@ -565,7 +547,6 @@ nav.scrolled {
   }
 }
 
-/* FOOTER */
 footer {
   background: #000;
   border-top: 1px solid #222;
