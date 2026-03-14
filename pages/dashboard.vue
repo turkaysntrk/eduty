@@ -56,8 +56,7 @@
             <div class="modal-content booking-modal">
                 <div class="modal-header">
                     <h3>Ders Zamanı Seç</h3>
-                    <p>Öğretmen: <span class="highlight-text">{{ selectedTeacherForBooking?.displayName ||
-                        selectedTeacherForBooking?.email }}</span></p>
+                    <p>Öğretmen: <span class="highlight-text">{{ selectedTeacherForBooking?.displayName || selectedTeacherForBooking?.email }}</span></p>
                 </div>
                 <div class="scheduler-grid">
                     <div v-if="availableSlots.length === 0" class="no-slots">
@@ -79,10 +78,72 @@
         </div>
 
         <div v-if="isTakingTest" class="test-runner-overlay">
+
+            <!-- ===== GÜVENLİK: SEKME DEĞİŞİM UYARISI ===== -->
+            <div v-if="tabWarningActive" class="tab-warning-overlay">
+                <div class="tab-warning-box">
+                    <div class="tab-warning-icon">⚠️</div>
+                    <h2>Sekme Dışına Çıktın!</h2>
+                    <p>Testin geçerli sayılabilmesi için bu sekmede kalman gerekiyor.</p>
+                    <div class="countdown-ring">
+                        <svg viewBox="0 0 120 120">
+                            <circle cx="60" cy="60" r="50" class="ring-bg" />
+                            <circle cx="60" cy="60" r="50" class="ring-progress"
+                                :style="{ strokeDashoffset: ringOffset }" />
+                        </svg>
+                        <span class="countdown-number">{{ tabTimeLeft }}</span>
+                    </div>
+                    <p class="tab-warning-sub">Geri dön, test devam edecek.</p>
+                    <p v-if="tabTimeLeft <= 3" class="tab-warning-danger">⛔ Test otomatik sonlandırılacak!</p>
+                </div>
+            </div>
+
+            <!-- ===== GÜVENLİK: KAMERA İZİN EKRANI ===== -->
+            <div v-if="cameraPermissionState === 'asking'" class="camera-permission-overlay">
+                <div class="camera-permission-box">
+                    <div class="cam-icon">📷</div>
+                    <h2>Kamera Erişimi Gerekiyor</h2>
+                    <p>Eduty, testin adil biçimde tamamlandığını doğrulamak için kameranı kullanır. Görüntüler
+                        kaydedilmez; yalnızca anlık AI analizi yapılır.</p>
+                    <ul class="cam-list">
+                        <li>✅ Görüntü sunucuya gönderilmez</li>
+                        <li>✅ Yalnızca yerel AI analizi</li>
+                        <li>✅ Test süresince aktif kalır</li>
+                    </ul>
+                    <div class="cam-actions">
+                        <button class="btn-cam-allow" @click="requestCameraAccess">Kameraya İzin Ver</button>
+                        <button class="btn-cam-deny" @click="denyCameraAccess">İzin Vermeden Devam Et</button>
+                    </div>
+                    <p class="cam-note">Not: Kamera izni verilmezse testten puan kazanamazsın.</p>
+                </div>
+            </div>
+
+            <!-- ===== GÜVENLİK: AI TARAMA UYARISI ===== -->
+            <div v-if="aiSuspicionWarning" class="ai-suspicion-overlay">
+                <div class="ai-suspicion-box">
+                    <div class="ai-icon">🤖</div>
+                    <h2>Şüpheli Aktivite Algılandı</h2>
+                    <p>Kamera analizimiz ekranında <strong>yapay zeka aracı kullanıldığını</strong> tespit etti. Bu
+                        testten puan kazanman engellenebilir.</p>
+                    <button class="btn-ai-ok" @click="aiSuspicionWarning = false">Anladım, Devam Et</button>
+                </div>
+            </div>
+
             <div class="test-runner-header">
                 <div class="tr-info">
                     <h3>{{ currentTest?.title }}</h3>
                     <span class="tr-badge">{{ currentTest?.subject }}</span>
+                </div>
+                <!-- Güvenlik Göstergeleri -->
+                <div class="security-indicators">
+                    <div class="sec-badge" :class="cameraSecClass" :title="cameraSecTitle">
+                        <span>{{ cameraSecIcon }}</span>
+                        <small>{{ cameraSecLabel }}</small>
+                    </div>
+                    <div class="sec-badge" :class="tabSecClass">
+                        <span>🔒</span>
+                        <small>{{ tabTimeLeft }}sn</small>
+                    </div>
                 </div>
                 <div class="tr-tools">
                     <button @click="setTool('pen')" :class="{ active: drawingTool === 'pen' }" title="Kalem">✏️</button>
@@ -92,6 +153,14 @@
                     <button class="btn-close-test" @click="confirmExitTest">Çıkış Yap</button>
                 </div>
             </div>
+
+            <!-- Kamera önizleme (küçük, köşede) -->
+            <div v-if="cameraPermissionState === 'granted'" class="camera-preview-corner">
+                <video ref="cameraVideo" autoplay muted playsinline class="cam-video"></video>
+                <canvas ref="cameraCanvas" style="display:none"></canvas>
+                <div class="cam-live-badge">🔴 CANLI</div>
+            </div>
+
             <div class="test-runner-body">
                 <div class="pdf-container" ref="pdfContainer">
                     <iframe :src="currentTest?.pdfUrl || '/sample.pdf'" class="pdf-frame"></iframe>
@@ -135,8 +204,7 @@
                 </div>
                 <h3 class="user-name">{{ userDisplayName || 'Öğrenci' }}</h3>
                 <p class="user-email">{{ userEmail }}</p>
-                <p v-if="userGrade" class="user-grade-info">{{ userGrade === 'Mezun' || userGrade === 13 ? 'Mezun' :
-                    userGrade + '. Sınıf' }}</p>
+                <p v-if="userGrade" class="user-grade-info">{{ userGrade === 'Mezun' || userGrade === 13 ? 'Mezun' : userGrade + '. Sınıf' }}</p>
             </div>
 
             <nav class="sidebar-nav">
@@ -184,12 +252,27 @@
                 <div class="score-card">
                     <span class="score-label">TOPLAM EDUTY PUANI</span>
                     <div class="score-value">{{ studentScore }} <span>Puan</span></div>
-                </div>
-                <div class="quick-stats">
-                    <div class="q-item">
-                        <span class="q-val">{{ completedLessons }}</span>
-                        <span class="q-lab">Bitirilen Test</span>
+                    <div class="score-stats-row">
+                        <div class="score-stat-item">
+                            <span class="ssi-val">{{ completedLessons }}</span>
+                            <span class="ssi-lab">Bitirilen Test</span>
+                        </div>
+                        <div class="score-stat-divider"></div>
+                        <div class="score-stat-item">
+                            <span class="ssi-val">
+                                {{ dailyTestCount }}<span class="ssi-max">/3</span>
+                            </span>
+                            <span class="ssi-lab">Bugünkü Test</span>
+                        </div>
+                        <div class="score-stat-divider"></div>
+                        <div class="score-stat-item">
+                            <span class="ssi-val daily-pts-val">{{ dailyTestPoints }}<span class="ssi-max">/150</span></span>
+                            <span class="ssi-lab">Günlük Puan</span>
+                        </div>
                     </div>
+                </div>
+                <div class="rank-display">
+                    <div class="rank-badge-large" :class="studentRank.class">{{ studentRank.title }}</div>
                 </div>
             </header>
 
@@ -245,8 +328,7 @@
                             <div v-for="test in testsForSelectedSubject" :key="test.id" class="test-card">
                                 <div class="test-header">
                                     <span class="badge-subject">{{ test.subject }}</span>
-                                    <span class="badge-grade">{{ test.grade === 'Mezun' ? 'Mezun' : test.grade +
-                                        '.Sınıf' }}</span>
+                                    <span class="badge-grade">{{ test.grade === 'Mezun' ? 'Mezun' : test.grade + '.Sınıf' }}</span>
                                 </div>
                                 <h3>{{ test.title }}</h3>
                                 <div class="test-meta">
@@ -289,8 +371,13 @@
                                 <span class="day-number" :class="{ 'today': isToday(date) }">{{ date }}</span>
                                 <div class="day-events">
                                     <div v-for="booking in getBookingsForDate(date)" :key="booking.id"
-                                        class="event-pill">
-                                        {{ booking.time }} - {{ booking.teacherName }}
+                                        class="event-pill" :class="{ 'pill-cancelled': booking.status?.includes('cancelled') }">
+                                        <span class="pill-text">{{ booking.time }} {{ booking.teacherName }}</span>
+                                        <button v-if="!booking.status?.includes('cancelled')"
+                                            class="pill-cancel-btn"
+                                            @click.stop="cancelBookingByStudent(booking)"
+                                            title="Dersi İptal Et">✕</button>
+                                        <span v-else class="pill-cancelled-label">İptal</span>
                                     </div>
                                 </div>
                             </div>
@@ -315,6 +402,12 @@
 
                     <div class="teachers-grid" v-if="filteredTeachers.length > 0">
                         <div v-for="teacher in filteredTeachers" :key="teacher.id" class="teacher-card">
+                            <button class="btn-heart"
+                                :class="{ active: isFavorite(teacher.id) }"
+                                @click.stop="toggleFavorite(teacher)"
+                                :title="isFavorite(teacher.id) ? 'Favorilerden Çıkar' : 'Favorilere Ekle'">
+                                {{ isFavorite(teacher.id) ? '❤️' : '🤍' }}
+                            </button>
                             <div class="teacher-img">
                                 <img :src="teacher.avatar?.uploadedImage || teacher.avatar?.selectedPreset || 'https://ui-avatars.com/api/?name=' + (teacher.displayName || 'T')"
                                     style="width:100%; height:100%; border-radius:50%; object-fit:cover;" />
@@ -322,8 +415,12 @@
                             <div class="teacher-info">
                                 <h3>{{ teacher.displayName || teacher.email || 'İsimsiz Öğretmen' }}</h3>
                                 <span class="badge">{{ teacher.branch || 'Branş Belirtilmedi' }}</span>
-                                <p class="t-time">🕒 Müsaitlik: {{ hasAvailability(teacher) ? 'Müsait' : 'Sorunuz' }}
-                                </p>
+                                <p v-if="teacher.bio" class="t-bio">{{ teacher.bio }}</p>
+                                <div class="teacher-meta-row">
+                                    <span class="t-time">🕒 {{ hasAvailability(teacher) ? 'Müsait' : 'Müsait Değil' }}</span>
+                                    <span v-if="teacher.lessonPrice > 0" class="t-price">💎 {{ teacher.lessonPrice }} puan/ders</span>
+                                    <span v-else class="t-price-free">🎁 Ücretsiz</span>
+                                </div>
                                 <button class="btn-request" @click="openBookingModal(teacher)">Ders Talep Et</button>
                                 <button class="btn-message" @click="startChat(teacher)">💬 Mesaj At</button>
                             </div>
@@ -342,6 +439,7 @@
                     <h2 class="section-title">Favori Öğretmenlerim</h2>
                     <div v-if="myFavorites.length > 0" class="teachers-grid">
                         <div v-for="teacher in myFavorites" :key="teacher.id" class="teacher-card">
+                            <button class="btn-heart active" @click.stop="toggleFavorite(teacher)" title="Favorilerden Çıkar">❤️</button>
                             <div class="teacher-img">
                                 <img :src="teacher.avatar?.uploadedImage || teacher.avatar?.selectedPreset || 'https://ui-avatars.com/api/?name=' + (teacher.displayName || 'T')"
                                     style="width:100%; height:100%; border-radius:50%; object-fit:cover;" />
@@ -349,6 +447,10 @@
                             <div class="teacher-info">
                                 <h3>{{ teacher.displayName || teacher.email }}</h3>
                                 <span class="badge">{{ teacher.branch }}</span>
+                                <div class="teacher-meta-row">
+                                    <span v-if="teacher.lessonPrice > 0" class="t-price">💎 {{ teacher.lessonPrice }} puan/ders</span>
+                                    <span v-else class="t-price-free">🎁 Ücretsiz</span>
+                                </div>
                                 <button class="btn-request" @click="openBookingModal(teacher)">Ders Talep Et</button>
                                 <button class="btn-message" @click="startChat(teacher)">💬 Mesaj At</button>
                             </div>
@@ -469,6 +571,56 @@ const drawCanvas = ref(null)
 const isDrawing = ref(false)
 let ctx = null
 
+// ===== GÜVENLİK SİSTEMİ STATE =====
+// Sekme değişim koruması
+const TAB_TIME_LIMIT = 10  // toplam izin verilen dışarıda kalma süresi (saniye)
+const tabTimeLeft = ref(TAB_TIME_LIMIT)
+const tabWarningActive = ref(false)
+const testDisqualified = ref(false)
+let tabCountdownInterval = null
+let tabOutStart = null
+
+// Kamera / AI tarama
+const cameraPermissionState = ref('idle') // 'idle' | 'asking' | 'granted' | 'denied'
+const cameraVideo = ref(null)
+const cameraCanvas = ref(null)
+const aiSuspicionWarning = ref(false)
+const aiSuspicionCount = ref(0)
+let cameraStream = null
+let aiScanInterval = null
+
+// Computed güvenlik göstergeleri
+const ringCircumference = 2 * Math.PI * 50  // r=50
+const ringOffset = computed(() => {
+    const fraction = tabTimeLeft.value / TAB_TIME_LIMIT
+    return ringCircumference * (1 - fraction)
+})
+const cameraSecClass = computed(() => {
+    if (cameraPermissionState.value === 'granted') return 'sec-ok'
+    if (cameraPermissionState.value === 'denied') return 'sec-warn'
+    return 'sec-idle'
+})
+const cameraSecIcon = computed(() => {
+    if (cameraPermissionState.value === 'granted') return '📷'
+    if (cameraPermissionState.value === 'denied') return '🚫'
+    return '📷'
+})
+const cameraSecTitle = computed(() => {
+    if (cameraPermissionState.value === 'granted') return 'Kamera aktif - AI tarama çalışıyor'
+    if (cameraPermissionState.value === 'denied') return 'Kamera izni verilmedi - puan kazanılamaz'
+    return 'Kamera bekleniyor'
+})
+const cameraSecLabel = computed(() => {
+    if (cameraPermissionState.value === 'granted') return 'Aktif'
+    if (cameraPermissionState.value === 'denied') return 'Kapalı'
+    return '...'
+})
+const tabSecClass = computed(() => {
+    if (tabTimeLeft.value > 5) return 'sec-ok'
+    if (tabTimeLeft.value > 2) return 'sec-warn'
+    return 'sec-danger'
+})
+
 // Calendar State
 const currentMonth = ref(new Date().getMonth())
 const currentYear = ref(new Date().getFullYear())
@@ -522,17 +674,237 @@ const selectChat = (chat) => { activeChat.value = chat; loadMessages(chat.id); m
 const selectSubject = (subject) => { selectedTestSubject.value = subject; }
 const getTestCountForSubject = (subject) => { return availableTests.value.filter(t => t.subject === subject).length; }
 const testsForSelectedSubject = computed(() => { if (!selectedTestSubject.value) return []; return availableTests.value.filter(t => t.subject === selectedTestSubject.value).sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt)); });
-const addToFavoritesById = (teacherId) => { const teacher = findTeacherById(teacherId); if (teacher && !myFavorites.value.find(f => f.id === teacher.id)) { myFavorites.value.push(teacher); alert(`${teacher.displayName || 'Öğretmen'} favorilere eklendi.`); } }
+const addToFavoritesById = (teacherId) => { const teacher = findTeacherById(teacherId); if (teacher && !myFavorites.value.find(f => f.id === teacher.id)) { myFavorites.value.push(teacher); } }
+const isFavorite = (teacherId) => !!myFavorites.value.find(f => f.id === teacherId)
+const toggleFavorite = (teacher) => {
+    const idx = myFavorites.value.findIndex(f => f.id === teacher.id)
+    if (idx === -1) {
+        myFavorites.value.push(teacher)
+    } else {
+        myFavorites.value.splice(idx, 1)
+    }
+}
+const cancelBookingByStudent = async (booking) => {
+    if (!confirm(`${booking.teacherName} ile ${booking.day} ${booking.time} randevunuzu iptal etmek istiyor musunuz?`)) return
+    if (!db) db = getFirestore()
+    try {
+        const bookingRef = doc(db, 'bookings', booking.id)
+        await updateDoc(bookingRef, { status: 'cancelled_by_student', cancelledAt: serverTimestamp() })
+        // Öğretmenin müsaitliğini geri aç
+        const teacherRef = doc(db, 'users', booking.teacherId)
+        const slotKey = `${booking.day}-${booking.time}`
+        await updateDoc(teacherRef, { [`availability.${slotKey}`]: true })
+        // Ücretli dersse puanı iade et
+        if (booking.lessonPrice > 0) {
+            await updateDoc(doc(db, 'users', $auth.currentUser.uid), { score: studentScore.value + booking.lessonPrice })
+            studentScore.value += booking.lessonPrice
+        }
+        await fetchBookings()
+        alert('Randevu iptal edildi.' + (booking.lessonPrice > 0 ? ` ${booking.lessonPrice} puan iade edildi.` : ''))
+    } catch(e) { console.error(e); alert('İptal sırasında hata oluştu.') }
+}
 const findTeacherById = (id) => { return realTeachers.value.find(t => t.id === id); }
 const bookLessonById = (teacherId) => { const teacher = findTeacherById(teacherId); if (teacher) openBookingModal(teacher); }
-const openTestRunner = async (test) => { currentTest.value = test; userAnswers.value = new Array(parseInt(test.questionCount)).fill(null); isTakingTest.value = true; await nextTick(); const canvas = drawCanvas.value; canvas.width = canvas.parentElement.clientWidth; canvas.height = canvas.parentElement.clientHeight; ctx = canvas.getContext('2d'); ctx.lineCap = 'round'; ctx.lineJoin = 'round'; ctx.strokeStyle = '#0055ff'; ctx.lineWidth = 2; }
+const openTestRunner = async (test) => {
+    currentTest.value = test
+    userAnswers.value = new Array(parseInt(test.questionCount)).fill(null)
+    tabTimeLeft.value = TAB_TIME_LIMIT
+    testDisqualified.value = false
+    tabWarningActive.value = false
+    aiSuspicionCount.value = 0
+    isTakingTest.value = true
+    await nextTick()
+    // Canvas kurulumu
+    const canvas = drawCanvas.value
+    canvas.width = canvas.parentElement.clientWidth
+    canvas.height = canvas.parentElement.clientHeight
+    ctx = canvas.getContext('2d')
+    ctx.lineCap = 'round'
+    ctx.lineJoin = 'round'
+    ctx.strokeStyle = '#0055ff'
+    ctx.lineWidth = 2
+    // Güvenlik sistemlerini başlat
+    startTabWatcher()
+    cameraPermissionState.value = 'asking'
+}
+
+// ===== SEKME DEĞİŞİM KORUMA SİSTEMİ =====
+const startTabWatcher = () => {
+    document.addEventListener('visibilitychange', handleVisibilityChange)
+}
+
+const stopTabWatcher = () => {
+    document.removeEventListener('visibilitychange', handleVisibilityChange)
+    if (tabCountdownInterval) {
+        clearInterval(tabCountdownInterval)
+        tabCountdownInterval = null
+    }
+}
+
+const handleVisibilityChange = () => {
+    if (!isTakingTest.value) return
+    if (document.hidden) {
+        // Kullanıcı sekme dışına çıktı
+        tabOutStart = Date.now()
+        tabWarningActive.value = true
+        if (!tabCountdownInterval) {
+            tabCountdownInterval = setInterval(() => {
+                tabTimeLeft.value -= 1
+                if (tabTimeLeft.value <= 0) {
+                    tabTimeLeft.value = 0
+                    clearInterval(tabCountdownInterval)
+                    tabCountdownInterval = null
+                    autoFailTest()
+                }
+            }, 1000)
+        }
+    } else {
+        // Kullanıcı sekmeye döndü — sayacı dondur ama sıfırlama
+        if (tabCountdownInterval) {
+            clearInterval(tabCountdownInterval)
+            tabCountdownInterval = null
+        }
+        tabWarningActive.value = false
+        // tabTimeLeft değeri korunur — bir sonraki çıkışta kaldığı yerden devam eder
+    }
+}
+
+const autoFailTest = () => {
+    testDisqualified.value = true
+    stopTabWatcher()
+    stopCameraStream()
+    alert('⛔ Süre doldu! Sekme dışında çok fazla süre geçirdin. Test puansız kapandı.')
+    isTakingTest.value = false
+}
+
+// ===== KAMERA / AI TARAMA SİSTEMİ =====
+const requestCameraAccess = async () => {
+    try {
+        cameraStream = await navigator.mediaDevices.getUserMedia({ video: true, audio: false })
+        cameraPermissionState.value = 'granted'
+        await nextTick()
+        if (cameraVideo.value) {
+            cameraVideo.value.srcObject = cameraStream
+        }
+        startAiScan()
+    } catch (e) {
+        console.warn('Kamera erişimi reddedildi:', e)
+        cameraPermissionState.value = 'denied'
+    }
+}
+
+const denyCameraAccess = () => {
+    cameraPermissionState.value = 'denied'
+}
+
+const stopCameraStream = () => {
+    if (cameraStream) {
+        cameraStream.getTracks().forEach(t => t.stop())
+        cameraStream = null
+    }
+    if (aiScanInterval) {
+        clearInterval(aiScanInterval)
+        aiScanInterval = null
+    }
+}
+
+// Her 30 saniyede bir kameradan frame al ve basit analiz yap
+// Gerçek projede bu frame bir backend AI endpoint'e gönderilmeli
+const startAiScan = () => {
+    aiScanInterval = setInterval(async () => {
+        if (!cameraVideo.value || !cameraCanvas.value) return
+        const video = cameraVideo.value
+        const canvas = cameraCanvas.value
+        canvas.width = video.videoWidth || 320
+        canvas.height = video.videoHeight || 240
+        const scanCtx = canvas.getContext('2d')
+        scanCtx.drawImage(video, 0, 0, canvas.width, canvas.height)
+        const imageData = canvas.toDataURL('image/jpeg', 0.7)
+        await analyzeFrameWithAI(imageData)
+    }, 30000)
+}
+
+const analyzeFrameWithAI = async (imageData) => {
+    try {
+        // Gerçek uygulamada: kendi backend'ine gönder, o da Vision API ile analiz eder
+        // Şimdilik simüle: ekranda AI aracı var mı kontrolü için placeholder
+        // TODO: await fetch('/api/ai-scan', { method:'POST', body: JSON.stringify({ frame: imageData }) })
+        // Sahte test için — gerçek entegrasyonda burası dolacak
+        console.log('[AI Scan] Frame alındı, analiz bekleniyor...')
+        // Örnek: eğer backend 'suspicious: true' dönerse:
+        // aiSuspicionCount.value++
+        // if (aiSuspicionCount.value >= 2) aiSuspicionWarning.value = true
+    } catch (e) {
+        console.warn('AI tarama hatası:', e)
+    }
+}
+
 const startDrawing = (e) => { isDrawing.value = true; ctx.beginPath(); ctx.moveTo(e.offsetX, e.offsetY); }
 const draw = (e) => { if (!isDrawing.value) return; ctx.lineTo(e.offsetX, e.offsetY); ctx.stroke(); }
 const stopDrawing = () => { isDrawing.value = false; ctx.closePath(); }
 const setTool = (t) => { drawingTool.value = t; ctx.globalCompositeOperation = t === 'eraser' ? 'destination-out' : 'source-over'; ctx.lineWidth = t === 'eraser' ? 20 : 2; }
 const clearCanvas = () => ctx.clearRect(0, 0, drawCanvas.value.width, drawCanvas.value.height)
-const confirmExitTest = () => { if (confirm("Testten çıkmak istediğine emin misin? İlerlemen kaybolacak.")) { isTakingTest.value = false } }
-const finishTest = () => { alert("Test tamamlandı! Sonuçlar hesaplanıyor..."); isTakingTest.value = false; }
+
+const confirmExitTest = () => {
+    if (confirm("Testten çıkmak istediğine emin misin? İlerlemen kaybolacak.")) {
+        stopTabWatcher()
+        stopCameraStream()
+        isTakingTest.value = false
+    }
+}
+
+const finishTest = async () => {
+    if (testDisqualified.value) {
+        alert('⛔ Bu test zaten disklifiye edildi.')
+        return
+    }
+    const totalQuestions = parseInt(currentTest.value?.questionCount || 0)
+    const answered = userAnswers.value.filter(a => a !== null).length
+    if (answered < totalQuestions) {
+        const proceed = confirm(`${totalQuestions - answered} soru boş bırakıldı. Yine de bitirmek istiyor musun?`)
+        if (!proceed) return
+    }
+    // Puanlama: başarı oranına göre 50 puan (max)
+    const correctAnswers = answered  // TODO: gerçek cevap anahtarı ile karşılaştır
+    const successPercent = totalQuestions > 0 ? Math.round((correctAnswers / totalQuestions) * 100) : 0
+    const earnedPoints = Math.round(50 * (successPercent / 100))
+    // Kamera yoksa puan yok
+    const cameraOk = cameraPermissionState.value === 'granted'
+    const finalPoints = cameraOk ? earnedPoints : 0
+    stopTabWatcher()
+    stopCameraStream()
+    isTakingTest.value = false
+    // Firestore'a kaydet
+    if (db && $auth.currentUser) {
+        try {
+            const userRef = doc(db, 'users', $auth.currentUser.uid)
+            const snap = await getDoc(userRef)
+            const current = snap.data() || {}
+            const newScore = (current.score || 0) + finalPoints
+            const newCount = (current.completedTestCount || 0) + 1
+            await updateDoc(userRef, {
+                score: newScore,
+                completedTestCount: newCount,
+                [`completedTests.${currentTest.value.id}`]: {
+                    completedAt: new Date().toISOString(),
+                    successPercent,
+                    earnedPoints: finalPoints,
+                    cameraUsed: cameraOk
+                }
+            })
+            studentScore.value = newScore
+            completedTestCount.value = newCount
+            completedLessons.value = newCount
+        } catch (e) {
+            console.error('Puan kaydedilemedi:', e)
+        }
+    }
+    if (!cameraOk) {
+        alert(`Test tamamlandı.\n\nBaşarı oranın: %${successPercent}\n⚠️ Kamera izni verilmediği için puan kazanılamadı.`)
+    } else {
+        alert(`✅ Test tamamlandı!\n\nBaşarı oranın: %${successPercent}\nKazandığın puan: +${finalPoints} 🎉`)
+    }
+}
 const isProfileModalOpen = ref(false); const fileInput = ref(null); const profileState = ref({ avatarType: 'initials', selectedPreset: '', uploadedImage: null }); const tempProfile = ref({ name: '', grade: null, avatarType: 'initials', selectedPreset: '', uploadedImage: null }); const presetAvatars = ["https://api.dicebear.com/7.x/avataaars/svg?seed=Felix", "https://api.dicebear.com/7.x/avataaars/svg?seed=Aneka", "https://api.dicebear.com/7.x/bottts/svg?seed=Bubba", "https://api.dicebear.com/7.x/micah/svg?seed=Callie", "https://api.dicebear.com/7.x/notionists/svg?seed=Cookie"]; const currentAvatarUrl = computed(() => { if (profileState.value.avatarType === 'upload' && profileState.value.uploadedImage) return profileState.value.uploadedImage; if (profileState.value.avatarType === 'preset' && profileState.value.selectedPreset) return profileState.value.selectedPreset; return `https://ui-avatars.com/api/?name=${userDisplayName.value || 'O'}&background=0055ff&color=fff` }); const openProfileModal = () => { tempProfile.value = { name: userDisplayName.value, grade: userGrade.value, avatarType: profileState.value.avatarType, selectedPreset: profileState.value.selectedPreset, uploadedImage: profileState.value.uploadedImage }; isProfileModalOpen.value = true }; const triggerFileUpload = () => fileInput.value.click(); const handleFileUpload = (event) => { const file = event.target.files[0]; if (file) { const reader = new FileReader(); reader.onload = (e) => { tempProfile.value.uploadedImage = e.target.result; tempProfile.value.avatarType = 'upload' }; reader.readAsDataURL(file) } }; const selectPresetAvatar = (url) => { tempProfile.value.selectedPreset = url; tempProfile.value.avatarType = 'preset' }; const saveProfile = async () => { if (!db) db = getFirestore(); userDisplayName.value = tempProfile.value.name; userGrade.value = tempProfile.value.grade; profileState.value = { avatarType: tempProfile.value.avatarType, selectedPreset: tempProfile.value.selectedPreset, uploadedImage: tempProfile.value.uploadedImage }; if ($auth.currentUser) { try { await updateProfile($auth.currentUser, { displayName: tempProfile.value.name }); const userRef = doc(db, "users", $auth.currentUser.uid); await updateDoc(userRef, { displayName: tempProfile.value.name, grade: tempProfile.value.grade, avatar: { type: tempProfile.value.avatarType, preset: tempProfile.value.selectedPreset, uploadedImage: tempProfile.value.uploadedImage } }) } catch (e) { console.error("Profil güncellenemedi", e) } } isProfileModalOpen.value = false }; const handleLogout = async () => { await signOut($auth); router.push('/'); }; const studentRank = computed(() => { const s = studentScore.value; if (s < 100) return { title: 'Acemi', class: 'rank-1' }; if (s < 500) return { title: 'Hırslı', class: 'rank-2' }; if (s < 1000) return { title: 'Kalfa', class: 'rank-3' }; if (s < 2000) return { title: 'Usta', class: 'rank-4' }; if (s < 5000) return { title: 'Doçent', class: 'rank-5' }; return { title: 'Profesör', class: 'rank-6' } });
 onMounted(() => { db = getFirestore(); onAuthStateChanged($auth, async (user) => { if (user) { userEmail.value = user.email; userDisplayName.value = user.displayName || ''; const docRef = doc(db, "users", user.uid); const docSnap = await getDoc(docRef); if (docSnap.exists()) { const data = docSnap.data(); if (data.role !== 'student') { router.push(data.role === 'teacher' ? '/dashboard-teacher' : '/'); return; } isStudent.value = true; if (data.grade) userGrade.value = data.grade; if (data.displayName) userDisplayName.value = data.displayName; studentScore.value = data.score || 0; completedTestCount.value = data.completedTestCount || 0; completedLessons.value = data.completedTestCount || 0; if (data.avatar) profileState.value = { avatarType: data.avatar.type || 'initials', selectedPreset: data.avatar.preset || '', uploadedImage: data.avatar.uploadedImage || null }; try { await fetchTests(); await fetchTeachers(); await fetchBookings(); fetchChats(); } catch (e) { console.error("Veri yükleme hatası:", e); } } isLoading.value = false; } else { router.push('/'); } }) });
 </script>
@@ -911,7 +1283,78 @@ onMounted(() => { db = getFirestore(); onAuthStateChanged($auth, async (user) =>
 .score-card {
     display: flex;
     flex-direction: column;
+    flex: 1;
 }
+
+.score-stats-row {
+    display: flex;
+    align-items: center;
+    gap: 0;
+    margin-top: 16px;
+    background: rgba(0,0,0,0.3);
+    border: 1px solid #222;
+    border-radius: 12px;
+    overflow: hidden;
+    width: fit-content;
+}
+
+.score-stat-item {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 10px 20px;
+    min-width: 90px;
+}
+
+.score-stat-divider {
+    width: 1px;
+    height: 38px;
+    background: #333;
+    flex-shrink: 0;
+}
+
+.ssi-val {
+    font-size: 1.3rem;
+    font-weight: 800;
+    color: #0055ff;
+    line-height: 1;
+    margin-bottom: 3px;
+}
+
+.ssi-max {
+    font-size: 0.75rem;
+    color: #444;
+    font-weight: 400;
+}
+
+.ssi-lab {
+    font-size: 0.7rem;
+    color: #555;
+    letter-spacing: 0.5px;
+    white-space: nowrap;
+}
+
+.daily-pts-val { color: #10b981 !important; }
+
+.rank-display {
+    display: flex;
+    align-items: center;
+}
+
+.rank-badge-large {
+    padding: 10px 20px;
+    border-radius: 12px;
+    font-weight: 800;
+    font-size: 0.95rem;
+    letter-spacing: 0.5px;
+    border: 1px solid currentColor;
+}
+.rank-1 { color: #888; border-color: #444; background: rgba(100,100,100,0.1); }
+.rank-2 { color: #f59e0b; border-color: rgba(245,158,11,0.4); background: rgba(245,158,11,0.08); }
+.rank-3 { color: #6366f1; border-color: rgba(99,102,241,0.4); background: rgba(99,102,241,0.08); }
+.rank-4 { color: #0ea5e9; border-color: rgba(14,165,233,0.4); background: rgba(14,165,233,0.08); }
+.rank-5 { color: #10b981; border-color: rgba(16,185,129,0.4); background: rgba(16,185,129,0.08); }
+.rank-6 { color: #f97316; border-color: rgba(249,115,22,0.4); background: rgba(249,115,22,0.08); }
 
 .score-label {
     color: #888;
@@ -930,25 +1373,9 @@ onMounted(() => { db = getFirestore(); onAuthStateChanged($auth, async (user) =>
     color: #eee;
 }
 
-.q-item {
-    text-align: center;
-    background: #000;
-    padding: 15px 25px;
-    border-radius: 12px;
-    border: 1px solid #222;
-}
-
-.q-val {
-    display: block;
-    font-size: 1.5rem;
-    font-weight: 700;
-    color: #0055ff;
-}
-
-.q-lab {
-    font-size: 0.8rem;
-    color: #666;
-}
+/* q-item artık score-card içinde .ssi-* ile değiştirildi */
+.q-val { display: block; font-size: 1.5rem; font-weight: 700; color: #0055ff; }
+.q-lab { font-size: 0.8rem; color: #666; }
 
 /* Diğer Bileşenler */
 .section-title {
@@ -1075,7 +1502,61 @@ onMounted(() => { db = getFirestore(); onAuthStateChanged($auth, async (user) =>
     gap: 15px;
     flex-direction: column;
     text-align: center;
+    position: relative;
+    transition: 0.3s;
 }
+.teacher-card:hover {
+    border-color: #0055ff;
+    transform: translateY(-3px);
+    box-shadow: 0 8px 25px rgba(0,85,255,0.12);
+}
+
+/* Kalp butonu — sağ üst köşe */
+.btn-heart {
+    position: absolute;
+    top: 12px;
+    right: 12px;
+    background: rgba(0,0,0,0.5);
+    border: 1px solid #333;
+    border-radius: 50%;
+    width: 34px;
+    height: 34px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1rem;
+    cursor: pointer;
+    transition: 0.2s;
+    z-index: 2;
+    backdrop-filter: blur(4px);
+}
+.btn-heart:hover { transform: scale(1.2); border-color: #ef4444; background: rgba(239,68,68,0.15); }
+.btn-heart.active { border-color: #ef4444; background: rgba(239,68,68,0.15); }
+
+/* Öğretmen biyografi */
+.t-bio {
+    font-size: 0.8rem;
+    color: #888;
+    line-height: 1.5;
+    margin: 6px 0;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+    text-align: left;
+}
+
+.teacher-meta-row {
+    display: flex;
+    gap: 10px;
+    align-items: center;
+    flex-wrap: wrap;
+    justify-content: center;
+    margin: 6px 0;
+}
+
+.t-price { font-size: 0.8rem; color: #a78bfa; font-weight: 600; }
+.t-price-free { font-size: 0.8rem; color: #34d399; font-weight: 600; }
 
 .teacher-img {
     font-size: 2.5rem;
@@ -1833,12 +2314,33 @@ onMounted(() => { db = getFirestore(); onAuthStateChanged($auth, async (user) =>
     background: #0055ff;
     color: white;
     font-size: 0.7rem;
-    padding: 2px 4px;
+    padding: 3px 5px 3px 5px;
     border-radius: 4px;
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 4px;
+    position: relative;
 }
+.pill-text { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; flex: 1; }
+.pill-cancel-btn {
+    background: transparent;
+    border: none;
+    color: rgba(255,255,255,0.7);
+    font-size: 0.6rem;
+    cursor: pointer;
+    padding: 0;
+    line-height: 1;
+    flex-shrink: 0;
+    transition: 0.15s;
+}
+.pill-cancel-btn:hover { color: #fca5a5; transform: scale(1.3); }
+.event-pill.pill-cancelled {
+    background: #333;
+    text-decoration: line-through;
+    opacity: 0.6;
+}
+.pill-cancelled-label { font-size: 0.58rem; color: #ef4444; flex-shrink: 0; }
 
 .teacher-actions-mini {
     display: flex;
@@ -1873,9 +2375,341 @@ onMounted(() => { db = getFirestore(); onAuthStateChanged($auth, async (user) =>
     transition: 0.2s;
 }
 
-.btn-icon-action:hover {
-    background: #0055ff;
-    border-color: #0055ff;
+/* ===== GÜVENLİK SİSTEMİ STİLLERİ ===== */
+
+/* Sekme değişim uyarı overlay */
+.tab-warning-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.92);
+    z-index: 99999;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.tab-warning-box {
+    background: #1a1a1a;
+    border: 2px solid #f59e0b;
+    border-radius: 20px;
+    padding: 50px 40px;
+    text-align: center;
+    max-width: 400px;
+    width: 90%;
+}
+
+.tab-warning-icon {
+    font-size: 3rem;
+    margin-bottom: 15px;
+}
+
+.tab-warning-box h2 {
+    font-size: 1.8rem;
+    color: #f59e0b;
+    margin-bottom: 10px;
+}
+
+.tab-warning-box>p {
+    color: #ccc;
+    font-size: 0.95rem;
+    margin-bottom: 30px;
+}
+
+.countdown-ring {
+    position: relative;
+    width: 120px;
+    height: 120px;
+    margin: 0 auto 20px;
+}
+
+.countdown-ring svg {
+    transform: rotate(-90deg);
+    width: 120px;
+    height: 120px;
+}
+
+.ring-bg {
+    fill: none;
+    stroke: #333;
+    stroke-width: 8;
+}
+
+.ring-progress {
+    fill: none;
+    stroke: #f59e0b;
+    stroke-width: 8;
+    stroke-dasharray: 314.16;
+    stroke-linecap: round;
+    transition: stroke-dashoffset 1s linear;
+}
+
+.countdown-number {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    font-size: 2.5rem;
+    font-weight: 800;
+    color: #f59e0b;
+}
+
+.tab-warning-sub {
+    color: #888;
+    font-size: 0.85rem;
+    margin: 0;
+}
+
+.tab-warning-danger {
+    color: #ef4444;
+    font-weight: bold;
+    margin-top: 10px;
+    animation: pulse 0.5s infinite alternate;
+}
+
+@keyframes pulse {
+    from {
+        opacity: 1;
+    }
+
+    to {
+        opacity: 0.4;
+    }
+}
+
+/* Kamera izin ekranı */
+.camera-permission-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.95);
+    z-index: 99998;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.camera-permission-box {
+    background: #161616;
+    border: 1px solid #333;
+    border-radius: 20px;
+    padding: 50px 40px;
+    text-align: center;
+    max-width: 460px;
+    width: 90%;
+}
+
+.cam-icon {
+    font-size: 4rem;
+    margin-bottom: 20px;
+}
+
+.camera-permission-box h2 {
+    font-size: 1.6rem;
     color: white;
+    margin-bottom: 12px;
+}
+
+.camera-permission-box>p {
+    color: #aaa;
+    line-height: 1.7;
+    margin-bottom: 25px;
+}
+
+.cam-list {
+    list-style: none;
+    padding: 0;
+    margin: 0 0 30px 0;
+    text-align: left;
+    background: #111;
+    border-radius: 10px;
+    padding: 15px 20px;
+}
+
+.cam-list li {
+    color: #ccc;
+    padding: 5px 0;
+    font-size: 0.9rem;
+}
+
+.cam-actions {
+    display: flex;
+    gap: 15px;
+    justify-content: center;
+    flex-wrap: wrap;
+}
+
+.btn-cam-allow {
+    background: #0055ff;
+    color: white;
+    border: none;
+    padding: 14px 30px;
+    border-radius: 10px;
+    font-size: 1rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: 0.2s;
+}
+
+.btn-cam-allow:hover {
+    background: #0044cc;
+}
+
+.btn-cam-deny {
+    background: transparent;
+    color: #888;
+    border: 1px solid #444;
+    padding: 14px 30px;
+    border-radius: 10px;
+    font-size: 0.9rem;
+    cursor: pointer;
+    transition: 0.2s;
+}
+
+.btn-cam-deny:hover {
+    color: white;
+    border-color: #888;
+}
+
+.cam-note {
+    color: #f59e0b;
+    font-size: 0.8rem;
+    margin-top: 20px;
+}
+
+/* AI Şüphe uyarısı */
+.ai-suspicion-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.85);
+    z-index: 99997;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.ai-suspicion-box {
+    background: #1a0000;
+    border: 2px solid #ef4444;
+    border-radius: 20px;
+    padding: 40px;
+    text-align: center;
+    max-width: 400px;
+    width: 90%;
+}
+
+.ai-icon {
+    font-size: 3rem;
+    margin-bottom: 15px;
+}
+
+.ai-suspicion-box h2 {
+    color: #ef4444;
+    margin-bottom: 12px;
+}
+
+.ai-suspicion-box p {
+    color: #ccc;
+    line-height: 1.7;
+    margin-bottom: 25px;
+}
+
+.btn-ai-ok {
+    background: #ef4444;
+    color: white;
+    border: none;
+    padding: 12px 30px;
+    border-radius: 10px;
+    font-weight: 600;
+    cursor: pointer;
+}
+
+/* Güvenlik göstergeleri (header'da) */
+.security-indicators {
+    display: flex;
+    gap: 10px;
+    align-items: center;
+    margin-right: 10px;
+}
+
+.sec-badge {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 2px;
+    background: #1a1a1a;
+    border: 1px solid #333;
+    border-radius: 8px;
+    padding: 5px 10px;
+    font-size: 0.7rem;
+    min-width: 48px;
+    transition: 0.3s;
+}
+
+.sec-badge span {
+    font-size: 1rem;
+}
+
+.sec-badge small {
+    color: #888;
+}
+
+.sec-ok {
+    border-color: #10b981;
+}
+
+.sec-ok small {
+    color: #10b981;
+}
+
+.sec-warn {
+    border-color: #f59e0b;
+}
+
+.sec-warn small {
+    color: #f59e0b;
+}
+
+.sec-danger {
+    border-color: #ef4444;
+    animation: pulse 0.5s infinite alternate;
+}
+
+.sec-danger small {
+    color: #ef4444;
+}
+
+.sec-idle {
+    border-color: #444;
+}
+
+/* Kamera köşe önizlemesi */
+.camera-preview-corner {
+    position: fixed;
+    bottom: 20px;
+    left: 20px;
+    width: 160px;
+    height: 120px;
+    background: #000;
+    border: 2px solid #10b981;
+    border-radius: 10px;
+    overflow: hidden;
+    z-index: 10000;
+}
+
+.cam-video {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+
+.cam-live-badge {
+    position: absolute;
+    top: 5px;
+    left: 5px;
+    background: rgba(0, 0, 0, 0.7);
+    color: #ef4444;
+    font-size: 0.65rem;
+    font-weight: bold;
+    padding: 2px 6px;
+    border-radius: 4px;
 }
 </style>

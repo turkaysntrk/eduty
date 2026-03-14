@@ -107,9 +107,18 @@
             </div>
 
             <nav class="sidebar-nav">
+                <button @click="{ activeTab = 'profile-settings'; isSidebarOpen = false }"
+                    :class="{ active: activeTab === 'profile-settings' }">
+                    <span class="icon">🎯</span> Yayın & Profil
+                    <span v-if="isPublished" class="live-dot">●</span>
+                </button>
                 <button @click="{ activeTab = 'calendar'; isSidebarOpen = false }"
                     :class="{ active: activeTab === 'calendar' }">
                     <span class="icon">📅</span> Programım
+                </button>
+                <button @click="{ activeTab = 'bookings'; isSidebarOpen = false }"
+                    :class="{ active: activeTab === 'bookings' }">
+                    <span class="icon">🗓️</span> Randevularım
                 </button>
                 <button @click="{ activeTab = 'test-upload'; isSidebarOpen = false }"
                     :class="{ active: activeTab === 'test-upload' }">
@@ -165,8 +174,7 @@
                                 <div v-for="(day, dIndex) in daysOfWeek" :key="dIndex" class="cal-cell"
                                     :class="{ 'available': isAvailable(day, time), 'booked': isBooked(day, time) }"
                                     @click="toggleAvailability(day, time)">
-                                    <span v-if="isBooked(day, time)" class="booked-info">{{ getBookingInfo(day, time)
-                                        }}</span>
+                                    <span v-if="isBooked(day, time)" class="booked-info">{{ getBookingInfo(day, time) }}</span>
                                     <span v-else-if="isAvailable(day, time)">Müsait</span>
                                     <span v-else class="plus-icon">+</span>
                                 </div>
@@ -258,8 +266,7 @@
                             <div v-for="test in myTests" :key="test.id" class="test-card">
                                 <div class="test-header">
                                     <span class="badge-subject">{{ test.subject }}</span>
-                                    <span class="badge-grade">{{ test.grade === 'Mezun' ? 'Mezun' : test.grade +
-                                        '.Sınıf' }}</span>
+                                    <span class="badge-grade">{{ test.grade === 'Mezun' ? 'Mezun' : test.grade + '.Sınıf' }}</span>
                                 </div>
                                 <h3>{{ test.title }}</h3>
                                 <div class="test-meta">
@@ -267,6 +274,107 @@
                                     <span>❓ {{ test.questionCount }} Soru</span>
                                 </div>
                                 <button class="btn-update-test" @click="openUpdateModal(test)">Düzenle</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- YAYIN & PROFİL SEKMESİ -->
+                <div v-if="activeTab === 'profile-settings'" class="animate-fade">
+                    <h2 class="section-title">Yayın & Profil</h2>
+
+                    <div v-if="myTests.length < MIN_TESTS_TO_PUBLISH" class="publish-warning-card">
+                        <span class="pw-icon">⚠️</span>
+                        <div>
+                            <h3>Yayına alabilmek için {{ MIN_TESTS_TO_PUBLISH }} test gerekiyor</h3>
+                            <p>Şu an <strong>{{ myTests.length }}</strong> test var. <strong>{{ MIN_TESTS_TO_PUBLISH - myTests.length }}</strong> tane daha eklemen gerekiyor.</p>
+                            <div class="test-progress-bar">
+                                <div class="test-progress-fill" :style="{ width: (myTests.length / MIN_TESTS_TO_PUBLISH * 100) + '%' }"></div>
+                            </div>
+                            <small>{{ myTests.length }}/{{ MIN_TESTS_TO_PUBLISH }}</small>
+                        </div>
+                    </div>
+
+                    <div class="publish-card" :class="{ published: isPublished }">
+                        <div class="publish-left">
+                            <div class="publish-status-dot" :class="{ active: isPublished }"></div>
+                            <div>
+                                <h3>{{ isPublished ? '🟢 Yayındasın!' : '⚫ Yayında Değilsin' }}</h3>
+                                <p>{{ isPublished ? 'Öğrenciler seni görebilir ve ders talep edebilir.' : 'Gizlisin. Yayına alınca öğrenciler seni bulabilir.' }}</p>
+                            </div>
+                        </div>
+                        <button class="btn-toggle-publish" :class="{ active: isPublished }" @click="togglePublish">
+                            {{ isPublished ? 'Yayından Kaldır' : 'Yayına Al' }}
+                        </button>
+                    </div>
+
+                    <div class="profile-edit-card">
+                        <h3>📝 Profil Bilgileri</h3>
+                        <p class="profile-edit-hint">Öğrenci kartında görünecek bilgiler</p>
+                        <div class="form-group" style="margin-top:20px">
+                            <label>Ders Ücreti (Puan)</label>
+                            <div class="price-input-wrapper">
+                                <span class="price-icon">💎</span>
+                                <input type="number" v-model="lessonPriceInput" min="0" placeholder="0 = Ücretsiz" class="price-input" />
+                                <span class="price-suffix">puan / ders</span>
+                            </div>
+                            <small>0 girerseniz ücretsiz görünür.</small>
+                        </div>
+                        <div class="form-group" style="margin-top:20px">
+                            <label>Biyografi</label>
+                            <textarea v-model="bioInput" rows="4" maxlength="300" placeholder="Kendinizi tanıtın..." class="bio-textarea"></textarea>
+                            <small>{{ bioInput.length }}/300 karakter</small>
+                        </div>
+                        <button class="btn-save-profile-public" @click="savePublicProfile" :disabled="isSavingProfile">
+                            {{ isSavingProfile ? 'Kaydediliyor...' : '💾 Kaydet' }}
+                        </button>
+                    </div>
+
+                    <div class="profile-preview-card" v-if="isPublished">
+                        <h3>👁️ Öğrenci Gözünden Görünüm</h3>
+                        <div class="teacher-preview">
+                            <div class="tp-avatar"><img :src="currentAvatarUrl" /></div>
+                            <div class="tp-info">
+                                <h4>{{ userDisplayName }}</h4>
+                                <span class="badge">{{ userBranch }}</span>
+                                <p v-if="bioInput" class="tp-bio">{{ bioInput }}</p>
+                                <div class="tp-meta">
+                                    <span class="tp-price" v-if="lessonPriceInput > 0">💎 {{ lessonPriceInput }} Puan/Ders</span>
+                                    <span class="tp-price-free" v-else>🎁 Ücretsiz</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- RANDEVULAR SEKMESİ -->
+                <div v-if="activeTab === 'bookings'" class="animate-fade">
+                    <h2 class="section-title">Randevularım</h2>
+                    <div v-if="myBookingsList.length === 0" class="empty-state">
+                        <p>Henüz randevunuz bulunmuyor.</p>
+                    </div>
+                    <div v-else class="bookings-list">
+                        <div v-for="booking in myBookingsList" :key="booking.id" class="booking-item"
+                            :class="{ cancelled: booking.status?.includes('cancelled'), completed: booking.status === 'completed' }">
+                            <div class="booking-left">
+                                <div class="booking-day-badge">{{ booking.day }}</div>
+                                <div>
+                                    <h4>{{ booking.studentName || 'Öğrenci' }}</h4>
+                                    <p>🕒 {{ booking.time }}</p>
+                                    <p v-if="booking.lessonPrice > 0" class="booking-price">💎 {{ booking.lessonPrice }} puan</p>
+                                </div>
+                            </div>
+                            <div class="booking-right">
+                                <span class="booking-status"
+                                    :class="booking.status === 'completed' ? 'status-completed' : booking.status?.includes('cancelled') ? 'status-cancelled' : 'status-confirmed'">
+                                    {{ booking.status === 'completed' ? '✅ Tamamlandı' : booking.status?.includes('cancelled') ? '❌ İptal' : '✅ Onaylı' }}
+                                </span>
+                                <template v-if="!booking.status?.includes('cancelled') && booking.status !== 'completed'">
+                                    <button class="btn-complete-lesson" @click="completeLesson(booking)">
+                                        {{ booking.lessonPrice > 0 ? `✅ Tamamla (+${booking.lessonPrice}p)` : '✅ Tamamla' }}
+                                    </button>
+                                    <button class="btn-cancel-lesson" @click="cancelBookingByTeacher(booking)">İptal Et</button>
+                                </template>
                             </div>
                         </div>
                     </div>
@@ -335,6 +443,8 @@
 </template>
 
 <script setup>
+definePageMeta({ ssr: false })
+
 import { ref, reactive, computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { onAuthStateChanged, signOut, updateProfile } from 'firebase/auth'
@@ -348,16 +458,125 @@ const testForm = reactive({ title: '', grade: '', subject: '', questionCount: 0,
 const availableGrades = computed(() => { const level = userSchoolLevel.value; if (level === 'ilkokul') return [1, 2, 3, 4]; else if (level === 'ortaokul') return [5, 6, 7, 8]; else if (level === 'lise') return [9, 10, 11, 12, 'Mezun']; else return [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, "Mezun"]; });
 const isFormValid = computed(() => testForm.title && testForm.grade && userBranch.value && testForm.file && testForm.questionCount > 0 && testForm.answers.length === testForm.questionCount && !testForm.answers.includes(undefined));
 const isUpdateModalOpen = ref(false); const editTestForm = reactive({ id: null, title: '', grade: '', subject: '' });
+const isPublished = ref(false)
+const lessonPriceInput = ref(0)
+const bioInput = ref('')
+const isSavingProfile = ref(false)
+const myBookingsList = ref([])
+const MIN_TESTS_TO_PUBLISH = 5
 const isAvailable = (day, time) => myAvailability[`${day}-${time}`] === true;
 const isBooked = (day, time) => !!myBookings[`${day}-${time}`];
 const getBookingInfo = (day, time) => { const booking = myBookings[`${day}-${time}`]; return booking ? booking.student : 'Dolu'; }
 const toggleAvailability = async (day, time) => { if (isBooked(day, time)) { alert("Bu saatte dersiniz var, iptal edemezsiniz."); return; } const key = `${day}-${time}`; if (myAvailability[key]) delete myAvailability[key]; else myAvailability[key] = true; if ($auth.currentUser) { const userRef = doc(db, "users", $auth.currentUser.uid); if (myAvailability[key]) await updateDoc(userRef, { [`availability.${key}`]: true }).catch(e => console.error(e)); else await updateDoc(userRef, { [`availability.${key}`]: deleteField() }).catch(e => console.error(e)); } }
-const fetchTeacherBookings = async () => { if (!db) db = getFirestore(); const q = query(collection(db, "bookings"), where("teacherId", "==", $auth.currentUser.uid)); const snap = await getDocs(q); snap.forEach(doc => { const data = doc.data(); const key = `${data.day}-${data.time}`; myBookings[key] = { student: data.studentName || 'Öğrenci', id: doc.id }; }); }
+const fetchTeacherBookings = async () => {
+    if (!db) db = getFirestore()
+    const q = query(collection(db, "bookings"), where("teacherId", "==", $auth.currentUser.uid))
+    const snap = await getDocs(q)
+    myBookingsList.value = snap.docs.map(d => ({ id: d.id, ...d.data() }))
+    snap.forEach(docItem => {
+        const data = docItem.data()
+        if (!data.status?.includes('cancelled')) {
+            const key = `${data.day}-${data.time}`
+            myBookings[key] = { student: data.studentName || 'Öğrenci', id: docItem.id, bookingId: docItem.id, lessonPrice: data.lessonPrice || 0, studentId: data.studentId }
+        }
+    })
+}
+
+// Yayın toggle - 5 test zorunluluğu kontrolü
+const togglePublish = async () => {
+    if (!db) db = getFirestore()
+    if (!isPublished.value && myTests.value.length < MIN_TESTS_TO_PUBLISH) {
+        const remaining = MIN_TESTS_TO_PUBLISH - myTests.value.length
+        alert(`⚠️ Yayına alabilmek için en az ${MIN_TESTS_TO_PUBLISH} test yüklemelisin.\nŞu an: ${myTests.value.length} test. ${remaining} tane daha ekle.`)
+        return
+    }
+    const newState = !isPublished.value
+    try {
+        await updateDoc(doc(db, "users", $auth.currentUser.uid), { isPublished: newState })
+        isPublished.value = newState
+    } catch(e) { console.error(e) }
+}
+
+const savePublicProfile = async () => {
+    if (!db) db = getFirestore()
+    isSavingProfile.value = true
+    try {
+        await updateDoc(doc(db, "users", $auth.currentUser.uid), {
+            lessonPrice: parseInt(lessonPriceInput.value) || 0,
+            bio: bioInput.value.slice(0, 300)
+        })
+        alert('✅ Profil kaydedildi!')
+    } catch(e) { alert('Kayıt hatası') }
+    isSavingProfile.value = false
+}
+
+const cancelBookingByTeacher = async (booking) => {
+    if (!confirm(`${booking.studentName} ile ${booking.day} ${booking.time} randevusunu iptal et?`)) return
+    if (!db) db = getFirestore()
+    try {
+        await updateDoc(doc(db, "bookings", booking.id), { status: "cancelled_by_teacher", cancelledAt: serverTimestamp() })
+        const slotKey = `${booking.day}-${booking.time}`
+        await updateDoc(doc(db, "users", $auth.currentUser.uid), { [`availability.${slotKey}`]: true })
+        if (booking.lessonPrice > 0) {
+            const studentSnap = await getDoc(doc(db, "users", booking.studentId))
+            if (studentSnap.exists()) {
+                await updateDoc(doc(db, "users", booking.studentId), { score: (studentSnap.data().score || 0) + booking.lessonPrice })
+            }
+        }
+        delete myBookings[`${booking.day}-${booking.time}`]
+        await fetchTeacherBookings()
+        alert('Randevu iptal edildi.' + (booking.lessonPrice > 0 ? ` Öğrenciye ${booking.lessonPrice} puan iade edildi.` : ''))
+    } catch(e) { console.error(e); alert("Hata oluştu.") }
+}
+
+const completeLesson = async (booking) => {
+    if (!confirm(`${booking.studentName} ile dersi tamamlandı olarak işaretle? Ücret öğretmen puanına aktarılacak.`)) return
+    if (!db) db = getFirestore()
+    try {
+        await updateDoc(doc(db, "bookings", booking.id), { status: "completed", completedAt: serverTimestamp() })
+        if (booking.lessonPrice > 0) {
+            const teacherSnap = await getDoc(doc(db, "users", $auth.currentUser.uid))
+            const newScore = (teacherSnap.data().score || 0) + booking.lessonPrice
+            await updateDoc(doc(db, "users", $auth.currentUser.uid), { score: newScore })
+            teacherScore.value = newScore
+            alert(`✅ Ders tamamlandı! +${booking.lessonPrice} puan kazandın.`)
+        } else {
+            alert('✅ Ders tamamlandı!')
+        }
+        await fetchTeacherBookings()
+    } catch(e) { console.error(e); alert("Hata oluştu.") }
+}
 const fetchMyTests = async (uid) => { if (!db) db = getFirestore(); try { const q = query(collection(db, "tests"), where("uploaderId", "==", uid)); const querySnapshot = await getDocs(q); const tests = querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })); myTests.value = tests.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt)); } catch (error) { console.error("Testler çekilemedi:", error); } }
 const handlePdfUpload = (e) => { const file = e.target.files[0]; if (file && file.type === "application/pdf") testForm.file = file; else alert("Lütfen geçerli bir PDF dosyası seçin."); }
 const generateAnswerKeyInputs = () => { const count = parseInt(testForm.questionCount); if (!count || count < 0) { testForm.answers = []; return; } const newAnswers = new Array(count).fill(null); for (let i = 0; i < Math.min(count, testForm.answers.length); i++) newAnswers[i] = testForm.answers[i]; testForm.answers = newAnswers; }
 const setAnswer = (index, option) => { testForm.answers[index] = option; }
-const submitTest = async () => { if (!db) db = getFirestore(); const finalSubject = userBranch.value; try { const fakePdfUrl = "https://example.com/uploads/sample_test.pdf"; await addDoc(collection(db, "tests"), { uploaderId: $auth.currentUser.uid, uploaderName: userDisplayName.value, title: testForm.title, grade: testForm.grade, subject: finalSubject, questionCount: testForm.questionCount, answerKey: testForm.answers, pdfUrl: fakePdfUrl, createdAt: new Date().toISOString() }); alert("Test başarıyla yüklendi!"); await fetchMyTests($auth.currentUser.uid); Object.assign(testForm, { title: '', questionCount: 0, file: null, answers: [] }) } catch (error) { alert("Hata: " + error.message); } }
+const submitTest = async () => {
+    if (!db) db = getFirestore()
+    const finalSubject = userBranch.value
+    try {
+        const fakePdfUrl = "https://example.com/uploads/sample_test.pdf"
+        await addDoc(collection(db, "tests"), {
+            uploaderId: $auth.currentUser.uid,
+            uploaderName: userDisplayName.value,
+            title: testForm.title,
+            grade: testForm.grade,
+            subject: finalSubject,
+            questionCount: testForm.questionCount,
+            answerKey: testForm.answers,
+            pdfUrl: fakePdfUrl,
+            createdAt: new Date().toISOString()
+        })
+        await fetchMyTests($auth.currentUser.uid)
+        const count = myTests.value.length
+        const remaining = Math.max(0, MIN_TESTS_TO_PUBLISH - count)
+        if (remaining > 0) {
+            alert(`✅ Test yüklendi! (${count}/${MIN_TESTS_TO_PUBLISH})\nYayına alabilmek için ${remaining} test daha eklemelisin.`)
+        } else {
+            alert(`✅ Test yüklendi! Artık yayına alabilirsin. 🎉`)
+        }
+        Object.assign(testForm, { title: '', questionCount: 0, file: null, answers: [] })
+    } catch (error) { alert("Hata: " + error.message) }
+}
 const openUpdateModal = (test) => { editTestForm.id = test.id; editTestForm.title = test.title; editTestForm.grade = test.grade; editTestForm.subject = test.subject; isUpdateModalOpen.value = true }
 const saveTestUpdate = async () => { if (!db) db = getFirestore(); try { const testRef = doc(db, "tests", editTestForm.id); await updateDoc(testRef, { title: editTestForm.title, grade: editTestForm.grade, }); alert("Test güncellendi."); isUpdateModalOpen.value = false; await fetchMyTests($auth.currentUser.uid) } catch (e) { alert("Güncelleme hatası: " + e.message) } }
 const fetchChats = () => { if (!db) db = getFirestore(); const q = query(collection(db, "chats"), where("participants", "array-contains", $auth.currentUser.uid)); onSnapshot(q, (snapshot) => { myChats.value = snapshot.docs.map(doc => { const data = doc.data(); const otherId = data.participants.find(p => p !== $auth.currentUser.uid); const otherName = otherId === data.studentId ? data.studentName : data.teacherName; return { id: doc.id, ...data, otherUserName: otherName, otherUserId: otherId }; }); if (activeChat.value) { const updated = myChats.value.find(c => c.id === activeChat.value.id); if (updated) activeChat.value = { ...activeChat.value, ...updated }; } }); };
@@ -370,7 +589,11 @@ const sendMessage = async () => { if (!newMessage.value.trim() || !activeChat.va
 const isProfileModalOpen = ref(false); const fileInput = ref(null); const profileState = ref({ avatarType: 'initials', selectedPreset: '', uploadedImage: null }); const tempProfile = ref({ avatarType: 'initials', selectedPreset: '', uploadedImage: null }); const presetAvatars = ["https://api.dicebear.com/7.x/avataaars/svg?seed=Felix", "https://api.dicebear.com/7.x/avataaars/svg?seed=Aneka", "https://api.dicebear.com/7.x/bottts/svg?seed=Bubba", "https://api.dicebear.com/7.x/micah/svg?seed=Callie", "https://api.dicebear.com/7.x/notionists/svg?seed=Cookie"];
 const currentAvatarUrl = computed(() => { if (profileState.value.avatarType === 'upload' && profileState.value.uploadedImage) return profileState.value.uploadedImage; if (profileState.value.avatarType === 'preset' && profileState.value.selectedPreset) return profileState.value.selectedPreset; return `https://ui-avatars.com/api/?name=${userDisplayName.value || 'T'}&background=0055ff&color=fff` });
 const openProfileModal = () => { tempProfile.value = { avatarType: profileState.value.avatarType, selectedPreset: profileState.value.selectedPreset, uploadedImage: profileState.value.uploadedImage }; isProfileModalOpen.value = true }; const triggerFileUpload = () => fileInput.value.click(); const handleFileUpload = (event) => { const file = event.target.files[0]; if (file) { const reader = new FileReader(); reader.onload = (e) => { tempProfile.value.uploadedImage = e.target.result; tempProfile.value.avatarType = 'upload' }; reader.readAsDataURL(file) } }; const selectPresetAvatar = (url) => { tempProfile.value.selectedPreset = url; tempProfile.value.avatarType = 'preset' }; const saveProfile = async () => { if (!db) db = getFirestore(); profileState.value = { avatarType: tempProfile.value.avatarType, selectedPreset: tempProfile.value.selectedPreset, uploadedImage: tempProfile.value.uploadedImage }; if ($auth.currentUser) { try { const userRef = doc(db, "users", $auth.currentUser.uid); await updateDoc(userRef, { avatar: { type: tempProfile.value.avatarType, preset: tempProfile.value.selectedPreset, uploadedImage: tempProfile.value.uploadedImage } }) } catch (e) { console.error("Profil güncellenemedi", e) } } isProfileModalOpen.value = false }; const handleLogout = async () => { localStorage.removeItem('userRole'); await signOut($auth); router.push('/'); };
-onMounted(() => { db = getFirestore(); onAuthStateChanged($auth, async (user) => { if (user) { userEmail.value = user.email; userDisplayName.value = user.displayName || ''; const docRef = doc(db, "users", user.uid); const docSnap = await getDoc(docRef); if (docSnap.exists()) { const data = docSnap.data(); if (data.role !== 'teacher') { router.push(data.role === 'student' ? '/dashboard' : '/'); return; } isTeacher.value = true; userBranch.value = data.branch || ''; userSchoolLevel.value = data.schoolLevel || ''; teacherScore.value = data.score || 0; if (data.avatar) { profileState.value = { avatarType: data.avatar.type || 'initials', selectedPreset: data.avatar.preset || '', uploadedImage: data.avatar.uploadedImage || null } } if (data.availability) Object.assign(myAvailability, data.availability); await fetchMyTests(user.uid); fetchChats(); fetchTeacherBookings(); } } else { router.push('/kayit-giris') } isLoading.value = false }) })
+onMounted(() => { db = getFirestore(); onAuthStateChanged($auth, async (user) => { if (user) { userEmail.value = user.email; userDisplayName.value = user.displayName || ''; const docRef = doc(db, "users", user.uid); const docSnap = await getDoc(docRef); if (docSnap.exists()) { const data = docSnap.data(); if (data.role !== 'teacher') { router.push(data.role === 'student' ? '/dashboard' : '/'); return; } isTeacher.value = true; userBranch.value = data.branch || ''; userSchoolLevel.value = data.schoolLevel || ''; teacherScore.value = data.score || 0; if (data.avatar) { profileState.value = { avatarType: data.avatar.type || 'initials', selectedPreset: data.avatar.preset || '', uploadedImage: data.avatar.uploadedImage || null } } if (data.availability) Object.assign(myAvailability, data.availability)
+                        isPublished.value = data.isPublished || false
+                        lessonPriceInput.value = data.lessonPrice || 0
+                        bioInput.value = data.bio || ''
+                        await fetchMyTests(user.uid); fetchChats(); fetchTeacherBookings(); } } else { router.push('/kayit-giris') } isLoading.value = false }) })
 </script>
 
 <style scoped>
@@ -1290,4 +1513,122 @@ select:focus {
     border-radius: 8px;
     cursor: pointer;
 }
+
+/* ── Yayın & Profil sekmesi ── */
+.live-dot {
+    color: #10b981; font-size: 0.6rem;
+    margin-left: auto;
+    animation: pulse-green 1.5s infinite;
+}
+@keyframes pulse-green { 0%,100%{opacity:1} 50%{opacity:0.3} }
+
+.publish-warning-card {
+    display: flex; gap: 15px; align-items: flex-start;
+    background: rgba(245,158,11,0.08);
+    border: 1px solid rgba(245,158,11,0.3);
+    border-radius: 14px; padding: 20px 25px;
+    margin-bottom: 20px;
+}
+.pw-icon { font-size: 1.5rem; flex-shrink: 0; }
+.publish-warning-card h3 { color: #f59e0b; font-size: 1rem; margin-bottom: 6px; }
+.publish-warning-card p { color: #aaa; font-size: 0.88rem; margin-bottom: 10px; }
+.publish-warning-card small { color: #666; font-size: 0.8rem; }
+.test-progress-bar {
+    width: 100%; height: 6px; background: #222;
+    border-radius: 3px; overflow: hidden; margin-bottom: 5px;
+}
+.test-progress-fill {
+    height: 100%;
+    background: linear-gradient(90deg, #f59e0b, #fbbf24);
+    border-radius: 3px; transition: width 0.5s ease;
+}
+
+.publish-card {
+    display: flex; justify-content: space-between; align-items: center;
+    background: #111; border: 1px solid #333; border-radius: 16px;
+    padding: 25px 30px; margin-bottom: 25px; gap: 20px; flex-wrap: wrap;
+    transition: 0.3s;
+}
+.publish-card.published { border-color: #10b981; background: linear-gradient(135deg, #071a0e, #0d1f11); }
+.publish-left { display: flex; align-items: center; gap: 15px; }
+.publish-status-dot { width: 14px; height: 14px; border-radius: 50%; background: #444; flex-shrink: 0; }
+.publish-status-dot.active { background: #10b981; box-shadow: 0 0 8px rgba(16,185,129,0.6); animation: pulse-green 1.5s infinite; }
+.publish-left h3 { font-size: 1.1rem; color: white; margin-bottom: 5px; }
+.publish-left p { font-size: 0.85rem; color: #888; }
+.btn-toggle-publish {
+    padding: 12px 25px; border-radius: 10px; border: 1px solid #555;
+    background: transparent; color: #ccc; font-weight: 600;
+    cursor: pointer; transition: 0.3s; white-space: nowrap;
+}
+.btn-toggle-publish.active { background: rgba(239,68,68,0.1); border-color: #ef4444; color: #ef4444; }
+.btn-toggle-publish:not(.active):hover { background: rgba(16,185,129,0.15); border-color: #10b981; color: #10b981; }
+
+.profile-edit-card { background: #111; border: 1px solid #222; border-radius: 16px; padding: 30px; margin-bottom: 25px; }
+.profile-edit-card h3 { font-size: 1.1rem; margin-bottom: 5px; color: white; }
+.profile-edit-hint { font-size: 0.82rem; color: #666; margin-bottom: 20px; }
+.price-input-wrapper {
+    display: flex; align-items: center; background: #0a0a0a;
+    border: 1px solid #333; border-radius: 10px; overflow: hidden; margin-top: 8px;
+}
+.price-icon { padding: 10px 12px; font-size: 1.1rem; background: #161616; border-right: 1px solid #333; }
+.price-input { flex:1; background: transparent; border: none; color: white; padding: 12px; font-size: 1rem; outline: none; }
+.price-suffix { padding: 10px 15px; color: #666; font-size: 0.85rem; white-space: nowrap; }
+.bio-textarea {
+    width: 100%; background: #0a0a0a; border: 1px solid #333; color: white;
+    padding: 12px; border-radius: 10px; font-size: 0.9rem; resize: vertical;
+    margin-top: 8px; font-family: inherit; line-height: 1.6;
+}
+.bio-textarea:focus { outline: none; border-color: #0055ff; }
+.profile-edit-card small { color: #555; font-size: 0.75rem; }
+.btn-save-profile-public {
+    margin-top: 20px; padding: 12px 30px; background: #0055ff;
+    color: white; border: none; border-radius: 10px; font-weight: 600;
+    cursor: pointer; transition: 0.2s; font-size: 1rem;
+}
+.btn-save-profile-public:hover:not(:disabled) { background: #0044cc; }
+.btn-save-profile-public:disabled { opacity: 0.5; cursor: not-allowed; }
+
+.profile-preview-card { background: #111; border: 1px dashed #333; border-radius: 16px; padding: 30px; }
+.profile-preview-card h3 { font-size: 1rem; color: #888; margin-bottom: 20px; }
+.teacher-preview { display: flex; gap: 20px; background: #1a1a1a; border: 1px solid #333; border-radius: 12px; padding: 20px; align-items: flex-start; }
+.tp-avatar img { width: 65px; height: 65px; border-radius: 50%; object-fit: cover; border: 2px solid #0055ff; }
+.tp-info h4 { color: white; margin-bottom: 5px; }
+.tp-bio { font-size: 0.82rem; color: #888; margin: 8px 0; line-height: 1.5; }
+.tp-meta { display: flex; gap: 12px; margin-top: 8px; }
+.tp-price { color: #a78bfa; font-size: 0.82rem; font-weight: 600; }
+.tp-price-free { color: #34d399; font-size: 0.82rem; font-weight: 600; }
+
+/* ── Randevu listesi ── */
+.bookings-list { display: flex; flex-direction: column; gap: 12px; }
+.booking-item {
+    display: flex; justify-content: space-between; align-items: center;
+    background: #111; border: 1px solid #333; border-radius: 12px;
+    padding: 20px; gap: 15px; flex-wrap: wrap; transition: 0.2s;
+}
+.booking-item:hover { border-color: #444; }
+.booking-item.cancelled { opacity: 0.45; }
+.booking-item.completed { border-color: rgba(16,185,129,0.3); background: rgba(16,185,129,0.04); }
+.booking-left { display: flex; align-items: center; gap: 15px; }
+.booking-day-badge { background: #0055ff; color: white; padding: 8px 12px; border-radius: 8px; font-weight: 700; font-size: 0.85rem; min-width: 42px; text-align: center; }
+.booking-left h4 { color: white; margin-bottom: 4px; }
+.booking-left p { color: #888; font-size: 0.85rem; margin: 2px 0; }
+.booking-price { color: #a78bfa !important; }
+.booking-right { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.booking-status { font-size: 0.8rem; font-weight: 600; padding: 4px 10px; border-radius: 20px; }
+.status-confirmed { background: rgba(16,185,129,0.15); color: #10b981; }
+.status-cancelled { background: rgba(239,68,68,0.15); color: #ef4444; }
+.status-completed { background: rgba(16,185,129,0.15); color: #10b981; }
+.btn-complete-lesson {
+    padding: 7px 14px; background: rgba(16,185,129,0.15);
+    border: 1px solid #10b981; color: #10b981;
+    border-radius: 8px; font-size: 0.82rem; cursor: pointer; transition: 0.2s;
+}
+.btn-complete-lesson:hover { background: rgba(16,185,129,0.3); }
+.btn-cancel-lesson {
+    padding: 7px 14px; background: transparent;
+    border: 1px solid #ef4444; color: #ef4444;
+    border-radius: 8px; font-size: 0.82rem; cursor: pointer; transition: 0.2s;
+}
+.btn-cancel-lesson:hover { background: rgba(239,68,68,0.15); }
+
 </style>

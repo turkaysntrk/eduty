@@ -42,6 +42,11 @@
                     :class="{ active: activeTab === 'donate' }">
                     <span class="icon">💙</span> Bağış Yap
                 </button>
+                <button @click="{ activeTab = 'distribution'; isSidebarOpen = false }"
+                    :class="{ active: activeTab === 'distribution' }">
+                    <span class="icon">🎯</span> Puan Dağıtımı
+                    <span v-if="pendingPool > 0" class="pending-badge">{{ pendingPool }}</span>
+                </button>
                 <button @click="{ activeTab = 'history'; isSidebarOpen = false }"
                     :class="{ active: activeTab === 'history' }">
                     <span class="icon">📜</span> Bağış Geçmişi
@@ -139,13 +144,153 @@
                                 <span class="h-icon">💙</span>
                                 <div>
                                     <h4>{{ item.packageName }}</h4>
-                                    <small>{{ new Date(item.createdAt).toLocaleDateString('tr-TR') }} - {{ new
-                                        Date(item.createdAt).toLocaleTimeString('tr-TR').slice(0, 5) }}</small>
+                                    <small>{{ new Date(item.createdAt).toLocaleDateString('tr-TR') }} - {{ new Date(item.createdAt).toLocaleTimeString('tr-TR').slice(0, 5) }}</small>
                                 </div>
                             </div>
                             <div class="h-right">
                                 <span class="h-amount">{{ item.amount }} ₺</span>
                                 <span class="h-points">+{{ item.points }} Puan</span>
+                                <span class="h-status" :class="item.distributed ? 'distributed' : 'pending'">
+                                    {{ item.distributed ? '✅ Dağıtıldı' : '⏳ Bekliyor' }}
+                                </span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- ===== PUAN DAĞITIM SEKMESİ ===== -->
+                <div v-if="activeTab === 'distribution'" class="animate-fade">
+                    <h2 class="section-title">Puan Dağıtım Merkezi</h2>
+
+                    <!-- Havuz durumu -->
+                    <div class="pool-status-card">
+                        <div class="pool-left">
+                            <div class="pool-label">Dağıtılmayı Bekleyen Puan Havuzu</div>
+                            <div class="pool-value" :class="{ 'pool-empty': pendingPool === 0 }">
+                                {{ pendingPool.toLocaleString('tr-TR') }}
+                                <span>Puan</span>
+                            </div>
+                            <div class="pool-sub" v-if="pendingPool > 0">
+                                Bu puanlar bağışçılar tarafından aktarıldı ve öğrencilere dağıtılmayı bekliyor.
+                            </div>
+                            <div class="pool-sub empty-pool-msg" v-else>
+                                Şu an bekleyen puan yok. Yeni bir bağış yapıldığında burada görünecek.
+                            </div>
+                        </div>
+                        <div class="pool-right">
+                            <button class="btn-distribute"
+                                :class="{ 'loading': isDistributing, 'disabled': pendingPool === 0 }"
+                                :disabled="pendingPool === 0 || isDistributing" @click="triggerDistribution">
+                                <span v-if="isDistributing" class="btn-spinner"></span>
+                                <span v-else>🎯</span>
+                                {{ isDistributing ? 'Dağıtılıyor...' : 'Dağıtımı Başlat' }}
+                            </button>
+                            <p class="distribute-note">
+                                Puanlar öğrencilerin başarı oranına göre orantılı dağıtılır.
+                            </p>
+                        </div>
+                    </div>
+
+                    <!-- Son dağıtım sonucu -->
+                    <div v-if="lastDistributionResult" class="dist-result-card"
+                        :class="lastDistributionResult.success ? 'result-success' : 'result-error'">
+                        <div v-if="lastDistributionResult.success">
+                            <h3>✅ Dağıtım Tamamlandı!</h3>
+                            <div class="dist-result-stats">
+                                <div class="dr-stat">
+                                    <span class="dr-val">{{ lastDistributionResult.totalDistributed.toLocaleString('tr-TR') }}</span>
+                                    <span class="dr-lab">Puan Dağıtıldı</span>
+                                </div>
+                                <div class="dr-stat">
+                                    <span class="dr-val">{{ lastDistributionResult.studentCount }}</span>
+                                    <span class="dr-lab">Öğrenci Kazandı</span>
+                                </div>
+                                <div class="dr-stat">
+                                    <span class="dr-val">{{ lastDistributionResult.processedDonations }}</span>
+                                    <span class="dr-lab">Bağış İşlendi</span>
+                                </div>
+                            </div>
+                            <!-- Kırılım tablosu -->
+                            <div class="breakdown-table" v-if="lastDistributionResult.breakdown?.length > 0">
+                                <h4>Öğrenci Kırılımı</h4>
+                                <div class="breakdown-header">
+                                    <span>Öğrenci</span>
+                                    <span>Başarı</span>
+                                    <span>Kazanılan</span>
+                                    <span>Yeni Toplam</span>
+                                </div>
+                                <div class="breakdown-row" v-for="row in lastDistributionResult.breakdown"
+                                    :key="row.uid">
+                                    <span class="br-name">{{ row.name }}</span>
+                                    <span class="br-rate">
+                                        <div class="rate-bar">
+                                            <div class="rate-fill" :style="{ width: row.successRate + '%' }"></div>
+                                        </div>
+                                        %{{ row.successRate }}
+                                    </span>
+                                    <span class="br-earned">+{{ row.pointsReceived }}</span>
+                                    <span class="br-total">{{ row.newTotal.toLocaleString('tr-TR') }}</span>
+                                </div>
+                            </div>
+                        </div>
+                        <div v-else>
+                            <h3>⚠️ Dağıtım Yapılamadı</h3>
+                            <p>{{ lastDistributionResult.error }}</p>
+                        </div>
+                    </div>
+
+                    <!-- Algoritma açıklaması -->
+                    <div class="algo-explainer">
+                        <h3>📐 Dağıtım Algoritması Nasıl Çalışır?</h3>
+                        <div class="algo-steps">
+                            <div class="algo-step">
+                                <div class="step-num">1</div>
+                                <div class="step-text">
+                                    <strong>Havuz toplanır</strong><br>
+                                    Tüm dağıtılmamış bağış puanları tek havuzda birleştirilir.
+                                </div>
+                            </div>
+                            <div class="algo-step">
+                                <div class="step-num">2</div>
+                                <div class="step-text">
+                                    <strong>Öğrenciler sıralanır</strong><br>
+                                    En az 1 test çözmüş öğrenciler başarı oranlarına göre ağırlıklandırılır.
+                                </div>
+                            </div>
+                            <div class="algo-step">
+                                <div class="step-num">3</div>
+                                <div class="step-text">
+                                    <strong>Orantılı dağıtım</strong><br>
+                                    Her öğrenci payı = (kendi başarı ağırlığı / toplam ağırlık) × havuz puanı
+                                </div>
+                            </div>
+                            <div class="algo-step">
+                                <div class="step-num">4</div>
+                                <div class="step-text">
+                                    <strong>Herkes kazanır</strong><br>
+                                    Düşük başarılı öğrenci de minimum pay alır — kimse sıfır almaz.
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Geçmiş dağıtımlar -->
+                    <div class="dist-history-section" v-if="distributionHistory.length > 0">
+                        <h3>Geçmiş Dağıtımlar</h3>
+                        <div class="dist-history-list">
+                            <div class="dist-history-item" v-for="dh in distributionHistory" :key="dh.id">
+                                <div class="dh-left">
+                                    <span class="dh-icon">🎯</span>
+                                    <div>
+                                        <h4>{{ dh.totalPoints?.toLocaleString('tr-TR') }} Puan Dağıtıldı</h4>
+                                        <small>{{ dh.studentCount }} öğrenci · {{ dh.processedDonations }} bağış
+                                            işlendi</small>
+                                        <small class="dh-date" v-if="dh.createdAt?.seconds">
+                                            {{ new Date(dh.createdAt.seconds * 1000).toLocaleString('tr-TR') }}
+                                        </small>
+                                    </div>
+                                </div>
+                                <span class="dh-badge">Tamamlandı</span>
                             </div>
                         </div>
                     </div>
@@ -157,10 +302,13 @@
 </template>
 
 <script setup>
+definePageMeta({ ssr: false })
+
 import { ref, onMounted, computed } from 'vue'
 import { useRouter } from 'vue-router'
 import { onAuthStateChanged, signOut } from 'firebase/auth'
 import { getFirestore, doc, getDoc, collection, query, where, getDocs, addDoc, serverTimestamp } from 'firebase/firestore'
+import { distributePoints, fetchPendingPool, fetchDistributionHistory } from '~/utils/distributionEngine.js'
 
 const router = useRouter()
 const { $auth } = useNuxtApp()
@@ -178,6 +326,12 @@ const totalDonatedPoints = ref(0)
 const donationCount = ref(0)
 const donationHistory = ref([])
 const customAmount = ref(null)
+
+// Dağıtım motoru state
+const pendingPool = ref(0)
+const isDistributing = ref(false)
+const lastDistributionResult = ref(null)
+const distributionHistory = ref([])
 
 // Stats (Mocked or Calculated)
 const distributedPoints = computed(() => Math.floor(totalDonatedPoints.value * 0.9))
@@ -202,14 +356,41 @@ const processDonation = async (amount, packageName) => {
             amount: parseInt(amount),
             points: points,
             packageName: packageName,
+            distributed: false,   // ← motor bu flag'i kullanır
             createdAt: new Date().toISOString()
         });
 
         alert("Bağışınız başarıyla alındı! Teşekkür ederiz.");
         fetchDonationHistory();
+        // Havuzu da güncelle
+        pendingPool.value = await fetchPendingPool(db)
     } catch (error) {
         console.error("Bağış hatası:", error);
     }
+}
+
+// ── DAĞITIMI BAŞLAT ──
+const triggerDistribution = async () => {
+    if (!db) db = getFirestore()
+    isDistributing.value = true
+    lastDistributionResult.value = null
+
+    const result = await distributePoints(db, $auth.currentUser?.uid || 'donor')
+    lastDistributionResult.value = result
+    isDistributing.value = false
+
+    if (result.success) {
+        // Havuzu sıfırla, geçmişi güncelle
+        pendingPool.value = 0
+        await loadDistributionHistory()
+        fetchDonationHistory()
+    }
+}
+
+// ── Dağıtım geçmişi yükle ──
+const loadDistributionHistory = async () => {
+    if (!db) db = getFirestore()
+    distributionHistory.value = await fetchDistributionHistory(db, 10)
 }
 
 const handleCustomDonation = () => {
@@ -259,6 +440,9 @@ onMounted(() => {
                 }
 
                 fetchDonationHistory();
+                // Dağıtım motoru verilerini yükle
+                pendingPool.value = await fetchPendingPool(db)
+                await loadDistributionHistory()
             }
         } else {
             router.push('/destek_ol');
@@ -871,5 +1055,401 @@ onMounted(() => {
         opacity: 1;
         transform: translateY(0);
     }
+}
+
+/* ── Bağış geçmişinde dağıtım durumu ── */
+.h-status {
+    font-size: 0.75rem;
+    font-weight: 600;
+    padding: 3px 8px;
+    border-radius: 20px;
+    margin-top: 4px;
+    display: inline-block;
+}
+
+.h-status.distributed {
+    background: rgba(0, 200, 83, 0.15);
+    color: #00c853;
+}
+
+.h-status.pending {
+    background: rgba(245, 158, 11, 0.15);
+    color: #f59e0b;
+}
+
+/* ── Sidebar bekleyen puan rozeti ── */
+.pending-badge {
+    background: #f59e0b;
+    color: black;
+    font-size: 0.65rem;
+    font-weight: 800;
+    padding: 2px 7px;
+    border-radius: 20px;
+    margin-left: auto;
+}
+
+/* ── Havuz durumu kartı ── */
+.pool-status-card {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    background: linear-gradient(135deg, #0d1a0d, #111);
+    border: 1px solid #1a3d1a;
+    border-left: 5px solid #00c853;
+    border-radius: 16px;
+    padding: 35px 40px;
+    margin-bottom: 30px;
+    gap: 30px;
+    flex-wrap: wrap;
+}
+
+.pool-label {
+    font-size: 0.8rem;
+    color: #666;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+    margin-bottom: 10px;
+}
+
+.pool-value {
+    font-size: 3rem;
+    font-weight: 800;
+    color: #00c853;
+    line-height: 1;
+    margin-bottom: 12px;
+}
+
+.pool-value span {
+    font-size: 1rem;
+    color: #aaa;
+    margin-left: 6px;
+}
+
+.pool-value.pool-empty {
+    color: #444;
+}
+
+.pool-sub {
+    font-size: 0.85rem;
+    color: #666;
+    max-width: 360px;
+}
+
+.empty-pool-msg {
+    color: #555;
+    font-style: italic;
+}
+
+.pool-right {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 12px;
+    min-width: 200px;
+}
+
+.btn-distribute {
+    background: linear-gradient(135deg, #00c853, #00e676);
+    color: black;
+    border: none;
+    padding: 18px 35px;
+    border-radius: 12px;
+    font-size: 1.1rem;
+    font-weight: 700;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    transition: 0.3s;
+    width: 100%;
+    justify-content: center;
+}
+
+.btn-distribute:hover:not(:disabled) {
+    background: linear-gradient(135deg, #00e676, #69f0ae);
+    transform: translateY(-2px);
+    box-shadow: 0 8px 25px rgba(0, 200, 83, 0.3);
+}
+
+.btn-distribute.disabled,
+.btn-distribute:disabled {
+    background: #1a1a1a;
+    color: #444;
+    cursor: not-allowed;
+    border: 1px solid #333;
+}
+
+.btn-distribute.loading {
+    background: #1a3d1a;
+    color: #00c853;
+    cursor: wait;
+}
+
+.btn-spinner {
+    width: 18px;
+    height: 18px;
+    border: 3px solid rgba(0, 200, 83, 0.3);
+    border-top-color: #00c853;
+    border-radius: 50%;
+    animation: spin 0.8s linear infinite;
+    display: inline-block;
+}
+
+.distribute-note {
+    font-size: 0.75rem;
+    color: #555;
+    text-align: center;
+}
+
+/* ── Dağıtım sonuç kartı ── */
+.dist-result-card {
+    border-radius: 16px;
+    padding: 30px;
+    margin-bottom: 30px;
+    border: 1px solid #333;
+}
+
+.result-success {
+    background: linear-gradient(135deg, #0a1f0a, #0d1a0d);
+    border-color: #1a4d1a;
+}
+
+.result-error {
+    background: linear-gradient(135deg, #1a0a0a, #200d0d);
+    border-color: #4d1a1a;
+}
+
+.dist-result-card h3 {
+    font-size: 1.4rem;
+    margin-bottom: 20px;
+    color: #00c853;
+}
+
+.result-error h3 {
+    color: #f59e0b;
+}
+
+.dist-result-card p {
+    color: #aaa;
+}
+
+.dist-result-stats {
+    display: flex;
+    gap: 20px;
+    margin-bottom: 25px;
+    flex-wrap: wrap;
+}
+
+.dr-stat {
+    background: rgba(0, 0, 0, 0.4);
+    border-radius: 12px;
+    padding: 15px 20px;
+    text-align: center;
+    min-width: 120px;
+    flex: 1;
+}
+
+.dr-val {
+    display: block;
+    font-size: 1.8rem;
+    font-weight: 800;
+    color: #00c853;
+}
+
+.dr-lab {
+    font-size: 0.75rem;
+    color: #666;
+}
+
+/* ── Kırılım tablosu ── */
+.breakdown-table {
+    margin-top: 20px;
+}
+
+.breakdown-table h4 {
+    font-size: 1rem;
+    color: #888;
+    margin-bottom: 12px;
+}
+
+.breakdown-header,
+.breakdown-row {
+    display: grid;
+    grid-template-columns: 2fr 2fr 1fr 1.5fr;
+    gap: 10px;
+    padding: 10px 15px;
+    font-size: 0.85rem;
+}
+
+.breakdown-header {
+    color: #555;
+    font-size: 0.75rem;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    border-bottom: 1px solid #222;
+}
+
+.breakdown-row {
+    background: rgba(0, 0, 0, 0.3);
+    border-radius: 8px;
+    margin-bottom: 4px;
+    align-items: center;
+    color: #ccc;
+}
+
+.br-name {
+    font-weight: 600;
+    color: white;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.br-rate {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.rate-bar {
+    flex: 1;
+    height: 6px;
+    background: #222;
+    border-radius: 3px;
+    overflow: hidden;
+    max-width: 60px;
+}
+
+.rate-fill {
+    height: 100%;
+    background: linear-gradient(90deg, #00c853, #00e676);
+    border-radius: 3px;
+    transition: width 0.5s ease;
+}
+
+.br-earned {
+    color: #00c853;
+    font-weight: 700;
+}
+
+.br-total {
+    font-weight: 600;
+}
+
+/* ── Algoritma açıklaması ── */
+.algo-explainer {
+    background: #111;
+    border: 1px solid #222;
+    border-radius: 16px;
+    padding: 30px;
+    margin-bottom: 30px;
+}
+
+.algo-explainer h3 {
+    font-size: 1.1rem;
+    margin-bottom: 20px;
+    color: #aaa;
+}
+
+.algo-steps {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 15px;
+}
+
+.algo-step {
+    display: flex;
+    gap: 15px;
+    align-items: flex-start;
+}
+
+.step-num {
+    width: 32px;
+    height: 32px;
+    background: #00c853;
+    color: black;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: 800;
+    font-size: 0.9rem;
+    flex-shrink: 0;
+}
+
+.step-text {
+    font-size: 0.85rem;
+    color: #888;
+    line-height: 1.6;
+}
+
+.step-text strong {
+    color: #ccc;
+    display: block;
+    margin-bottom: 3px;
+}
+
+/* ── Dağıtım geçmişi ── */
+.dist-history-section {
+    margin-top: 10px;
+}
+
+.dist-history-section h3 {
+    font-size: 1.1rem;
+    color: #aaa;
+    margin-bottom: 15px;
+}
+
+.dist-history-list {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.dist-history-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    background: #111;
+    border: 1px solid #222;
+    border-radius: 12px;
+    padding: 18px 20px;
+}
+
+.dh-left {
+    display: flex;
+    align-items: center;
+    gap: 15px;
+}
+
+.dh-icon {
+    font-size: 1.5rem;
+}
+
+.dh-left h4 {
+    margin: 0 0 4px;
+    font-size: 0.95rem;
+    color: white;
+}
+
+.dh-left small {
+    color: #555;
+    font-size: 0.78rem;
+    display: block;
+}
+
+.dh-date {
+    color: #444 !important;
+    margin-top: 2px;
+}
+
+.dh-badge {
+    background: rgba(0, 200, 83, 0.1);
+    color: #00c853;
+    border: 1px solid rgba(0, 200, 83, 0.2);
+    border-radius: 20px;
+    padding: 4px 12px;
+    font-size: 0.75rem;
+    font-weight: 600;
 }
 </style>

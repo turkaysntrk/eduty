@@ -1,4 +1,7 @@
 <script setup>
+// Bu sayfa Firebase auth kullandığı için SSR kapatılmıştır
+definePageMeta({ ssr: false })
+
 import { ref, reactive } from 'vue'
 import { useRouter } from 'vue-router'
 import { 
@@ -13,7 +16,7 @@ import { getFirestore, doc, setDoc } from "firebase/firestore";
 
 const router = useRouter();
 const { $auth } = useNuxtApp(); 
-const db = getFirestore();
+let db  // Firebase SSR fix: initialized lazily on first use
 
 // GÖRÜNÜM KONTROLLERİ
 const currentView = ref('login');
@@ -69,7 +72,7 @@ const handleLogin = async () => {
 
     // Firestore'dan kullanıcının rolünü çekiyoruz
     const { getFirestore, doc, getDoc } = await import("firebase/firestore");
-    const db = getFirestore();
+    const db = getFirestore()
     const userDoc = await getDoc(doc(db, "users", user.uid));
 
     if (userDoc.exists()) {
@@ -136,6 +139,7 @@ const handleRegister = async () => {
       });
     }
 
+    if (!db) db = getFirestore()
     await setDoc(doc(db, "users", user.uid), userData);
     
     await $auth.signOut(); 
