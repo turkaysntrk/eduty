@@ -2712,4 +2712,5 @@ onMounted(() => { db = getFirestore(); onAuthStateChanged($auth, async (user) =>
     padding: 2px 6px;
     border-radius: 4px;
 }
+
 </style>
