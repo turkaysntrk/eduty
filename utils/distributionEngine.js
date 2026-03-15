@@ -67,6 +67,9 @@ const calcWeightedShares = (students, totalPoints) => {
 }
 
 // ────────────────────────────────────────────────────
+// SABİT: Platform komisyon oranı
+// ────────────────────────────────────────────────────
+// ────────────────────────────────────────────────────
 // ANA FONKSİYON: distributePoints
 // Çağrı: await distributePoints(db, triggeredByUid)
 // triggeredByUid: bağışçının UID'i (loglama için)
@@ -75,6 +78,7 @@ export const distributePoints = async (db, triggeredByUid = 'system') => {
     const result = {
         success: false,
         totalDistributed: 0,
+        commissionPoints: 0,
         studentCount: 0,
         processedDonations: 0,
         breakdown: [],
@@ -99,6 +103,10 @@ export const distributePoints = async (db, triggeredByUid = 'system') => {
             result.error = 'Havuzda dağıtılacak puan bulunamadı.'
             return result
         }
+
+        // Komisyon bağış anında zaten kesildi — tüm havuz öğrencilere gider
+        const commissionPoints = 0
+        const distributablePoints = pendingPool
 
         // ── 2. Aktif öğrencileri çek ──
         const usersRef = collection(db, 'users')
@@ -128,11 +136,13 @@ export const distributePoints = async (db, triggeredByUid = 'system') => {
             return result
         }
 
-        // ── 3. Ağırlıklı payları hesapla ──
-        const shares = calcWeightedShares(students, pendingPool)
+        // ── 3. Ağırlıklı payları hesapla (komisyon düşülmüş miktar üzerinden) ──
+        const shares = calcWeightedShares(students, distributablePoints)
 
         // ── 4. Toplu Firestore yazımı (batch) ──
         const batch = writeBatch(db)
+
+        // Komisyon bağış anında kesildiğinden burada adminStats yazılmaz
 
         const breakdown = []
         students.forEach((student, i) => {
@@ -163,7 +173,10 @@ export const distributePoints = async (db, triggeredByUid = 'system') => {
         // ── 5. Dağıtım logunu kaydet ──
         await addDoc(collection(db, 'distributions'), {
             triggeredBy: triggeredByUid,
-            totalPoints: pendingPool,
+            totalPool: pendingPool,
+            commissionPoints: 0,
+            commissionNote: 'Komisyon bağış anında kesildi',
+            totalPoints: distributablePoints,
             studentCount: breakdown.length,
             processedDonations: pendingDonations.length,
             breakdown,
@@ -171,7 +184,8 @@ export const distributePoints = async (db, triggeredByUid = 'system') => {
         })
 
         result.success = true
-        result.totalDistributed = pendingPool
+        result.totalDistributed = distributablePoints
+        result.commissionPoints = commissionPoints
         result.studentCount = breakdown.length
         result.processedDonations = pendingDonations.length
         result.breakdown = breakdown

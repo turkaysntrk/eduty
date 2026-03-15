@@ -120,6 +120,10 @@
                     :class="{ active: activeTab === 'bookings' }">
                     <span class="icon">🗓️</span> Randevularım
                 </button>
+                <button @click="{ activeTab = 'monthly-calendar'; isSidebarOpen = false }"
+                    :class="{ active: activeTab === 'monthly-calendar' }">
+                    <span class="icon">📅</span> Takvimim
+                </button>
                 <button @click="{ activeTab = 'test-upload'; isSidebarOpen = false }"
                     :class="{ active: activeTab === 'test-upload' }">
                     <span class="icon">📤</span> Test Yönetimi
@@ -370,11 +374,45 @@
                                     {{ booking.status === 'completed' ? '✅ Tamamlandı' : booking.status?.includes('cancelled') ? '❌ İptal' : '✅ Onaylı' }}
                                 </span>
                                 <template v-if="!booking.status?.includes('cancelled') && booking.status !== 'completed'">
+                                    <button class="btn-enter-lesson" @click="enterLesson(booking)">
+                                        🎥 Derse Gir
+                                    </button>
                                     <button class="btn-complete-lesson" @click="completeLesson(booking)">
                                         {{ booking.lessonPrice > 0 ? `✅ Tamamla (+${booking.lessonPrice}p)` : '✅ Tamamla' }}
                                     </button>
                                     <button class="btn-cancel-lesson" @click="cancelBookingByTeacher(booking)">İptal Et</button>
                                 </template>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div v-if="activeTab === 'monthly-calendar'" class="animate-fade">
+                    <h2 class="section-title">Takvimim</h2>
+                    <div class="calendar-container">
+                        <div class="calendar-header-control">
+                            <button @click="changeMonth(-1)">❮</button>
+                            <h3>{{ currentMonthName }} {{ currentYear }}</h3>
+                            <button @click="changeMonth(1)">❯</button>
+                        </div>
+                        <div class="calendar-grid-header">
+                            <div v-for="day in ['Pzt', 'Sal', 'Çar', 'Per', 'Cum', 'Cmt', 'Paz']" :key="day">{{ day }}</div>
+                        </div>
+                        <div class="calendar-grid">
+                            <div v-for="blank in firstDayOffset" :key="'blank-' + blank" class="calendar-day empty"></div>
+                            <div v-for="date in daysInMonth" :key="date" class="calendar-day">
+                                <span class="day-number" :class="{ 'today': isToday(date) }">{{ date }}</span>
+                                <div class="day-events">
+                                    <div v-for="booking in getTeacherBookingsForDate(date)" :key="booking.id"
+                                        class="event-pill" :class="{ 'pill-cancelled': booking.status?.includes('cancelled') }">
+                                        <span class="pill-text">{{ booking.time }} {{ booking.studentName }}</span>
+                                        <button v-if="!booking.status?.includes('cancelled')"
+                                            class="pill-enter-btn"
+                                            @click.stop="enterLesson(booking)"
+                                            title="Derse Gir">🎥</button>
+                                        <span v-else class="pill-cancelled-label">İptal</span>
+                                    </div>
+                                </div>
                             </div>
                         </div>
                     </div>
@@ -463,6 +501,35 @@ const lessonPriceInput = ref(0)
 const bioInput = ref('')
 const isSavingProfile = ref(false)
 const myBookingsList = ref([])
+
+// ── Aylık Takvim State ──
+const currentMonth = ref(new Date().getMonth())
+const currentYear = ref(new Date().getFullYear())
+const monthNames = ["Ocak", "Şubat", "Mart", "Nisan", "Mayıs", "Haziran", "Temmuz", "Ağustos", "Eylül", "Ekim", "Kasım", "Aralık"]
+const currentMonthName = computed(() => monthNames[currentMonth.value])
+const daysInMonth = computed(() => new Date(currentYear.value, currentMonth.value + 1, 0).getDate())
+const firstDayOffset = computed(() => { let d = new Date(currentYear.value, currentMonth.value, 1).getDay(); return d === 0 ? 6 : d - 1 })
+const changeMonth = (delta) => { currentMonth.value += delta; if (currentMonth.value > 11) { currentMonth.value = 0; currentYear.value++ } if (currentMonth.value < 0) { currentMonth.value = 11; currentYear.value-- } }
+const isToday = (date) => { const today = new Date(); return date === today.getDate() && currentMonth.value === today.getMonth() && currentYear.value === today.getFullYear() }
+const getTeacherBookingsForDate = (date) => {
+    const d = new Date(currentYear.value, currentMonth.value, date)
+    const dayIndex = d.getDay()
+    const dayMap = ["Paz", "Pzt", "Sal", "Çar", "Per", "Cum", "Cmt"]
+    const dayName = dayMap[dayIndex]
+    return myBookingsList.value.filter(b => {
+        if (b.bookingDate) {
+            const bookDate = new Date(b.bookingDate)
+            return bookDate.getFullYear() === d.getFullYear() &&
+                   bookDate.getMonth() === d.getMonth() &&
+                   bookDate.getDate() === d.getDate()
+        }
+        if (b.day !== dayName) return false
+        if (!b.createdAt) return true
+        const created = b.createdAt.toDate ? b.createdAt.toDate() : new Date(b.createdAt.seconds ? b.createdAt.seconds * 1000 : b.createdAt)
+        const getMonday = (dt) => { const day = dt.getDay(); const diff = (day === 0 ? -6 : 1 - day); return new Date(dt.getFullYear(), dt.getMonth(), dt.getDate() + diff) }
+        return getMonday(created).getTime() === getMonday(d).getTime()
+    })
+}
 const MIN_TESTS_TO_PUBLISH = 5
 const isAvailable = (day, time) => myAvailability[`${day}-${time}`] === true;
 const isBooked = (day, time) => !!myBookings[`${day}-${time}`];
@@ -508,6 +575,28 @@ const savePublicProfile = async () => {
         alert('✅ Profil kaydedildi!')
     } catch(e) { alert('Kayıt hatası') }
     isSavingProfile.value = false
+}
+
+const enterLesson = (booking) => {
+    // Saat kontrolü
+    if (booking.bookingDate && booking.time) {
+        const [hour, minute] = booking.time.split(':').map(Number)
+        const lessonStart = new Date(booking.bookingDate)
+        lessonStart.setHours(hour, minute, 0, 0)
+        const lessonEnd = new Date(lessonStart.getTime() + 60 * 60 * 1000)
+        const earliestEntry = new Date(lessonStart.getTime() - 15 * 60 * 1000)
+        const now = new Date()
+        if (now < earliestEntry) {
+            const dateStr = lessonStart.toLocaleDateString('tr-TR', { day: 'numeric', month: 'long' })
+            alert(`⏰ Ders henüz başlamadı.\n\nDers zamanı: ${dateStr} ${booking.time}\n\nDerse 15 dakika öncesinden girebilirsiniz.`)
+            return
+        }
+        if (now > lessonEnd) {
+            alert('⏰ Bu ders süresi dolmuş.')
+            return
+        }
+    }
+    router.push(`/meets/${booking.id}`)
 }
 
 const cancelBookingByTeacher = async (booking) => {
@@ -1642,6 +1731,17 @@ select:focus {
 .status-confirmed { background: rgba(16,185,129,0.15); color: #10b981; }
 .status-cancelled { background: rgba(239,68,68,0.15); color: #ef4444; }
 .status-completed { background: rgba(16,185,129,0.15); color: #10b981; }
+.btn-enter-lesson {
+    background: rgba(0,85,255,0.15);
+    border: 1px solid rgba(0,85,255,0.4);
+    color: #4488ff;
+    padding: 6px 14px; border-radius: 6px;
+    cursor: pointer; font-size: 0.8rem;
+    font-weight: 700; transition: 0.2s;
+    margin-bottom: 5px; width: 100%;
+}
+.btn-enter-lesson:hover { background: #0055ff; color: white; border-color: #0055ff; }
+
 .btn-complete-lesson {
     padding: 7px 14px; background: rgba(16,185,129,0.15);
     border: 1px solid #10b981; color: #10b981;
@@ -1654,5 +1754,25 @@ select:focus {
     border-radius: 8px; font-size: 0.82rem; cursor: pointer; transition: 0.2s;
 }
 .btn-cancel-lesson:hover { background: rgba(239,68,68,0.15); }
+
+/* ── Aylık Takvim ── */
+.calendar-container { background: #161616; padding: 20px; border-radius: 12px; border: 1px solid #333; }
+.calendar-header-control { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; }
+.calendar-header-control button { background: transparent; border: none; color: white; font-size: 1.5rem; cursor: pointer; }
+.calendar-header-control h3 { margin: 0; color: white; }
+.calendar-grid-header { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); text-align: center; font-weight: bold; margin-bottom: 4px; color: #888; font-size: 0.8rem; }
+.calendar-grid-header > div { padding: 8px 2px; }
+.calendar-grid { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 3px; }
+.calendar-day { min-height: 80px; background: #111; border: 1px solid #222; border-radius: 6px; padding: 5px; font-size: 0.78rem; position: relative; overflow: hidden; box-sizing: border-box; }
+.calendar-day.empty { background: transparent; border: none; }
+.day-number { display: block; text-align: right; margin-bottom: 5px; color: #666; }
+.day-number.today { color: #0055ff; font-weight: bold; }
+.day-events { display: flex; flex-direction: column; gap: 2px; }
+.event-pill { background: #0055ff; color: white; font-size: 0.7rem; padding: 3px 5px; border-radius: 4px; display: flex; align-items: center; justify-content: space-between; gap: 4px; }
+.pill-text { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; flex: 1; }
+.pill-enter-btn { background: transparent; border: none; color: rgba(255,255,255,0.85); font-size: 0.7rem; cursor: pointer; padding: 0; line-height: 1; flex-shrink: 0; transition: 0.15s; }
+.pill-enter-btn:hover { transform: scale(1.3); }
+.event-pill.pill-cancelled { background: #333; text-decoration: line-through; opacity: 0.6; }
+.pill-cancelled-label { font-size: 0.58rem; color: #ef4444; flex-shrink: 0; }
 
 </style>

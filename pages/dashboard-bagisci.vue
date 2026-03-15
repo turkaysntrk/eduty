@@ -111,12 +111,13 @@
                             :class="{ featured: pkg.featured }">
                             <div v-if="pkg.featured" class="best-value">POPÜLER</div>
                             <div class="pkg-header">{{ pkg.name }}</div>
-                            <div class="price">{{ pkg.price }} ₺</div>
+                            <div class="price">{{ pkg.points?.toLocaleString('tr-TR') }} <span class="price-unit">puan</span></div>
+                            <div class="price-sub">{{ pkg.price }} ₺ karşılığı</div>
                             <ul class="features">
                                 <li v-for="feat in pkg.features" :key="feat">{{ feat }}</li>
                             </ul>
                             <button class="btn-select" :class="{ 'featured-btn': pkg.featured }"
-                                @click="processDonation(pkg.price, pkg.name)" :disabled="isDonating">
+                                @click="processDonation(pkg.price, pkg.name, pkg.points)" :disabled="isDonating">
                                 Bağış Yap
                             </button>
                         </div>
@@ -149,7 +150,7 @@
                             </div>
                             <div class="h-right">
                                 <span class="h-amount">{{ item.amount }} ₺</span>
-                                <span class="h-points">+{{ item.points }} Puan</span>
+                                <span class="h-points">+{{ (item.totalPoints || item.points) }} Puan</span>
                                 <span class="h-status" :class="item.distributed ? 'distributed' : 'pending'">
                                     {{ item.distributed ? '✅ Dağıtıldı' : '⏳ Bekliyor' }}
                                 </span>
@@ -343,18 +344,23 @@ const usageRate = computed(() => {
 })
 
 const packages = [
-    { name: 'Başlangıç', price: 250, features: ['✅ 1 Öğrenciye Kaynak', '✅ Teşekkür Sertifikası'] },
-    { name: 'Gelişim', price: 750, featured: true, features: ['✅ 3 Öğrenciye Kaynak', '✅ Özel Rozet', '✅ Aylık Rapor'] },
-    { name: 'Akademi', price: 2000, features: ['✅ 1 Sınıfa Kaynak', '✅ Kurumsal Teşekkür', '✅ Etki Raporu'] }
+    { name: 'Başlangıç', price: 250, points: 2500, features: ['✅ 2300 puan öğrencilere aktarılır', '✅ Teşekkür Sertifikası'] },
+    { name: 'Gelişim', price: 750, points: 7500, featured: true, features: ['✅ 6900 puan öğrencilere aktarılır', '✅ Özel Rozet', '✅ Aylık Rapor'] },
+    { name: 'Akademi', price: 2000, points: 20000, features: ['✅ 18400 puan öğrencilere aktarılır', '✅ Kurumsal Teşekkür', '✅ Etki Raporu'] }
 ]
 
 const isDonating = ref(false)
+const COMMISSION_RATE = 0.08  // %8 platform payı — bağışçıya gösterilmez
 
-const processDonation = async (amount, packageName) => {
+const processDonation = async (amount, packageName, totalPoints) => {
     if (!$auth.currentUser) { alert('Giriş yapmalısınız.'); return }
     const numAmount = parseInt(amount)
     if (!numAmount || numAmount < 1) { alert('Geçersiz tutar.'); return }
-    if (!confirm(`${packageName} için ${numAmount} TL bağış yapılacak.\n${numAmount * 10} puan dağıtım havuzuna eklenecek. Onaylıyor musunuz?`)) return
+
+    const pointsTotal = totalPoints || numAmount * 10
+    const studentPoints = Math.floor(pointsTotal * (1 - COMMISSION_RATE))
+
+    if (!confirm(`${packageName} paketi için ${numAmount} ₺ bağış yapılacak.\n${pointsTotal.toLocaleString('tr-TR')} puan öğrencilere aktarılacak.\nOnaylıyor musunuz?`)) return
     if (!db) db = getFirestore()
     isDonating.value = true
     try {
@@ -362,21 +368,21 @@ const processDonation = async (amount, packageName) => {
             donorId: $auth.currentUser.uid,
             donorName: userDisplayName.value || $auth.currentUser.email || 'Bağışçı',
             amount: numAmount,
-            points: numAmount * 10,
+            points: studentPoints,
+            totalPoints: pointsTotal,
             packageName: packageName,
             distributed: false,
             createdAt: new Date().toISOString()
         })
-        alert(`🎉 Bağışınız alındı!\n${numAmount} TL → ${numAmount * 10} Puan\nPuan Dağıtım sekmesinden öğrencilere dağıtabilirsiniz.`)
+        alert(`🎉 Bağışınız alındı!\n${pointsTotal.toLocaleString('tr-TR')} puan öğrencilere aktarılmak üzere havuza eklendi.`)
         customAmount.value = null
         await fetchDonationHistory()
-        pendingPool.value = await fetchPendingPool(db)
         await fetchRealStats()
         activeTab.value = 'distribution'
     } catch (error) {
         console.error("Bağış hatası:", error)
         if (error.code === 'permission-denied') {
-            alert('⛔ Yetki hatası!\nFirebase Console → Firestore → Rules kısmına:\nmatch /donations/{id} { allow create: if request.auth != null; }\nkuralını eklemeniz gerekiyor.')
+            alert('⛔ Yetki hatası! Firebase Rules güncellenmesi gerekiyor.')
         } else {
             alert('Hata: ' + error.message)
         }
@@ -414,7 +420,7 @@ const handleCustomDonation = () => {
         alert("Minimum bağış tutarı 50 TL'dir.");
         return;
     }
-    processDonation(customAmount.value, 'Özel Bağış');
+    processDonation(customAmount.value, 'Özel Bağış', customAmount.value * 10);
 }
 
 const fetchDonationHistory = async () => {
@@ -425,8 +431,13 @@ const fetchDonationHistory = async () => {
     history.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt))
     donationHistory.value = history
     donationCount.value = history.length
-    totalDonatedPoints.value = history.reduce((acc, curr) => acc + (curr.points || 0), 0)
-    distributedPoints.value = history.filter(d => d.distributed).reduce((acc, d) => acc + (d.points || 0), 0)
+    // Bağışçıya totalPoints göster (gördüğü puan), yoksa points'e düş
+    totalDonatedPoints.value = history.reduce((acc, curr) => acc + (curr.totalPoints || curr.points || 0), 0)
+    distributedPoints.value = history.filter(d => d.distributed).reduce((acc, d) => acc + (d.totalPoints || d.points || 0), 0)
+    // Bekleyen havuz: dağıtılmamış bağışların totalPoints toplamı
+    pendingPool.value = history
+        .filter(d => !d.distributed)
+        .reduce((acc, d) => acc + (d.totalPoints || d.points || 0), 0)
 }
 
 const fetchRealStats = async () => {
@@ -469,10 +480,10 @@ onMounted(() => {
                     currentAvatarUrl.value = `https://ui-avatars.com/api/?name=${data.firstName}+${data.lastName}&background=00c853&color=fff`;
                 }
 
-                fetchDonationHistory();
+                await fetchDonationHistory();
                 // Dağıtım motoru verilerini yükle
-                pendingPool.value = await fetchPendingPool(db)
                 await loadDistributionHistory()
+                await fetchRealStats()
             }
         } else {
             router.push('/destek_ol');
@@ -1003,7 +1014,19 @@ onMounted(() => {
     font-size: 2rem;
     color: #00c853;
     font-weight: bold;
-    margin-bottom: 20px;
+    margin-bottom: 4px;
+}
+
+.price-unit {
+    font-size: 1rem;
+    color: #00c853;
+    font-weight: 600;
+}
+
+.price-sub {
+    font-size: 0.8rem;
+    color: #555;
+    margin-bottom: 16px;
 }
 
 .features {

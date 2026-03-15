@@ -212,7 +212,8 @@
                                 </div>
                             </div>
                             <div class="result-points" v-if="!currentTest?.practiceOnly">
-                                <span v-if="testResult.finalPoints > 0">+{{ testResult.finalPoints }} puan kazandın 🎉</span>
+                                <span v-if="testResult.alreadyCompleted" class="no-pts">⚠️ Bu testi daha önce çözdün — tekrar puan verilmez</span>
+                                <span v-else-if="testResult.finalPoints > 0">+{{ testResult.finalPoints }} puan kazandın 🎉</span>
                                 <span v-else class="no-pts">⚠️ Kamera izni olmadığı için puan yok</span>
                             </div>
                             <div class="result-points practice-note" v-else>
@@ -440,10 +441,14 @@
                                     <div v-for="booking in getBookingsForDate(date)" :key="booking.id"
                                         class="event-pill" :class="{ 'pill-cancelled': booking.status?.includes('cancelled') }">
                                         <span class="pill-text">{{ booking.time }} {{ booking.teacherName }}</span>
-                                        <button v-if="!booking.status?.includes('cancelled')"
-                                            class="pill-cancel-btn"
-                                            @click.stop="cancelBookingByStudent(booking)"
-                                            title="Dersi İptal Et">✕</button>
+                                        <template v-if="!booking.status?.includes('cancelled')">
+                                            <button class="pill-enter-btn"
+                                                @click.stop="enterLessonStudent(booking)"
+                                                title="Derse Gir">🎥</button>
+                                            <button class="pill-cancel-btn"
+                                                @click.stop="cancelBookingByStudent(booking)"
+                                                title="Dersi İptal Et">✕</button>
+                                        </template>
                                         <span v-else class="pill-cancelled-label">İptal</span>
                                     </div>
                                 </div>
@@ -514,11 +519,14 @@
                             <div class="teacher-info">
                                 <h3>{{ teacher.displayName || teacher.email }}</h3>
                                 <span class="badge">{{ teacher.branch }}</span>
+                                <span v-if="!teacher.isPublished" class="badge-offline">🔒 Yayında Değil</span>
                                 <div class="teacher-meta-row">
                                     <span v-if="teacher.lessonPrice > 0" class="t-price">💎 {{ teacher.lessonPrice }} puan/ders</span>
                                     <span v-else class="t-price-free">🎁 Ücretsiz</span>
                                 </div>
-                                <button class="btn-request" @click="openBookingModal(teacher)">Ders Talep Et</button>
+                                <button class="btn-request" :class="{ 'btn-request-disabled': !teacher.isPublished }" @click="openBookingModal(teacher)">
+                                    {{ teacher.isPublished ? 'Ders Talep Et' : '🔒 Yayında Değil' }}
+                                </button>
                                 <button class="btn-message" @click="startChat(teacher)">💬 Mesaj At</button>
                             </div>
                         </div>
@@ -612,7 +620,12 @@ const userGrade = ref(null)
 const studentScore = ref(0)
 const completedLessons = ref(0)
 const completedTestCount = ref(0)
-const successRate = ref(0)
+const successRate = computed(() => {
+    const tests = Object.values(completedTestIds.value)
+    if (tests.length === 0) return 0
+    const total = tests.reduce((acc, t) => acc + (t.successPercent || 0), 0)
+    return Math.round(total / tests.length)
+})
 
 const availableTests = ref([])
 const realTeachers = ref([])
@@ -637,6 +650,13 @@ const drawingTool = ref('pen')
 const drawCanvas = ref(null)
 const isDrawing = ref(false)
 let ctx = null
+
+// Çözülmüş testler — { testId: { done:1, successPercent, earnedPoints } }
+const completedTestIds = ref({})
+
+// Günlük test sayaçları
+const dailyTestCount = ref(0)
+const dailyTestPoints = ref(0)
 
 // Test sonuç state
 const testResult = ref(null)     // null | { successPercent, earnedPoints, finalPoints, ... }
@@ -732,21 +752,171 @@ const lessons = computed(() => {
     return list
 })
 
-const fetchTests = async () => { if (!db) db = getFirestore(); const q = await getDocs(collection(db, "tests")); availableTests.value = q.docs.map(doc => ({ id: doc.id, ...doc.data() })); };
+const fetchTests = async () => {
+    if (!db) db = getFirestore()
+    try {
+        const snap = await getDocs(collection(db, 'tests'))
+        availableTests.value = snap.docs.map(d => ({ id: d.id, ...d.data() }))
+        console.log('[fetchTests] Yüklenen test sayısı:', availableTests.value.length)
+    } catch(e) {
+        console.error('[fetchTests] HATA:', e.code, e.message)
+        // permission-denied ise Firebase Rules'ta tests koleksiyonu için okuma izni yok
+    }
+}
 const fetchTeachers = async () => { if (!db) db = getFirestore(); try { const q = query(collection(db, "users"), where("role", "==", "teacher")); const snapshot = await getDocs(q); realTeachers.value = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })).filter(t => !t.displayName || !t.displayName.toLowerCase().includes('piç')); } catch (e) { console.error(e) } }
 const filteredTeachers = computed(() => { return realTeachers.value.filter(t => { if (t.isPublished !== true) return false; const matchSubject = filters.value.subject === '' || t.branch === filters.value.subject; return matchSubject }) })
 const hasAvailability = (teacher) => { return teacher.availability && Object.keys(teacher.availability).length > 0; }
-const openBookingModal = (teacher) => { selectedTeacherForBooking.value = teacher; bookingSlot.value = null; const slots = []; if (teacher.availability) { Object.keys(teacher.availability).forEach(key => { const [day, time] = key.split('-'); slots.push({ id: key, day, time }); }); } availableSlots.value = slots; isBookingModalOpen.value = true }
-const confirmBooking = async () => { if (!db) db = getFirestore(); if (!selectedTeacherForBooking.value || !bookingSlot.value) return; try { await addDoc(collection(db, "bookings"), { teacherId: selectedTeacherForBooking.value.id, teacherName: selectedTeacherForBooking.value.displayName || selectedTeacherForBooking.value.email, studentId: $auth.currentUser.uid, studentName: userDisplayName.value, day: bookingSlot.value.day, time: bookingSlot.value.time, createdAt: serverTimestamp(), status: 'confirmed' }); const teacherRef = doc(db, "users", selectedTeacherForBooking.value.id); const slotKey = `${bookingSlot.value.day}-${bookingSlot.value.time}`; await updateDoc(teacherRef, { [`availability.${slotKey}`]: deleteField() }); alert(`Randevu oluşturuldu.`); isBookingModalOpen.value = false; fetchBookings(); fetchTeachers(); } catch (error) { console.error(error); alert("Hata oluştu."); } }
+const openBookingModal = (teacher) => {
+    if (teacher.isPublished !== true) {
+        alert('⚠️ Bu öğretmen şu an yayında değil. Ders talebi gönderilemez.')
+        return
+    }
+    selectedTeacherForBooking.value = teacher
+    bookingSlot.value = null
+    const slots = []
+    if (teacher.availability) {
+        Object.keys(teacher.availability).forEach(key => {
+            const [day, time] = key.split('-')
+            slots.push({ id: key, day, time })
+        })
+    }
+    availableSlots.value = slots
+    isBookingModalOpen.value = true
+}
+
+const bookLessonById = (teacherId) => {
+    const teacher = findTeacherById(teacherId)
+    if (!teacher) return
+    if (teacher.isPublished !== true) {
+        alert('⚠️ Bu öğretmen şu an yayında değil. Ders talebi gönderilemez.')
+        return
+    }
+    openBookingModal(teacher)
+}
+const confirmBooking = async () => {
+    if (!db) db = getFirestore()
+    if (!selectedTeacherForBooking.value || !bookingSlot.value) return
+    try {
+        // Seçilen gün adını bugünden itibaren en yakın tarihe çevir
+        const dayMap = { "Pzt": 1, "Sal": 2, "Çar": 3, "Per": 4, "Cum": 5, "Cmt": 6, "Paz": 0 }
+        const targetDay = dayMap[bookingSlot.value.day]
+        const today = new Date()
+        const todayDay = today.getDay()
+        let diff = targetDay - todayDay
+        if (diff < 0) diff += 7
+        if (diff === 0) diff = 7 // Bu haftanın aynı günü geçtiyse gelecek haftaya al
+        const bookingDate = new Date(today.getFullYear(), today.getMonth(), today.getDate() + diff)
+        const bookingDateISO = bookingDate.toISOString().slice(0, 10)
+
+        await addDoc(collection(db, "bookings"), {
+            teacherId: selectedTeacherForBooking.value.id,
+            teacherName: selectedTeacherForBooking.value.displayName || selectedTeacherForBooking.value.email,
+            studentId: $auth.currentUser.uid,
+            studentName: userDisplayName.value,
+            day: bookingSlot.value.day,
+            time: bookingSlot.value.time,
+            bookingDate: bookingDateISO,
+            createdAt: serverTimestamp(),
+            status: 'confirmed'
+        })
+        const teacherRef = doc(db, "users", selectedTeacherForBooking.value.id)
+        const slotKey = `${bookingSlot.value.day}-${bookingSlot.value.time}`
+        await updateDoc(teacherRef, { [`availability.${slotKey}`]: deleteField() })
+        alert(`Randevu oluşturuldu: ${bookingSlot.value.day} ${bookingDateISO} ${bookingSlot.value.time}`)
+        isBookingModalOpen.value = false
+        fetchBookings()
+        fetchTeachers()
+    } catch (error) {
+        console.error(error)
+        alert("Hata oluştu.")
+    }
+}
 const fetchBookings = async () => { if (!db) db = getFirestore(); const q = query(collection(db, "bookings"), where("studentId", "==", $auth.currentUser.uid)); const snap = await getDocs(q); myBookings.value = snap.docs.map(d => ({ id: d.id, ...d.data() })); }
-const monthNames = ["Ocak", "Şubat", "Mart", "Nisan", "Mayıs", "Haziran", "Temmuz", "Ağustos", "Eylül", "Ekim", "Kasım", "Aralık"]; const currentMonthName = computed(() => monthNames[currentMonth.value]); const daysInMonth = computed(() => new Date(currentYear.value, currentMonth.value + 1, 0).getDate()); const firstDayOffset = computed(() => { let d = new Date(currentYear.value, currentMonth.value, 1).getDay(); return d === 0 ? 6 : d - 1 }); const changeMonth = (delta) => { currentMonth.value += delta; if (currentMonth.value > 11) { currentMonth.value = 0; currentYear.value++ } if (currentMonth.value < 0) { currentMonth.value = 11; currentYear.value-- } }; const isToday = (date) => { const today = new Date(); return date === today.getDate() && currentMonth.value === today.getMonth() && currentYear.value === today.getFullYear() }; const getBookingsForDate = (date) => { const d = new Date(currentYear.value, currentMonth.value, date); const dayIndex = d.getDay(); const dayMap = ["Paz", "Pzt", "Sal", "Çar", "Per", "Cum", "Cmt"]; const dayName = dayMap[dayIndex]; return myBookings.value.filter(b => b.day === dayName); }
+const monthNames = ["Ocak", "Şubat", "Mart", "Nisan", "Mayıs", "Haziran", "Temmuz", "Ağustos", "Eylül", "Ekim", "Kasım", "Aralık"]; const currentMonthName = computed(() => monthNames[currentMonth.value]); const daysInMonth = computed(() => new Date(currentYear.value, currentMonth.value + 1, 0).getDate()); const firstDayOffset = computed(() => { let d = new Date(currentYear.value, currentMonth.value, 1).getDay(); return d === 0 ? 6 : d - 1 }); const changeMonth = (delta) => { currentMonth.value += delta; if (currentMonth.value > 11) { currentMonth.value = 0; currentYear.value++ } if (currentMonth.value < 0) { currentMonth.value = 11; currentYear.value-- } }; const isToday = (date) => { const today = new Date(); return date === today.getDate() && currentMonth.value === today.getMonth() && currentYear.value === today.getFullYear() }; const getBookingsForDate = (date) => {
+    const d = new Date(currentYear.value, currentMonth.value, date)
+    const dayIndex = d.getDay()
+    const dayMap = ["Paz", "Pzt", "Sal", "Çar", "Per", "Cum", "Cmt"]
+    const dayName = dayMap[dayIndex]
+    // Tarihe göre filtrele: bookingDate alanı varsa onu kullan, yoksa sadece aynı haftanın içindeyse göster
+    return myBookings.value.filter(b => {
+        if (b.status?.includes('cancelled')) return b.day === dayName && isBookingInThisWeek(b, d)
+        // bookingDate (ISO string) varsa tam tarihe göre eşleştir
+        if (b.bookingDate) {
+            const bookDate = new Date(b.bookingDate)
+            return bookDate.getFullYear() === d.getFullYear() &&
+                   bookDate.getMonth() === d.getMonth() &&
+                   bookDate.getDate() === d.getDate()
+        }
+        // Eski kayıtlar için: sadece gün adı + ilk oluşturulma haftasıyla eşleştir
+        if (b.day !== dayName) return false
+        if (!b.createdAt) return true
+        const created = b.createdAt.toDate ? b.createdAt.toDate() : new Date(b.createdAt.seconds ? b.createdAt.seconds * 1000 : b.createdAt)
+        // createdAt'ın haftasını hesapla
+        const createdDay = new Date(created.getFullYear(), created.getMonth(), created.getDate())
+        const targetDay = new Date(d.getFullYear(), d.getMonth(), d.getDate())
+        // Aynı haftanın başından 7 gün içindeyse göster (o haftanın Pzt'si baz alınır)
+        const getMonday = (dt) => { const day = dt.getDay(); const diff = (day === 0 ? -6 : 1 - day); return new Date(dt.getFullYear(), dt.getMonth(), dt.getDate() + diff) }
+        const createdMonday = getMonday(createdDay)
+        const targetMonday = getMonday(targetDay)
+        return createdMonday.getTime() === targetMonday.getTime()
+    })
+}
+
+const isBookingInThisWeek = (booking, date) => {
+    if (!booking.createdAt) return true
+    const created = booking.createdAt.toDate ? booking.createdAt.toDate() : new Date(booking.createdAt.seconds ? booking.createdAt.seconds * 1000 : booking.createdAt)
+    const getMonday = (dt) => { const day = dt.getDay(); const diff = (day === 0 ? -6 : 1 - day); return new Date(dt.getFullYear(), dt.getMonth(), dt.getDate() + diff) }
+    return getMonday(created).getTime() === getMonday(date).getTime()
+}
 const startChat = async (teacher) => { if (!db) db = getFirestore(); const myUid = $auth.currentUser.uid; const teacherUid = teacher.id; const q = query(collection(db, "chats"), where("participants", "array-contains", myUid)); const snap = await getDocs(q); let existingChat = snap.docs.find(doc => { const data = doc.data(); return data.participants.includes(teacherUid); }); if (existingChat) { activeTab.value = 'messages'; const chatData = existingChat.data(); selectChat({ id: existingChat.id, ...chatData, otherUserName: teacher.displayName || teacher.email, otherUserId: teacherUid }); } else { const newChatRef = await addDoc(collection(db, "chats"), { participants: [myUid, teacherUid], studentId: myUid, teacherId: teacherUid, studentName: userDisplayName.value, teacherName: teacher.displayName || teacher.email, createdAt: serverTimestamp(), lastMessage: '', typing: {} }); activeTab.value = 'messages'; selectChat({ id: newChatRef.id, participants: [myUid, teacherUid], otherUserName: teacher.displayName || teacher.email, otherUserId: teacherUid }); } }
 const fetchChats = () => { if (!db) db = getFirestore(); const q = query(collection(db, "chats"), where("participants", "array-contains", $auth.currentUser.uid)); onSnapshot(q, (snapshot) => { myChats.value = snapshot.docs.map(doc => { const data = doc.data(); const otherId = data.participants.find(p => p !== $auth.currentUser.uid); const otherName = otherId === data.teacherId ? data.teacherName : data.studentName; return { id: doc.id, ...data, otherUserName: otherName, otherUserId: otherId }; }); if (activeChat.value) { const updated = myChats.value.find(c => c.id === activeChat.value.id); if (updated) activeChat.value = { ...activeChat.value, ...updated }; } }); };
 const selectChat = (chat) => { activeChat.value = chat; loadMessages(chat.id); markAsRead(chat.id); }; const loadMessages = (chatId) => { if (!db) db = getFirestore(); const q = query(collection(db, "chats", chatId, "messages"), orderBy("createdAt", "asc")); onSnapshot(q, (snapshot) => { activeMessages.value = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })); setTimeout(() => { const container = document.querySelector('.messages-area'); if (container) container.scrollTop = container.scrollHeight; }, 100); }); }; const sendMessage = async () => { if (!newMessage.value.trim() || !activeChat.value) return; const text = newMessage.value; newMessage.value = ''; const chatRef = doc(db, "chats", activeChat.value.id); await addDoc(collection(chatRef, "messages"), { text, senderId: $auth.currentUser.uid, createdAt: serverTimestamp() }); await updateDoc(chatRef, { lastMessage: text, updatedAt: serverTimestamp() }); if (typingTimeout) clearTimeout(typingTimeout); await updateDoc(chatRef, { [`typing.${$auth.currentUser.uid}`]: false }); }; const handleTyping = async () => { if (!activeChat.value) return; const chatRef = doc(db, "chats", activeChat.value.id); await updateDoc(chatRef, { [`typing.${$auth.currentUser.uid}`]: true }); if (typingTimeout) clearTimeout(typingTimeout); typingTimeout = setTimeout(async () => { await updateDoc(chatRef, { [`typing.${$auth.currentUser.uid}`]: false }); }, 2000); }; const markAsRead = async (chatId) => { if (!chatId) return; const chatRef = doc(db, "chats", chatId); await updateDoc(chatRef, { [`lastRead.${$auth.currentUser.uid}`]: serverTimestamp() }); }; const isMessageRead = (msg) => { if (!activeChat.value || !activeChat.value.lastRead || !msg.createdAt) return false; const otherUserId = activeChat.value.otherUserId; const readTime = activeChat.value.lastRead[otherUserId]; if (!readTime) return false; return readTime.seconds >= msg.createdAt.seconds; };
 const selectSubject = (subject) => { selectedTestSubject.value = subject; }
 const getTestCountForSubject = (subject) => { return availableTests.value.filter(t => t.subject === subject).length; }
 const testsForSelectedSubject = computed(() => { if (!selectedTestSubject.value) return []; return availableTests.value.filter(t => t.subject === selectedTestSubject.value).sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt)); });
-const addToFavoritesById = (teacherId) => { const teacher = findTeacherById(teacherId); if (teacher && !myFavorites.value.find(f => f.id === teacher.id)) { myFavorites.value.push(teacher); } }
+const addToFavoritesById = async (teacherId) => {
+    const teacher = findTeacherById(teacherId)
+    if (!teacher) return
+    if (myFavorites.value.find(f => f.id === teacher.id)) {
+        alert('Bu öğretmen zaten favorilerinizde.')
+        return
+    }
+    myFavorites.value.push(teacher)
+    if (!db) db = getFirestore()
+    try {
+        await updateDoc(doc(db, 'users', $auth.currentUser.uid), {
+            favoriteTeacherIds: myFavorites.value.map(f => f.id)
+        })
+    } catch(e) {
+        console.error('Favori kaydedilemedi:', e)
+    }
+}
+const fetchFavorites = async (savedFavIds) => {
+    if (!savedFavIds || savedFavIds.length === 0) {
+        myFavorites.value = []
+        return
+    }
+    if (!db) db = getFirestore()
+    try {
+        // Önce realTeachers'dan eşleştir (hızlı yol)
+        const fromCache = realTeachers.value.filter(t => savedFavIds.includes(t.id))
+        if (fromCache.length === savedFavIds.length) {
+            myFavorites.value = fromCache
+            return
+        }
+        // Eksik olanları Firestore'dan tek tek çek
+        const promises = savedFavIds.map(id => getDoc(doc(db, 'users', id)))
+        const snaps = await Promise.all(promises)
+        myFavorites.value = snaps
+            .filter(s => s.exists())
+            .map(s => ({ id: s.id, ...s.data() }))
+    } catch(e) {
+        console.error('Favoriler yüklenemedi:', e)
+        // Fallback: realTeachers'dan eşleştir
+        myFavorites.value = realTeachers.value.filter(t => savedFavIds.includes(t.id))
+    }
+}
+
 const isFavorite = (teacherId) => !!myFavorites.value.find(f => f.id === teacherId)
 const toggleFavorite = async (teacher) => {
     if (!db) db = getFirestore()
@@ -815,26 +985,33 @@ ${price} puan iade edildi.` : ''))
         }
     }
 }
-const findTeacherById = (id) => { return realTeachers.value.find(t => t.id === id); }
-const bookLessonById = (teacherId) => { const teacher = findTeacherById(teacherId); if (teacher) openBookingModal(teacher); }
-const openTestRunner = async (test) => {
-    // Daha önce çözülmüş mü? done:1 ise uyar
-    const prev = completedTestIds.value[test.id]
-    const alreadyDone = prev && prev.done === 1
-
-    if (alreadyDone) {
-        const go = confirm('Bu testi daha önce çözdün!\n\nBaşarı oranın: %' + prev.successPercent + '\nKazandığın puan: ' + prev.earnedPoints + '\n\nTekrar girersen PUAN KAZANAMAZSIN.\nYine de devam etmek istiyor musun?')
-        if (!go) return
+const enterLessonStudent = (booking) => {
+    if (booking.bookingDate && booking.time) {
+        const [hour, minute] = booking.time.split(':').map(Number)
+        const lessonStart = new Date(booking.bookingDate)
+        lessonStart.setHours(hour, minute, 0, 0)
+        const lessonEnd = new Date(lessonStart.getTime() + 60 * 60 * 1000)
+        const earliestEntry = new Date(lessonStart.getTime() - 15 * 60 * 1000)
+        const now = new Date()
+        if (now < earliestEntry) {
+            const dateStr = lessonStart.toLocaleDateString('tr-TR', { day: 'numeric', month: 'long' })
+            alert(`⏰ Ders henüz başlamadı.\n\nDers zamanı: ${dateStr} ${booking.time}\n\nDerse 15 dakika öncesinden girebilirsiniz.`)
+            return
+        }
+        if (now > lessonEnd) {
+            alert('⏰ Bu ders süresi dolmuş.')
+            return
+        }
     }
-
-    currentTest.value = { ...test, practiceOnly: alreadyDone }
+    router.push(`/meets/${booking.id}`)
+}
+const openTestRunner = async (test) => {
+    currentTest.value = test
     userAnswers.value = new Array(parseInt(test.questionCount)).fill(null)
     tabTimeLeft.value = TAB_TIME_LIMIT
     testDisqualified.value = false
     tabWarningActive.value = false
     aiSuspicionCount.value = 0
-    isShowingResult.value = false
-    testResult.value = null
     isTakingTest.value = true
     await nextTick()
     // Canvas kurulumu
@@ -846,13 +1023,9 @@ const openTestRunner = async (test) => {
     ctx.lineJoin = 'round'
     ctx.strokeStyle = '#0055ff'
     ctx.lineWidth = 2
-    // Güvenlik sistemleri sadece puan kazanılabilir modda başlar
-    if (!alreadyDone) {
-        startTabWatcher()
-        cameraPermissionState.value = 'asking'
-    } else {
-        cameraPermissionState.value = 'idle'
-    }
+    // Güvenlik sistemlerini başlat
+    startTabWatcher()
+    cameraPermissionState.value = 'asking'
 }
 
 // ===== SEKME DEĞİŞİM KORUMA SİSTEMİ =====
@@ -1018,6 +1191,28 @@ const finishTest = async () => {
         return
     }
 
+    // ── Daha önce çözülmüş mü kontrol et ──
+    const alreadyDone = completedTestIds.value[currentTest.value?.id]
+    if (alreadyDone) {
+        // Sadece sonucu göster, puan verme
+        const totalQ = parseInt(currentTest.value?.questionCount || 0)
+        const answerKey = currentTest.value?.answerKey || []
+        const review = buildReview(totalQ, answerKey)
+        const cc = review.filter(r => r.status === 'correct').length
+        const wc = review.filter(r => r.status === 'wrong').length
+        const ec = review.filter(r => r.status === 'empty').length
+        const pct = totalQ > 0 ? Math.round((cc / totalQ) * 100) : 0
+        testResult.value = {
+            successPercent: pct, correctCount: cc, wrongCount: wc, emptyCount: ec,
+            finalPoints: 0, cameraOk: false, questionReview: review,
+            alreadyCompleted: true
+        }
+        stopTabWatcher()
+        stopCameraStream()
+        isShowingResult.value = true
+        return
+    }
+
     const totalQuestions = parseInt(currentTest.value?.questionCount || 0)
     const answered = userAnswers.value.filter(a => a !== null).length
     if (answered < totalQuestions) {
@@ -1048,9 +1243,17 @@ const finishTest = async () => {
             const current = snap.data() || {}
             const newScore = (current.score || 0) + finalPoints
             const newCount = (current.completedTestCount || 0) + 1
+            // Günlük sayaçlar
+            const todayStr = new Date().toISOString().slice(0, 10)
+            const isSameDay = current.dailyTestDate === todayStr
+            const newDailyCount = isSameDay ? (current.dailyTestCount || 0) + 1 : 1
+            const newDailyPoints = isSameDay ? (current.dailyTestPoints || 0) + finalPoints : finalPoints
             await updateDoc(userRef, {
                 score: newScore,
                 completedTestCount: newCount,
+                dailyTestDate: todayStr,
+                dailyTestCount: newDailyCount,
+                dailyTestPoints: newDailyPoints,
                 [`completedTests.${currentTest.value.id}`]: {
                     done: 1,
                     completedAt: new Date().toISOString(),
@@ -1062,6 +1265,8 @@ const finishTest = async () => {
             studentScore.value = newScore
             completedTestCount.value = newCount
             completedLessons.value = newCount
+            dailyTestCount.value = newDailyCount
+            dailyTestPoints.value = newDailyPoints
             completedTestIds.value[currentTest.value.id] = { done: 1, successPercent, earnedPoints: finalPoints }
         } catch (e) {
             console.error('Puan kaydedilemedi:', e)
@@ -1122,8 +1327,11 @@ onMounted(() => {
                 // Günlük sayaçlar
                 const today = new Date().toISOString().slice(0, 10)
                 if (data.dailyTestDate === today) {
-                    if (typeof dailyTestCount !== 'undefined') dailyTestCount.value = data.dailyTestCount || 0
-                    if (typeof dailyTestPoints !== 'undefined') dailyTestPoints.value = data.dailyTestPoints || 0
+                    dailyTestCount.value = data.dailyTestCount || 0
+                    dailyTestPoints.value = data.dailyTestPoints || 0
+                } else {
+                    dailyTestCount.value = 0
+                    dailyTestPoints.value = 0
                 }
                 // Tamamlanan testler
                 if (data.completedTests) {
@@ -1146,9 +1354,7 @@ onMounted(() => {
                     await fetchTeachers()
                     // Favorileri öğretmenler yüklendikten SONRA eşleştir
                     const savedFavIds = data.favoriteTeacherIds || []
-                    if (savedFavIds.length > 0) {
-                        myFavorites.value = realTeachers.value.filter(t => savedFavIds.includes(t.id))
-                    }
+                    await fetchFavorites(savedFavIds)
                     await fetchBookings()
                     fetchChats()
                 } catch (e) {
@@ -1865,10 +2071,28 @@ onMounted(() => {
     pointer-events: all;
 }
 
-.btn-request:hover {
-    background: #0055ff;
-    color: white;
+.badge-offline {
+    background: #333;
+    color: #f59e0b;
+    padding: 2px 8px;
+    border-radius: 4px;
+    font-size: 0.75rem;
+    display: inline-block;
+    margin-top: 4px;
 }
+
+.btn-request-disabled {
+    border-color: #444 !important;
+    color: #555 !important;
+    cursor: not-allowed !important;
+}
+
+.btn-request-disabled:hover {
+    background: transparent !important;
+    color: #555 !important;
+}
+
+
 
 .btn-message {
     background: #222;
@@ -2647,16 +2871,18 @@ onMounted(() => {
 }
 .pill-text { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; flex: 1; }
 .pill-cancel-btn {
-    background: transparent;
-    border: none;
+    background: transparent; border: none;
     color: rgba(255,255,255,0.7);
-    font-size: 0.6rem;
-    cursor: pointer;
-    padding: 0;
-    line-height: 1;
-    flex-shrink: 0;
-    transition: 0.15s;
+    font-size: 0.6rem; cursor: pointer;
+    padding: 0; line-height: 1; flex-shrink: 0; transition: 0.15s;
 }
+.pill-enter-btn {
+    background: transparent; border: none;
+    color: rgba(255,255,255,0.85);
+    font-size: 0.7rem; cursor: pointer;
+    padding: 0; line-height: 1; flex-shrink: 0; transition: 0.15s;
+}
+.pill-enter-btn:hover { transform: scale(1.3); }
 .pill-cancel-btn:hover { color: #fca5a5; transform: scale(1.3); }
 .event-pill.pill-cancelled {
     background: #333;

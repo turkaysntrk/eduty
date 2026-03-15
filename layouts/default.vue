@@ -121,6 +121,7 @@ const formatRoleName = (role) => {
   if (role === 'teacher') return 'Öğretmen';
   if (role === 'student') return 'Öğrenci';
   if (role === 'donor') return 'Bağışçı';
+  if (role === 'admin') return 'Admin';
   return 'Hesap';
 }
 
@@ -129,6 +130,8 @@ const goToDashboard = () => {
     router.push('/dashboard-teacher')
   } else if (userRole.value === 'donor') {
     router.push('/dashboard-bagisci')
+  } else if (userRole.value === 'admin') {
+    router.push('/dashboard-admin')
   } else {
     router.push('/dashboard')
   }

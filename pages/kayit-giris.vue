@@ -83,8 +83,9 @@ const handleLogin = async () => {
       } else if (userData.role === 'teacher') {
         router.push('/dashboard-teacher');
       } else if (userData.role === 'donor') {
-        // Bağışçı normal girişten girmeye çalışırsa ana sayfaya veya destek sayfasına atabiliriz
         router.push('/destek_ol');
+      } else if (userData.role === 'admin') {
+        router.push('/dashboard-admin');
       }
     } else {
       router.push('/'); // Rol bulunamazsa ana sayfaya
