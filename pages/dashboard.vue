@@ -168,19 +168,86 @@
                         @mouseup="stopDrawing" @mouseleave="stopDrawing"></canvas>
                 </div>
                 <div class="optical-form">
-                    <h4>Cevap Anahtarı</h4>
-                    <div class="questions-list">
-                        <div v-for="n in parseInt(currentTest?.questionCount || 0)" :key="n" class="opt-row">
-                            <span class="q-no">{{ n }}.</span>
-                            <div class="opt-options">
-                                <button v-for="opt in ['A', 'B', 'C', 'D', 'E']" :key="opt"
-                                    :class="{ selected: userAnswers[n - 1] === opt }" @click="userAnswers[n - 1] = opt">
-                                    {{ opt }}
-                                </button>
+
+                    <!-- ÇÖZÜM SIRASINDA -->
+                    <template v-if="!isShowingResult">
+                        <h4>Cevap Formu</h4>
+                        <div class="questions-list">
+                            <div v-for="n in parseInt(currentTest?.questionCount || 0)" :key="n" class="opt-row">
+                                <span class="q-no">{{ n }}.</span>
+                                <div class="opt-options">
+                                    <button v-for="opt in ['A', 'B', 'C', 'D', 'E']" :key="opt"
+                                        :class="{ 'opt-selected': userAnswers[n - 1] === opt }"
+                                        @click="userAnswers[n - 1] = opt">
+                                        {{ opt }}
+                                    </button>
+                                </div>
                             </div>
                         </div>
-                    </div>
-                    <button class="btn-finish-test" @click="finishTest">TESTİ BİTİR</button>
+                        <button class="btn-finish-test" @click="finishTest">TESTİ BİTİR</button>
+                    </template>
+
+                    <!-- SONUÇ EKRANI -->
+                    <template v-else>
+                        <div class="result-header">
+                            <h4>Test Sonucu</h4>
+                            <div class="result-score-row">
+                                <div class="rs-item">
+                                    <span class="rs-val" :class="testResult.successPercent >= 70 ? 'rs-good' : testResult.successPercent >= 40 ? 'rs-mid' : 'rs-bad'">
+                                        %{{ testResult.successPercent }}
+                                    </span>
+                                    <span class="rs-lab">Başarı</span>
+                                </div>
+                                <div class="rs-item">
+                                    <span class="rs-val rs-good">{{ testResult.correctCount }}</span>
+                                    <span class="rs-lab">Doğru</span>
+                                </div>
+                                <div class="rs-item">
+                                    <span class="rs-val rs-bad">{{ testResult.wrongCount }}</span>
+                                    <span class="rs-lab">Yanlış</span>
+                                </div>
+                                <div class="rs-item">
+                                    <span class="rs-val rs-empty">{{ testResult.emptyCount }}</span>
+                                    <span class="rs-lab">Boş</span>
+                                </div>
+                            </div>
+                            <div class="result-points" v-if="!currentTest?.practiceOnly">
+                                <span v-if="testResult.finalPoints > 0">+{{ testResult.finalPoints }} puan kazandın 🎉</span>
+                                <span v-else class="no-pts">⚠️ Kamera izni olmadığı için puan yok</span>
+                            </div>
+                            <div class="result-points practice-note" v-else>
+                                📝 Pratik mod — puan kazanılmadı
+                            </div>
+                        </div>
+
+                        <div class="questions-list result-list">
+                            <div v-for="(row, idx) in testResult.questionReview" :key="idx"
+                                class="opt-row result-row"
+                                :class="'row-' + row.status">
+                                <span class="q-no">{{ row.no }}.</span>
+                                <div class="opt-options">
+                                    <button v-for="opt in ['A', 'B', 'C', 'D', 'E']" :key="opt"
+                                        :class="getResultClass(row, opt)"
+                                        disabled>
+                                        {{ opt }}
+                                    </button>
+                                </div>
+                                <span class="row-icon">
+                                    {{ row.status === 'correct' ? '✓' : row.status === 'wrong' ? '✗' : '–' }}
+                                </span>
+                            </div>
+                        </div>
+
+                        <div class="result-legend">
+                            <span class="leg-item"><span class="leg-dot correct"></span>Doğru</span>
+                            <span class="leg-item"><span class="leg-dot wrong"></span>Yanlış / Cevabın</span>
+                            <span class="leg-item"><span class="leg-dot correct-answer"></span>Doğru Cevap</span>
+                            <span class="leg-item"><span class="leg-dot empty"></span>Boş/Doğru</span>
+                        </div>
+
+                        <button class="btn-close-result" @click="closeTestResult">Testi Kapat</button>
+                    </template>
+
                 </div>
             </div>
         </div>
@@ -571,6 +638,14 @@ const drawCanvas = ref(null)
 const isDrawing = ref(false)
 let ctx = null
 
+// Test sonuç state
+const testResult = ref(null)
+const isShowingResult = ref(false)
+
+// Çözülmüş testler — { testId: { done: 1, successPercent, earnedPoints } }
+// Firestore'dan yüklenir, test bitince güncellenir
+const completedTestIds = ref({})
+
 // ===== GÜVENLİK SİSTEMİ STATE =====
 // Sekme değişim koruması
 const TAB_TIME_LIMIT = 10  // toplam izin verilen dışarıda kalma süresi (saniye)
@@ -662,7 +737,7 @@ const lessons = computed(() => {
 
 const fetchTests = async () => { if (!db) db = getFirestore(); const q = await getDocs(collection(db, "tests")); availableTests.value = q.docs.map(doc => ({ id: doc.id, ...doc.data() })); };
 const fetchTeachers = async () => { if (!db) db = getFirestore(); try { const q = query(collection(db, "users"), where("role", "==", "teacher")); const snapshot = await getDocs(q); realTeachers.value = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })).filter(t => !t.displayName || !t.displayName.toLowerCase().includes('piç')); } catch (e) { console.error(e) } }
-const filteredTeachers = computed(() => { return realTeachers.value.filter(t => { const matchSubject = filters.value.subject === '' || t.branch === filters.value.subject; return matchSubject }) })
+const filteredTeachers = computed(() => { return realTeachers.value.filter(t => { if (t.isPublished !== true) return false; const matchSubject = filters.value.subject === '' || t.branch === filters.value.subject; return matchSubject }) })
 const hasAvailability = (teacher) => { return teacher.availability && Object.keys(teacher.availability).length > 0; }
 const openBookingModal = (teacher) => { selectedTeacherForBooking.value = teacher; bookingSlot.value = null; const slots = []; if (teacher.availability) { Object.keys(teacher.availability).forEach(key => { const [day, time] = key.split('-'); slots.push({ id: key, day, time }); }); } availableSlots.value = slots; isBookingModalOpen.value = true }
 const confirmBooking = async () => { if (!db) db = getFirestore(); if (!selectedTeacherForBooking.value || !bookingSlot.value) return; try { await addDoc(collection(db, "bookings"), { teacherId: selectedTeacherForBooking.value.id, teacherName: selectedTeacherForBooking.value.displayName || selectedTeacherForBooking.value.email, studentId: $auth.currentUser.uid, studentName: userDisplayName.value, day: bookingSlot.value.day, time: bookingSlot.value.time, createdAt: serverTimestamp(), status: 'confirmed' }); const teacherRef = doc(db, "users", selectedTeacherForBooking.value.id); const slotKey = `${bookingSlot.value.day}-${bookingSlot.value.time}`; await updateDoc(teacherRef, { [`availability.${slotKey}`]: deleteField() }); alert(`Randevu oluşturuldu.`); isBookingModalOpen.value = false; fetchBookings(); fetchTeachers(); } catch (error) { console.error(error); alert("Hata oluştu."); } }
@@ -676,42 +751,96 @@ const getTestCountForSubject = (subject) => { return availableTests.value.filter
 const testsForSelectedSubject = computed(() => { if (!selectedTestSubject.value) return []; return availableTests.value.filter(t => t.subject === selectedTestSubject.value).sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt)); });
 const addToFavoritesById = (teacherId) => { const teacher = findTeacherById(teacherId); if (teacher && !myFavorites.value.find(f => f.id === teacher.id)) { myFavorites.value.push(teacher); } }
 const isFavorite = (teacherId) => !!myFavorites.value.find(f => f.id === teacherId)
-const toggleFavorite = (teacher) => {
+const toggleFavorite = async (teacher) => {
+    if (!db) db = getFirestore()
     const idx = myFavorites.value.findIndex(f => f.id === teacher.id)
     if (idx === -1) {
         myFavorites.value.push(teacher)
     } else {
         myFavorites.value.splice(idx, 1)
     }
+    // Firestore'a kaydet
+    const favoriteIds = myFavorites.value.map(f => f.id)
+    try {
+        await updateDoc(doc(db, 'users', $auth.currentUser.uid), {
+            favoriteTeacherIds: favoriteIds
+        })
+    } catch(e) {
+        console.error('Favori kaydedilemedi:', e)
+    }
 }
 const cancelBookingByStudent = async (booking) => {
-    if (!confirm(`${booking.teacherName} ile ${booking.day} ${booking.time} randevunuzu iptal etmek istiyor musunuz?`)) return
+    if (!confirm(`${booking.teacherName || 'Öğretmen'} ile ${booking.day} ${booking.time} randevunuzu iptal etmek istiyor musunuz?`)) return
     if (!db) db = getFirestore()
+    let step = 'booking'
     try {
-        const bookingRef = doc(db, 'bookings', booking.id)
-        await updateDoc(bookingRef, { status: 'cancelled_by_student', cancelledAt: serverTimestamp() })
-        // Öğretmenin müsaitliğini geri aç
-        const teacherRef = doc(db, 'users', booking.teacherId)
-        const slotKey = `${booking.day}-${booking.time}`
-        await updateDoc(teacherRef, { [`availability.${slotKey}`]: true })
-        // Ücretli dersse puanı iade et
-        if (booking.lessonPrice > 0) {
-            await updateDoc(doc(db, 'users', $auth.currentUser.uid), { score: studentScore.value + booking.lessonPrice })
-            studentScore.value += booking.lessonPrice
+        // 1. Booking'i iptal et — en kritik adım
+        step = 'booking'
+        await updateDoc(doc(db, 'bookings', booking.id), {
+            status: 'cancelled_by_student',
+            cancelledAt: serverTimestamp()
+        })
+        // 2. Öğretmenin müsaitliğini geri aç — bu başarısız olsa da iptal tamamdır
+        step = 'teacher'
+        if (booking.teacherId) {
+            try {
+                await updateDoc(doc(db, 'users', booking.teacherId), {
+                    [`availability.${booking.day}-${booking.time}`]: true
+                })
+            } catch (e2) {
+                console.warn('Öğretmen müsaitliği güncellenemedi (önemli değil):', e2.message)
+            }
         }
+        // 3. Ücretli dersse puan iade et
+        step = 'refund'
+        const price = booking.lessonPrice || 0
+        if (price > 0) {
+            const snap = await getDoc(doc(db, 'users', $auth.currentUser.uid))
+            const currentScore = snap.exists() ? (snap.data().score || 0) : studentScore.value
+            await updateDoc(doc(db, 'users', $auth.currentUser.uid), { score: currentScore + price })
+            studentScore.value = currentScore + price
+        }
+        // 4. Local state'i hemen güncelle — Firestore'dan tekrar çekmeden önce UI'da göster
+        myBookings.value = myBookings.value.map(b =>
+            b.id === booking.id ? { ...b, status: 'cancelled_by_student' } : b
+        )
         await fetchBookings()
-        alert('Randevu iptal edildi.' + (booking.lessonPrice > 0 ? ` ${booking.lessonPrice} puan iade edildi.` : ''))
-    } catch(e) { console.error(e); alert('İptal sırasında hata oluştu.') }
+        alert('✅ Randevu iptal edildi.' + (price > 0 ? `
+${price} puan iade edildi.` : ''))
+    } catch(e) {
+        console.error(`İptal hatası (adım: ${step}):`, e)
+        // Booking güncellendi ama sonraki adım patlıyorsa kullanıcıya doğruyu söyle
+        if (step !== 'booking') {
+            await fetchBookings()  // Gerçek durumu çek
+            alert('Randevu iptal edildi, ancak bazı güncellemeler gecikmeli olabilir.')
+        } else {
+            alert('İptal başarısız: ' + e.message)
+        }
+    }
 }
 const findTeacherById = (id) => { return realTeachers.value.find(t => t.id === id); }
 const bookLessonById = (teacherId) => { const teacher = findTeacherById(teacherId); if (teacher) openBookingModal(teacher); }
 const openTestRunner = async (test) => {
-    currentTest.value = test
+    // ── Daha önce çözülmüş mü kontrol et ──
+    const prev = completedTestIds.value[test.id]
+    const alreadyDone = prev && prev.done === 1
+
+    if (alreadyDone) {
+    const go = confirm(
+        'Bu testi daha önce çözdün!\n\nBaşarı oranın: %' + prev.successPercent + '\nKazandığın puan: ' + prev.earnedPoints + '\n\nTekrar girersen PUAN KAZANAMAZSIN.\nYine de devam etmek istiyor musun?'
+    )
+    if (!go) return
+}
+
+    // practiceOnly flag'i ile başlat
+    currentTest.value = { ...test, practiceOnly: alreadyDone }
     userAnswers.value = new Array(parseInt(test.questionCount)).fill(null)
     tabTimeLeft.value = TAB_TIME_LIMIT
     testDisqualified.value = false
     tabWarningActive.value = false
     aiSuspicionCount.value = 0
+    isShowingResult.value = false
+    testResult.value = null
     isTakingTest.value = true
     await nextTick()
     // Canvas kurulumu
@@ -723,9 +852,13 @@ const openTestRunner = async (test) => {
     ctx.lineJoin = 'round'
     ctx.strokeStyle = '#0055ff'
     ctx.lineWidth = 2
-    // Güvenlik sistemlerini başlat
-    startTabWatcher()
-    cameraPermissionState.value = 'asking'
+    // Güvenlik sistemleri sadece puan kazanılabilir modda başlar
+    if (!alreadyDone) {
+        startTabWatcher()
+        cameraPermissionState.value = 'asking'
+    } else {
+        cameraPermissionState.value = 'idle'
+    }
 }
 
 // ===== SEKME DEĞİŞİM KORUMA SİSTEMİ =====
@@ -853,28 +986,67 @@ const confirmExitTest = () => {
     }
 }
 
+const getResultClass = (row, opt) => {
+    if (row.status === 'correct' && row.userAnswer === opt) return 'opt-correct'
+    if (row.status === 'wrong') {
+        if (row.userAnswer === opt) return 'opt-wrong'          // öğrenci yanlış işaretledi
+        if (row.correctAnswer === opt) return 'opt-correct-answer' // doğru olan şık
+    }
+    if (row.status === 'empty' && row.correctAnswer === opt) return 'opt-empty-correct' // boş sorunun doğrusu
+    return 'opt-disabled'
+}
+
+const closeTestResult = () => {
+    isShowingResult.value = false
+    testResult.value = null
+    isTakingTest.value = false
+}
+
 const finishTest = async () => {
     if (testDisqualified.value) {
-        alert('⛔ Bu test zaten disklifiye edildi.')
+        alert('⛔ Bu test disklifiye edildi.')
         return
     }
+
+    // Pratik modu — sadece sonucu göster, puan yazma
+    if (currentTest.value?.practiceOnly) {
+        const totalQ = parseInt(currentTest.value?.questionCount || 0)
+        const answerKey = currentTest.value?.answerKey || []
+        const review = buildReview(totalQ, answerKey)
+        const cc = review.filter(r => r.status === 'correct').length
+        const wc = review.filter(r => r.status === 'wrong').length
+        const ec = review.filter(r => r.status === 'empty').length
+        const pct = totalQ > 0 ? Math.round((cc / totalQ) * 100) : 0
+        testResult.value = { successPercent: pct, correctCount: cc, wrongCount: wc, emptyCount: ec, finalPoints: 0, questionReview: review }
+        stopTabWatcher()
+        stopCameraStream()
+        isShowingResult.value = true
+        return
+    }
+
     const totalQuestions = parseInt(currentTest.value?.questionCount || 0)
     const answered = userAnswers.value.filter(a => a !== null).length
     if (answered < totalQuestions) {
         const proceed = confirm(`${totalQuestions - answered} soru boş bırakıldı. Yine de bitirmek istiyor musun?`)
         if (!proceed) return
     }
-    // Puanlama: başarı oranına göre 50 puan (max)
-    const correctAnswers = answered  // TODO: gerçek cevap anahtarı ile karşılaştır
-    const successPercent = totalQuestions > 0 ? Math.round((correctAnswers / totalQuestions) * 100) : 0
+
+    // Cevap anahtarıyla karşılaştır
+    const answerKey = currentTest.value?.answerKey || []
+    const review = buildReview(totalQuestions, answerKey)
+    const correctCount = review.filter(r => r.status === 'correct').length
+    const wrongCount   = review.filter(r => r.status === 'wrong').length
+    const emptyCount   = review.filter(r => r.status === 'empty').length
+    const successPercent = totalQuestions > 0 ? Math.round((correctCount / totalQuestions) * 100) : 0
     const earnedPoints = Math.round(50 * (successPercent / 100))
-    // Kamera yoksa puan yok
+
     const cameraOk = cameraPermissionState.value === 'granted'
     const finalPoints = cameraOk ? earnedPoints : 0
+
     stopTabWatcher()
     stopCameraStream()
-    isTakingTest.value = false
-    // Firestore'a kaydet
+
+    // Firestore'a kaydet — done:1
     if (db && $auth.currentUser) {
         try {
             const userRef = doc(db, 'users', $auth.currentUser.uid)
@@ -886,6 +1058,7 @@ const finishTest = async () => {
                 score: newScore,
                 completedTestCount: newCount,
                 [`completedTests.${currentTest.value.id}`]: {
+                    done: 1,
                     completedAt: new Date().toISOString(),
                     successPercent,
                     earnedPoints: finalPoints,
@@ -895,18 +1068,104 @@ const finishTest = async () => {
             studentScore.value = newScore
             completedTestCount.value = newCount
             completedLessons.value = newCount
+            completedTestIds.value[currentTest.value.id] = { done: 1, successPercent, earnedPoints: finalPoints }
         } catch (e) {
             console.error('Puan kaydedilemedi:', e)
         }
     }
-    if (!cameraOk) {
-        alert(`Test tamamlandı.\n\nBaşarı oranın: %${successPercent}\n⚠️ Kamera izni verilmediği için puan kazanılamadı.`)
-    } else {
-        alert(`✅ Test tamamlandı!\n\nBaşarı oranın: %${successPercent}\nKazandığın puan: +${finalPoints} 🎉`)
+
+    // Sonuç ekranını göster — testten çıkma, sonuçları gör
+    testResult.value = {
+        successPercent,
+        correctCount,
+        wrongCount,
+        emptyCount,
+        finalPoints,
+        cameraOk,
+        questionReview: review
     }
+    isShowingResult.value = true
+}
+
+// Soru bazlı sonuç listesi oluştur
+const buildReview = (totalQuestions, answerKey) => {
+    return Array.from({ length: totalQuestions }, (_, i) => {
+        const no = i + 1
+        const userAnswer   = userAnswers.value[i] || null
+        const correctAnswer = answerKey[i] || null
+        let status = 'empty'
+        if (userAnswer) {
+            if (!correctAnswer || userAnswer === correctAnswer) {
+                status = 'correct'
+            } else {
+                status = 'wrong'
+            }
+        }
+        return { no, userAnswer, correctAnswer, status }
+    })
 }
 const isProfileModalOpen = ref(false); const fileInput = ref(null); const profileState = ref({ avatarType: 'initials', selectedPreset: '', uploadedImage: null }); const tempProfile = ref({ name: '', grade: null, avatarType: 'initials', selectedPreset: '', uploadedImage: null }); const presetAvatars = ["https://api.dicebear.com/7.x/avataaars/svg?seed=Felix", "https://api.dicebear.com/7.x/avataaars/svg?seed=Aneka", "https://api.dicebear.com/7.x/bottts/svg?seed=Bubba", "https://api.dicebear.com/7.x/micah/svg?seed=Callie", "https://api.dicebear.com/7.x/notionists/svg?seed=Cookie"]; const currentAvatarUrl = computed(() => { if (profileState.value.avatarType === 'upload' && profileState.value.uploadedImage) return profileState.value.uploadedImage; if (profileState.value.avatarType === 'preset' && profileState.value.selectedPreset) return profileState.value.selectedPreset; return `https://ui-avatars.com/api/?name=${userDisplayName.value || 'O'}&background=0055ff&color=fff` }); const openProfileModal = () => { tempProfile.value = { name: userDisplayName.value, grade: userGrade.value, avatarType: profileState.value.avatarType, selectedPreset: profileState.value.selectedPreset, uploadedImage: profileState.value.uploadedImage }; isProfileModalOpen.value = true }; const triggerFileUpload = () => fileInput.value.click(); const handleFileUpload = (event) => { const file = event.target.files[0]; if (file) { const reader = new FileReader(); reader.onload = (e) => { tempProfile.value.uploadedImage = e.target.result; tempProfile.value.avatarType = 'upload' }; reader.readAsDataURL(file) } }; const selectPresetAvatar = (url) => { tempProfile.value.selectedPreset = url; tempProfile.value.avatarType = 'preset' }; const saveProfile = async () => { if (!db) db = getFirestore(); userDisplayName.value = tempProfile.value.name; userGrade.value = tempProfile.value.grade; profileState.value = { avatarType: tempProfile.value.avatarType, selectedPreset: tempProfile.value.selectedPreset, uploadedImage: tempProfile.value.uploadedImage }; if ($auth.currentUser) { try { await updateProfile($auth.currentUser, { displayName: tempProfile.value.name }); const userRef = doc(db, "users", $auth.currentUser.uid); await updateDoc(userRef, { displayName: tempProfile.value.name, grade: tempProfile.value.grade, avatar: { type: tempProfile.value.avatarType, preset: tempProfile.value.selectedPreset, uploadedImage: tempProfile.value.uploadedImage } }) } catch (e) { console.error("Profil güncellenemedi", e) } } isProfileModalOpen.value = false }; const handleLogout = async () => { await signOut($auth); router.push('/'); }; const studentRank = computed(() => { const s = studentScore.value; if (s < 100) return { title: 'Acemi', class: 'rank-1' }; if (s < 500) return { title: 'Hırslı', class: 'rank-2' }; if (s < 1000) return { title: 'Kalfa', class: 'rank-3' }; if (s < 2000) return { title: 'Usta', class: 'rank-4' }; if (s < 5000) return { title: 'Doçent', class: 'rank-5' }; return { title: 'Profesör', class: 'rank-6' } });
-onMounted(() => { db = getFirestore(); onAuthStateChanged($auth, async (user) => { if (user) { userEmail.value = user.email; userDisplayName.value = user.displayName || ''; const docRef = doc(db, "users", user.uid); const docSnap = await getDoc(docRef); if (docSnap.exists()) { const data = docSnap.data(); if (data.role !== 'student') { router.push(data.role === 'teacher' ? '/dashboard-teacher' : '/'); return; } isStudent.value = true; if (data.grade) userGrade.value = data.grade; if (data.displayName) userDisplayName.value = data.displayName; studentScore.value = data.score || 0; completedTestCount.value = data.completedTestCount || 0; completedLessons.value = data.completedTestCount || 0; if (data.avatar) profileState.value = { avatarType: data.avatar.type || 'initials', selectedPreset: data.avatar.preset || '', uploadedImage: data.avatar.uploadedImage || null }; try { await fetchTests(); await fetchTeachers(); await fetchBookings(); fetchChats(); } catch (e) { console.error("Veri yükleme hatası:", e); } } isLoading.value = false; } else { router.push('/'); } }) });
+onMounted(() => {
+    db = getFirestore()
+    onAuthStateChanged($auth, async (user) => {
+        if (user) {
+            userEmail.value = user.email
+            userDisplayName.value = user.displayName || ''
+            const docRef = doc(db, 'users', user.uid)
+            const docSnap = await getDoc(docRef)
+            if (docSnap.exists()) {
+                const data = docSnap.data()
+                if (data.role !== 'student') {
+                    router.push(data.role === 'teacher' ? '/dashboard-teacher' : '/')
+                    return
+                }
+                isStudent.value = true
+                if (data.grade) userGrade.value = data.grade
+                if (data.displayName) userDisplayName.value = data.displayName
+                studentScore.value = data.score || 0
+                completedTestCount.value = data.completedTestCount || 0
+                completedLessons.value = data.completedTestCount || 0
+                // Günlük sayaçlar
+                const today = new Date().toISOString().slice(0, 10)
+                if (data.dailyTestDate === today) {
+                    if (typeof dailyTestCount !== 'undefined') dailyTestCount.value = data.dailyTestCount || 0
+                    if (typeof dailyTestPoints !== 'undefined') dailyTestPoints.value = data.dailyTestPoints || 0
+                }
+                // Tamamlanan testler
+                if (data.completedTests && typeof completedTestIds !== 'undefined') {
+                    completedTestIds.value = Object.fromEntries(
+                        Object.entries(data.completedTests).map(([k, v]) => [k, {
+                            successPercent: v.successPercent || 0,
+                            earnedPoints: v.earnedPoints || 0
+                        }])
+                    )
+                }
+                // Avatar
+                if (data.avatar) profileState.value = {
+                    avatarType: data.avatar.type || 'initials',
+                    selectedPreset: data.avatar.preset || '',
+                    uploadedImage: data.avatar.uploadedImage || null
+                }
+                try {
+                    await fetchTests()
+                    await fetchTeachers()
+                    // Favorileri öğretmenler yüklendikten SONRA eşleştir
+                    const savedFavIds = data.favoriteTeacherIds || []
+                    if (savedFavIds.length > 0) {
+                        myFavorites.value = realTeachers.value.filter(t => savedFavIds.includes(t.id))
+                    }
+                    await fetchBookings()
+                    fetchChats()
+                } catch (e) {
+                    console.error('Veri yükleme hatası:', e)
+                }
+            }
+            isLoading.value = false
+        } else {
+            router.push('/')
+        }
+    })
+})
 </script>
 
 <style scoped>
@@ -1503,7 +1762,8 @@ onMounted(() => { db = getFirestore(); onAuthStateChanged($auth, async (user) =>
     flex-direction: column;
     text-align: center;
     position: relative;
-    transition: 0.3s;
+    transition: border-color 0.3s, box-shadow 0.3s, transform 0.3s;
+    overflow: visible;
 }
 .teacher-card:hover {
     border-color: #0055ff;
@@ -1569,6 +1829,12 @@ onMounted(() => { db = getFirestore(); onAuthStateChanged($auth, async (user) =>
     border-radius: 50%;
 }
 
+.teacher-info {
+    position: relative;
+    z-index: 5;
+    width: 100%;
+}
+
 .teacher-info h3 {
     margin: 10px 0 5px 0;
     font-size: 1.1rem;
@@ -1599,6 +1865,9 @@ onMounted(() => { db = getFirestore(); onAuthStateChanged($auth, async (user) =>
     transition: 0.3s;
     width: 100%;
     margin-bottom: 5px;
+    position: relative;
+    z-index: 10;
+    pointer-events: all;
 }
 
 .btn-request:hover {
@@ -1616,6 +1885,9 @@ onMounted(() => { db = getFirestore(); onAuthStateChanged($auth, async (user) =>
     font-size: 0.85rem;
     transition: 0.3s;
     width: 100%;
+    position: relative;
+    z-index: 10;
+    pointer-events: all;
 }
 
 .btn-message:hover {
@@ -2127,10 +2399,55 @@ onMounted(() => { db = getFirestore(); onAuthStateChanged($auth, async (user) =>
     border-color: #0055ff;
 }
 
-.opt-options button.selected {
+/* Çözüm sırasında seçili = MAVİ */
+.opt-options button.opt-selected {
     background: #0055ff;
     color: white;
     border-color: #0055ff;
+}
+
+/* Sonuç: doğru cevapladı = YEŞİL */
+.opt-options button.opt-correct {
+    background: #10b981;
+    color: white;
+    border-color: #10b981;
+}
+
+/* Sonuç: yanlış işaretledi = KIRMIZI */
+.opt-options button.opt-wrong {
+    background: #ef4444;
+    color: white;
+    border-color: #ef4444;
+}
+
+/* Sonuç: doğru şıkkı göster (yanlış veya boş sorularda) = YEŞİL OUTLINE */
+.opt-options button.opt-correct-answer {
+    background: transparent;
+    color: #10b981;
+    border-color: #10b981;
+    border-width: 2px;
+    font-weight: 700;
+}
+
+/* Sonuç: boş bırakılan sorunun doğrusu = SARI */
+.opt-options button.opt-empty-correct {
+    background: transparent;
+    color: #f59e0b;
+    border-color: #f59e0b;
+    border-width: 2px;
+    font-weight: 700;
+}
+
+/* Sonuç modunda diğer şıklar = soluk */
+.opt-options button.opt-disabled {
+    background: #111;
+    color: #333;
+    border-color: #222;
+    cursor: default;
+}
+
+.opt-options button:disabled {
+    cursor: default;
 }
 
 .btn-finish-test {
@@ -2265,26 +2582,37 @@ onMounted(() => { db = getFirestore(); onAuthStateChanged($auth, async (user) =>
 
 .calendar-grid-header {
     display: grid;
-    grid-template-columns: repeat(7, 1fr);
+    grid-template-columns: repeat(7, minmax(0, 1fr));
     text-align: center;
     font-weight: bold;
-    margin-bottom: 10px;
+    margin-bottom: 4px;
     color: #888;
+    font-size: 0.8rem;
+}
+
+.calendar-grid-header > div {
+    padding: 8px 2px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
 }
 
 .calendar-grid {
     display: grid;
-    grid-template-columns: repeat(7, 1fr);
-    gap: 5px;
+    grid-template-columns: repeat(7, minmax(0, 1fr));
+    gap: 3px;
 }
 
 .calendar-day {
-    min-height: 100px;
+    min-height: 80px;
     background: #111;
     border: 1px solid #222;
+    border-radius: 6px;
     padding: 5px;
-    font-size: 0.9rem;
+    font-size: 0.78rem;
     position: relative;
+    overflow: hidden;
+    box-sizing: border-box;
 }
 
 .calendar-day.empty {

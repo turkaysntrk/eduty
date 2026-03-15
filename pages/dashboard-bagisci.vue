@@ -99,7 +99,7 @@
 
                     <div class="impact-message">
                         <h3>🎉 Teşekkürler!</h3>
-                        <p>Sizin sayenizde <strong>{{ Math.floor(distributedPoints / 100) }}</strong> öğrenci eğitime
+                        <p>Sizin sayenizde <strong>{{ studentsHelped }}</strong> öğrenci eğitime
                             ücretsiz erişim sağladı.</p>
                     </div>
                 </div>
@@ -116,7 +116,7 @@
                                 <li v-for="feat in pkg.features" :key="feat">{{ feat }}</li>
                             </ul>
                             <button class="btn-select" :class="{ 'featured-btn': pkg.featured }"
-                                @click="processDonation(pkg.price, pkg.name)">
+                                @click="processDonation(pkg.price, pkg.name)" :disabled="isDonating">
                                 Bağış Yap
                             </button>
                         </div>
@@ -128,7 +128,7 @@
                                 <span>₺</span>
                                 <input type="number" v-model="customAmount" placeholder="0" min="50" />
                             </div>
-                            <button class="btn-select" @click="handleCustomDonation">Destek Ol</button>
+                            <button class="btn-select" @click="handleCustomDonation" :disabled="isDonating">{{ isDonating ? "İşleniyor..." : "Destek Ol" }}</button>
                         </div>
                     </div>
                 </div>
@@ -333,10 +333,14 @@ const isDistributing = ref(false)
 const lastDistributionResult = ref(null)
 const distributionHistory = ref([])
 
-// Stats (Mocked or Calculated)
-const distributedPoints = computed(() => Math.floor(totalDonatedPoints.value * 0.9))
-const usedPoints = computed(() => Math.floor(distributedPoints.value * 0.75))
-const usageRate = computed(() => totalDonatedPoints.value > 0 ? Math.floor((usedPoints.value / totalDonatedPoints.value) * 100) : 0)
+// Gerçek istatistikler - Firestore'dan doldurulur
+const distributedPoints = ref(0)
+const usedPoints = ref(0)
+const studentsHelped = ref(0)
+const usageRate = computed(() => {
+    if (distributedPoints.value <= 0) return 0
+    return Math.floor((usedPoints.value / distributedPoints.value) * 100)
+})
 
 const packages = [
     { name: 'Başlangıç', price: 250, features: ['✅ 1 Öğrenciye Kaynak', '✅ Teşekkür Sertifikası'] },
@@ -344,28 +348,40 @@ const packages = [
     { name: 'Akademi', price: 2000, features: ['✅ 1 Sınıfa Kaynak', '✅ Kurumsal Teşekkür', '✅ Etki Raporu'] }
 ]
 
+const isDonating = ref(false)
+
 const processDonation = async (amount, packageName) => {
-    if (!confirm(`${packageName} paketi için ${amount} TL bağış yapmak üzeresiniz. Onaylıyor musunuz? (Demo)`)) return;
-
-    if (!db) db = getFirestore();
-    const points = amount * 10;
-
+    if (!$auth.currentUser) { alert('Giriş yapmalısınız.'); return }
+    const numAmount = parseInt(amount)
+    if (!numAmount || numAmount < 1) { alert('Geçersiz tutar.'); return }
+    if (!confirm(`${packageName} için ${numAmount} TL bağış yapılacak.\n${numAmount * 10} puan dağıtım havuzuna eklenecek. Onaylıyor musunuz?`)) return
+    if (!db) db = getFirestore()
+    isDonating.value = true
     try {
         await addDoc(collection(db, "donations"), {
             donorId: $auth.currentUser.uid,
-            amount: parseInt(amount),
-            points: points,
+            donorName: userDisplayName.value || $auth.currentUser.email || 'Bağışçı',
+            amount: numAmount,
+            points: numAmount * 10,
             packageName: packageName,
-            distributed: false,   // ← motor bu flag'i kullanır
+            distributed: false,
             createdAt: new Date().toISOString()
-        });
-
-        alert("Bağışınız başarıyla alındı! Teşekkür ederiz.");
-        fetchDonationHistory();
-        // Havuzu da güncelle
+        })
+        alert(`🎉 Bağışınız alındı!\n${numAmount} TL → ${numAmount * 10} Puan\nPuan Dağıtım sekmesinden öğrencilere dağıtabilirsiniz.`)
+        customAmount.value = null
+        await fetchDonationHistory()
         pendingPool.value = await fetchPendingPool(db)
+        await fetchRealStats()
+        activeTab.value = 'distribution'
     } catch (error) {
-        console.error("Bağış hatası:", error);
+        console.error("Bağış hatası:", error)
+        if (error.code === 'permission-denied') {
+            alert('⛔ Yetki hatası!\nFirebase Console → Firestore → Rules kısmına:\nmatch /donations/{id} { allow create: if request.auth != null; }\nkuralını eklemeniz gerekiyor.')
+        } else {
+            alert('Hata: ' + error.message)
+        }
+    } finally {
+        isDonating.value = false
     }
 }
 
@@ -402,16 +418,30 @@ const handleCustomDonation = () => {
 }
 
 const fetchDonationHistory = async () => {
-    if (!db) db = getFirestore();
-    const q = query(collection(db, "donations"), where("donorId", "==", $auth.currentUser.uid));
-    const snap = await getDocs(q);
+    if (!db) db = getFirestore()
+    const q = query(collection(db, "donations"), where("donorId", "==", $auth.currentUser.uid))
+    const snap = await getDocs(q)
+    let history = snap.docs.map(d => ({ id: d.id, ...d.data() }))
+    history.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt))
+    donationHistory.value = history
+    donationCount.value = history.length
+    totalDonatedPoints.value = history.reduce((acc, curr) => acc + (curr.points || 0), 0)
+    distributedPoints.value = history.filter(d => d.distributed).reduce((acc, d) => acc + (d.points || 0), 0)
+}
 
-    let history = snap.docs.map(d => ({ id: d.id, ...d.data() }));
-    history.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
-
-    donationHistory.value = history;
-    donationCount.value = history.length;
-    totalDonatedPoints.value = history.reduce((acc, curr) => acc + (curr.points || 0), 0);
+const fetchRealStats = async () => {
+    if (!db) db = getFirestore()
+    try {
+        const distSnap = await getDocs(collection(db, 'distributions'))
+        const allStudents = new Set()
+        distSnap.docs.forEach(d => {
+            const data = d.data()
+            if (data.breakdown) data.breakdown.forEach(row => allStudents.add(row.uid))
+        })
+        studentsHelped.value = allStudents.size
+        const booksSnap = await getDocs(query(collection(db, 'bookings'), where('status', '==', 'completed')))
+        usedPoints.value = booksSnap.docs.reduce((acc, d) => acc + (d.data().lessonPrice || 0), 0)
+    } catch(e) { console.error('Stats yüklenemedi:', e) }
 }
 
 const handleLogout = async () => {

@@ -1032,22 +1032,27 @@ onMounted(() => { db = getFirestore(); onAuthStateChanged($auth, async (user) =>
 
 .calendar-header {
     display: grid;
-    grid-template-columns: 80px repeat(7, 1fr);
-    background: #222;
-    border-bottom: 1px solid #333;
+    grid-template-columns: 64px repeat(7, minmax(0, 1fr));
+    background: #1a1a1a;
+    border-bottom: 1px solid #2a2a2a;
 }
 
 .cal-time-col,
 .cal-day-col {
-    padding: 15px 5px;
+    padding: 12px 4px;
     text-align: center;
-    font-weight: 600;
-    color: #ccc;
-    font-size: 0.9rem;
+    font-weight: 700;
+    color: #888;
+    font-size: 0.78rem;
+    letter-spacing: 0.3px;
+    text-transform: uppercase;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
 }
 
 .cal-time-col {
-    border-right: 1px solid #333;
+    border-right: 1px solid #2a2a2a;
 }
 
 .calendar-body {
@@ -1057,68 +1062,87 @@ onMounted(() => { db = getFirestore(); onAuthStateChanged($auth, async (user) =>
 
 .cal-row {
     display: grid;
-    grid-template-columns: 80px repeat(7, 1fr);
-    border-bottom: 1px solid #222;
+    grid-template-columns: 64px repeat(7, minmax(0, 1fr));
+    border-bottom: 1px solid #1a1a1a;
 }
 
 .cal-row:last-child {
     border-bottom: none;
 }
 
+.cal-row:hover {
+    background: rgba(255,255,255,0.01);
+}
+
 .cal-time-cell {
-    padding: 15px 5px;
+    padding: 0 8px;
     text-align: center;
-    color: #666;
-    font-size: 0.85rem;
-    border-right: 1px solid #333;
+    color: #555;
+    font-size: 0.75rem;
+    font-weight: 600;
+    border-right: 1px solid #2a2a2a;
     display: flex;
     align-items: center;
     justify-content: center;
+    min-height: 52px;
 }
 
 .cal-cell {
-    padding: 10px;
-    border-right: 1px solid #222;
+    padding: 6px 4px;
+    border-right: 1px solid #1a1a1a;
     cursor: pointer;
-    transition: 0.2s;
+    transition: background 0.15s;
     display: flex;
+    flex-direction: column;
     align-items: center;
     justify-content: center;
-    font-size: 0.8rem;
-    min-height: 50px;
+    font-size: 0.72rem;
+    min-height: 52px;
+    overflow: hidden;
+    box-sizing: border-box;
+}
+
+.cal-cell:last-child {
+    border-right: none;
 }
 
 .cal-cell:hover {
-    background: #1f1f1f;
+    background: rgba(255,255,255,0.04);
 }
 
 .cal-cell.available {
-    background: rgba(0, 85, 255, 0.2);
-    color: #0055ff;
-    font-weight: bold;
-    box-shadow: inset 0 0 0 1px #0055ff;
+    background: rgba(16,185,129,0.12);
+    color: #10b981;
+    font-weight: 700;
+}
+
+.cal-cell.available:hover {
+    background: rgba(16,185,129,0.06);
 }
 
 .cal-cell.booked {
-    background: #0055ff;
-    color: white;
-    cursor: not-allowed;
+    background: rgba(0,85,255,0.15);
+    color: #6699ff;
+    cursor: default;
 }
 
 .booked-info {
-    font-size: 0.75rem;
+    font-size: 0.65rem;
     text-align: center;
-    line-height: 1.2;
+    line-height: 1.3;
+    word-break: break-word;
+    max-width: 100%;
+    overflow: hidden;
 }
 
 .plus-icon {
-    opacity: 0;
-    color: #555;
-    font-size: 1.2rem;
+    color: #333;
+    font-size: 1rem;
+    transition: color 0.15s;
 }
 
 .cal-cell:hover .plus-icon {
-    opacity: 1;
+    color: #10b981;
 }
 
 .section-block {
