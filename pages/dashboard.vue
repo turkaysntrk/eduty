@@ -639,12 +639,9 @@ const isDrawing = ref(false)
 let ctx = null
 
 // Test sonuç state
-const testResult = ref(null)
+const testResult = ref(null)     // null | { successPercent, earnedPoints, finalPoints, ... }
 const isShowingResult = ref(false)
-
-// Çözülmüş testler — { testId: { done: 1, successPercent, earnedPoints } }
-// Firestore'dan yüklenir, test bitince güncellenir
-const completedTestIds = ref({})
+// testResult.questionReview: [ { no, userAnswer, correctAnswer, status: 'correct'|'wrong'|'empty' } ]
 
 // ===== GÜVENLİK SİSTEMİ STATE =====
 // Sekme değişim koruması
@@ -821,18 +818,15 @@ ${price} puan iade edildi.` : ''))
 const findTeacherById = (id) => { return realTeachers.value.find(t => t.id === id); }
 const bookLessonById = (teacherId) => { const teacher = findTeacherById(teacherId); if (teacher) openBookingModal(teacher); }
 const openTestRunner = async (test) => {
-    // ── Daha önce çözülmüş mü kontrol et ──
+    // Daha önce çözülmüş mü? done:1 ise uyar
     const prev = completedTestIds.value[test.id]
     const alreadyDone = prev && prev.done === 1
 
     if (alreadyDone) {
-    const go = confirm(
-        'Bu testi daha önce çözdün!\n\nBaşarı oranın: %' + prev.successPercent + '\nKazandığın puan: ' + prev.earnedPoints + '\n\nTekrar girersen PUAN KAZANAMAZSIN.\nYine de devam etmek istiyor musun?'
-    )
-    if (!go) return
-}
+        const go = confirm('Bu testi daha önce çözdün!\n\nBaşarı oranın: %' + prev.successPercent + '\nKazandığın puan: ' + prev.earnedPoints + '\n\nTekrar girersen PUAN KAZANAMAZSIN.\nYine de devam etmek istiyor musun?')
+        if (!go) return
+    }
 
-    // practiceOnly flag'i ile başlat
     currentTest.value = { ...test, practiceOnly: alreadyDone }
     userAnswers.value = new Array(parseInt(test.questionCount)).fill(null)
     tabTimeLeft.value = TAB_TIME_LIMIT
@@ -1132,9 +1126,10 @@ onMounted(() => {
                     if (typeof dailyTestPoints !== 'undefined') dailyTestPoints.value = data.dailyTestPoints || 0
                 }
                 // Tamamlanan testler
-                if (data.completedTests && typeof completedTestIds !== 'undefined') {
+                if (data.completedTests) {
                     completedTestIds.value = Object.fromEntries(
                         Object.entries(data.completedTests).map(([k, v]) => [k, {
+                            done: v.done ?? 1,
                             successPercent: v.successPercent || 0,
                             earnedPoints: v.earnedPoints || 0
                         }])
