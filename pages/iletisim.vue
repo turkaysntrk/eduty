@@ -109,7 +109,6 @@ import { ref } from 'vue'
 import { useNuxtApp } from '#app'
 import { getFirestore, collection, addDoc, serverTimestamp } from "firebase/firestore"
 
-// Form verileri
 const form = ref({
   name: '',
   email: '',
@@ -119,40 +118,95 @@ const form = ref({
 
 const isLoading = ref(false)
 const statusMessage = ref('')
-const statusType = ref('') // 'success' veya 'error'
+const statusType = ref('')
+
+// ── Basit input temizleme ──
+const sanitize = (str) => {
+  if (!str || typeof str !== 'string') return ''
+  return str
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .trim()
+    .slice(0, 1000)
+}
+
+const validateEmail = (email) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email) && email.length <= 254
+
+// ── Rate limit: 60 saniyede max 3 mesaj ──
+const checkRateLimit = () => {
+  const key = 'rl_contact'
+  const now = Date.now()
+  const windowMs = 60000
+  const maxReq = 3
+  let data = { requests: [] }
+  try {
+    const stored = sessionStorage.getItem(key)
+    if (stored) data = JSON.parse(stored)
+  } catch (e) {}
+  data.requests = data.requests.filter(t => now - t < windowMs)
+  if (data.requests.length >= maxReq) {
+    const wait = Math.ceil((windowMs - (now - data.requests[0])) / 1000)
+    return { allowed: false, wait }
+  }
+  data.requests.push(now)
+  try { sessionStorage.setItem(key, JSON.stringify(data)) } catch (e) {}
+  return { allowed: true, wait: 0 }
+}
 
 const submitForm = async () => {
-  // Geri bildirimleri sıfırla ve yükleme durumuna geç
   isLoading.value = true
   statusMessage.value = ''
-  
-  try {
-    // 1. Firestore veritabanına bağlan
-    const db = getFirestore()
 
-    // 2. Veriyi Firestore'a gönder (messages isimli koleksiyona ekler)
+  // Rate limit kontrolü
+  const limit = checkRateLimit()
+  if (!limit.allowed) {
+    statusType.value = 'error'
+    statusMessage.value = `Çok fazla istek gönderdiniz. ${limit.wait} saniye bekleyin.`
+    isLoading.value = false
+    return
+  }
+
+  // Input doğrulama
+  if (!form.value.name.trim() || form.value.name.trim().length < 2) {
+    statusType.value = 'error'
+    statusMessage.value = 'Lütfen geçerli bir isim girin.'
+    isLoading.value = false
+    return
+  }
+
+  if (!validateEmail(form.value.email)) {
+    statusType.value = 'error'
+    statusMessage.value = 'Lütfen geçerli bir e-posta adresi girin.'
+    isLoading.value = false
+    return
+  }
+
+  if (!form.value.message.trim() || form.value.message.trim().length < 10) {
+    statusType.value = 'error'
+    statusMessage.value = 'Mesajınız en az 10 karakter olmalıdır.'
+    isLoading.value = false
+    return
+  }
+
+  try {
+    const db = getFirestore()
     await addDoc(collection(db, "messages"), {
-      name: form.value.name,
-      email: form.value.email,
-      subject: form.value.subject,
-      message: form.value.message,
-      createdAt: serverTimestamp() // Gönderilme zamanı
+      name: sanitize(form.value.name),
+      email: sanitize(form.value.email),
+      subject: sanitize(form.value.subject),
+      message: sanitize(form.value.message),
+      createdAt: serverTimestamp()
     })
 
-    // 3. Başarılı geri bildirimi gönder
     statusType.value = 'success'
     statusMessage.value = 'Mesajınız başarıyla iletildi. Teşekkür ederiz!'
-    
-    // Formu temizle
     form.value = { name: '', email: '', subject: 'Genel Bilgi', message: '' }
 
   } catch (error) {
-    // 4. Hata durumunda geri bildirim gönder
     console.error("Firebase Hatası:", error)
     statusType.value = 'error'
-    statusMessage.value = 'Bir hata oluştu, mesaj gönderilemedi. Lütfen internetinizi kontrol edip tekrar deneyin.'
+    statusMessage.value = 'Bir hata oluştu, mesaj gönderilemedi. Lütfen tekrar deneyin.'
   } finally {
-    // İşlem bittiğinde butonu tekrar aktif et
     isLoading.value = false
   }
 }

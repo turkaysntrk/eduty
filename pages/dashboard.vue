@@ -319,7 +319,12 @@
             <header class="content-header">
                 <div class="score-card">
                     <span class="score-label">TOPLAM EDUTY PUANI</span>
-                    <div class="score-value">{{ studentScore }} <span>Puan</span></div>
+                    <div class="score-value">
+                        {{ studentScore }} <span>/ 5.000 Puan</span>
+                    </div>
+                    <div class="score-progress-bar">
+                        <div class="score-progress-fill" :style="{ width: Math.min((studentScore / 5000) * 100, 100) + '%' }"></div>
+                    </div>
                     <div class="score-stats-row">
                         <div class="score-stat-item">
                             <span class="ssi-val">{{ completedLessons }}</span>
@@ -1238,16 +1243,21 @@ const finishTest = async () => {
     // Firestore'a kaydet — done:1
     if (db && $auth.currentUser) {
         try {
+            const MAX_STUDENT_SCORE = 5000
             const userRef = doc(db, 'users', $auth.currentUser.uid)
             const snap = await getDoc(userRef)
             const current = snap.data() || {}
-            const newScore = (current.score || 0) + finalPoints
+            const currentScore = current.score || 0
+            // 5000 puan limitini aş, fazlasını ekleme
+            const scoreAfter = Math.min(currentScore + finalPoints, MAX_STUDENT_SCORE)
+            const actualEarned = scoreAfter - currentScore  // gerçekten eklenen
+            const newScore = scoreAfter
             const newCount = (current.completedTestCount || 0) + 1
             // Günlük sayaçlar
             const todayStr = new Date().toISOString().slice(0, 10)
             const isSameDay = current.dailyTestDate === todayStr
             const newDailyCount = isSameDay ? (current.dailyTestCount || 0) + 1 : 1
-            const newDailyPoints = isSameDay ? (current.dailyTestPoints || 0) + finalPoints : finalPoints
+            const newDailyPoints = isSameDay ? (current.dailyTestPoints || 0) + actualEarned : actualEarned
             await updateDoc(userRef, {
                 score: newScore,
                 completedTestCount: newCount,
@@ -1258,7 +1268,7 @@ const finishTest = async () => {
                     done: 1,
                     completedAt: new Date().toISOString(),
                     successPercent,
-                    earnedPoints: finalPoints,
+                    earnedPoints: actualEarned,
                     cameraUsed: cameraOk
                 }
             })
@@ -1267,7 +1277,11 @@ const finishTest = async () => {
             completedLessons.value = newCount
             dailyTestCount.value = newDailyCount
             dailyTestPoints.value = newDailyPoints
-            completedTestIds.value[currentTest.value.id] = { done: 1, successPercent, earnedPoints: finalPoints }
+            completedTestIds.value[currentTest.value.id] = { done: 1, successPercent, earnedPoints: actualEarned }
+            // Limite ulaştıysa bildir
+            if (currentScore < MAX_STUDENT_SCORE && newScore >= MAX_STUDENT_SCORE) {
+                setTimeout(() => alert('🎯 Tebrikler! Maksimum 5.000 puana ulaştın. Artık test çözmeye devam edebilirsin ama puan kazanamazsın.'), 500)
+            }
         } catch (e) {
             console.error('Puan kaydedilemedi:', e)
         }
@@ -1815,6 +1829,22 @@ onMounted(() => {
 .rank-4 { color: #0ea5e9; border-color: rgba(14,165,233,0.4); background: rgba(14,165,233,0.08); }
 .rank-5 { color: #10b981; border-color: rgba(16,185,129,0.4); background: rgba(16,185,129,0.08); }
 .rank-6 { color: #f97316; border-color: rgba(249,115,22,0.4); background: rgba(249,115,22,0.08); }
+
+.score-progress-bar {
+    width: 100%;
+    max-width: 280px;
+    height: 6px;
+    background: #1a1a1a;
+    border-radius: 3px;
+    margin-top: 8px;
+    overflow: hidden;
+}
+.score-progress-fill {
+    height: 100%;
+    background: linear-gradient(90deg, #0055ff, #0088ff);
+    border-radius: 3px;
+    transition: width 0.5s ease;
+}
 
 .score-label {
     color: #888;

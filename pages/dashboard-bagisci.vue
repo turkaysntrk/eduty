@@ -344,9 +344,9 @@ const usageRate = computed(() => {
 })
 
 const packages = [
-    { name: 'Başlangıç', price: 250, points: 2500, features: ['✅ 2300 puan öğrencilere aktarılır', '✅ Teşekkür Sertifikası'] },
-    { name: 'Gelişim', price: 750, points: 7500, featured: true, features: ['✅ 6900 puan öğrencilere aktarılır', '✅ Özel Rozet', '✅ Aylık Rapor'] },
-    { name: 'Akademi', price: 2000, points: 20000, features: ['✅ 18400 puan öğrencilere aktarılır', '✅ Kurumsal Teşekkür', '✅ Etki Raporu'] }
+    { name: 'Başlangıç', price: 250, points: 250, features: ['✅ 230 puan öğrencilere aktarılır', '✅ Teşekkür Sertifikası'] },
+    { name: 'Gelişim', price: 750, points: 750, featured: true, features: ['✅ 690 puan öğrencilere aktarılır', '✅ Özel Rozet', '✅ Aylık Rapor'] },
+    { name: 'Akademi', price: 2000, points: 2000, features: ['✅ 1840 puan öğrencilere aktarılır', '✅ Kurumsal Teşekkür', '✅ Etki Raporu'] }
 ]
 
 const isDonating = ref(false)
@@ -357,7 +357,7 @@ const processDonation = async (amount, packageName, totalPoints) => {
     const numAmount = parseInt(amount)
     if (!numAmount || numAmount < 1) { alert('Geçersiz tutar.'); return }
 
-    const pointsTotal = totalPoints || numAmount * 10
+    const pointsTotal = totalPoints || numAmount
     const studentPoints = Math.floor(pointsTotal * (1 - COMMISSION_RATE))
 
     if (!confirm(`${packageName} paketi için ${numAmount} ₺ bağış yapılacak.\n${pointsTotal.toLocaleString('tr-TR')} puan öğrencilere aktarılacak.\nOnaylıyor musunuz?`)) return
@@ -420,7 +420,7 @@ const handleCustomDonation = () => {
         alert("Minimum bağış tutarı 50 TL'dir.");
         return;
     }
-    processDonation(customAmount.value, 'Özel Bağış', customAmount.value * 10);
+    processDonation(customAmount.value, 'Özel Bağış', customAmount.value);
 }
 
 const fetchDonationHistory = async () => {

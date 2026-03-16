@@ -151,7 +151,13 @@
             <header class="content-header">
                 <div class="score-card">
                     <span class="score-label">TOPLAM EDUTY PUANI</span>
-                    <div class="score-value">{{ teacherScore }} <span>Puan</span></div>
+                    <div class="score-value">{{ teacherScore }} <span>/ 10.000 Puan</span></div>
+                    <div class="score-progress-bar">
+                        <div class="score-progress-fill" :style="{ width: Math.min((teacherScore / 10000) * 100, 100) + '%' }" :class="{ 'progress-warning': teacherScore >= 8000 }"></div>
+                    </div>
+                    <div v-if="teacherScore >= 10000" class="score-limit-warning">
+                        ⚠️ Limite ulaştın! Ödeme talebi oluştur.
+                    </div>
                 </div>
                 <div class="quick-stats">
                     <div class="q-item">
@@ -319,7 +325,8 @@
                             <label>Ders Ücreti (Puan)</label>
                             <div class="price-input-wrapper">
                                 <span class="price-icon">💎</span>
-                                <input type="number" v-model="lessonPriceInput" min="0" placeholder="0 = Ücretsiz" class="price-input" />
+                                <input type="number" v-model="lessonPriceInput" min="0" max="2500" placeholder="0 = Ücretsiz" class="price-input" />
+                                <small style="color:#666; font-size:0.75rem;">Maksimum: 2.500 puan/ders</small>
                                 <span class="price-suffix">puan / ders</span>
                             </div>
                             <small>0 girerseniz ücretsiz görünür.</small>
@@ -567,9 +574,16 @@ const togglePublish = async () => {
 const savePublicProfile = async () => {
     if (!db) db = getFirestore()
     isSavingProfile.value = true
+    const MAX_LESSON_PRICE = 2500
+    const rawPrice = parseInt(lessonPriceInput.value) || 0
+    const finalPrice = Math.min(rawPrice, MAX_LESSON_PRICE)
+    if (rawPrice > MAX_LESSON_PRICE) {
+        alert(`⚠️ Maksimum ders ücreti ${MAX_LESSON_PRICE} puandır. ${MAX_LESSON_PRICE} olarak kaydedildi.`)
+        lessonPriceInput.value = MAX_LESSON_PRICE
+    }
     try {
         await updateDoc(doc(db, "users", $auth.currentUser.uid), {
-            lessonPrice: parseInt(lessonPriceInput.value) || 0,
+            lessonPrice: finalPrice,
             bio: bioInput.value.slice(0, 300)
         })
         alert('✅ Profil kaydedildi!')
@@ -621,14 +635,46 @@ const cancelBookingByTeacher = async (booking) => {
 const completeLesson = async (booking) => {
     if (!confirm(`${booking.studentName} ile dersi tamamlandı olarak işaretle? Ücret öğretmen puanına aktarılacak.`)) return
     if (!db) db = getFirestore()
+    const MAX_TEACHER_SCORE = 10000
     try {
         await updateDoc(doc(db, "bookings", booking.id), { status: "completed", completedAt: serverTimestamp() })
         if (booking.lessonPrice > 0) {
             const teacherSnap = await getDoc(doc(db, "users", $auth.currentUser.uid))
-            const newScore = (teacherSnap.data().score || 0) + booking.lessonPrice
+            const currentTeacherScore = teacherSnap.data().score || 0
+
+            // 10.000 limite ulaştıysa puan ekleme
+            if (currentTeacherScore >= MAX_TEACHER_SCORE) {
+                alert(`⚠️ Bakiye limitine (10.000 puan) ulaştın!\nÖdeme talebi oluşturman gerekiyor.`)
+                await fetchTeacherBookings()
+                return
+            }
+
+            // %20 havuza iade, %80 öğretmene
+            const poolReturn = Math.floor(booking.lessonPrice * 0.20)
+            const teacherEarned = booking.lessonPrice - poolReturn
+            // Limite göre gerçekte eklenecek puanı hesapla
+            const actualEarned = Math.min(teacherEarned, MAX_TEACHER_SCORE - currentTeacherScore)
+            const newScore = currentTeacherScore + actualEarned
+
             await updateDoc(doc(db, "users", $auth.currentUser.uid), { score: newScore })
             teacherScore.value = newScore
-            alert(`✅ Ders tamamlandı! +${booking.lessonPrice} puan kazandın.`)
+
+            // Havuza iade edilen puanı donations koleksiyonuna yaz
+            if (poolReturn > 0) {
+                await addDoc(collection(db, 'donations'), {
+                    donorId: 'system_pool_return',
+                    donorName: 'Sistem — Ders İadesi',
+                    amount: 0,
+                    points: poolReturn,
+                    totalPoints: poolReturn,
+                    packageName: 'Ders Tamamlama İadesi',
+                    distributed: false,
+                    createdAt: new Date().toISOString()
+                })
+            }
+
+            const limitMsg = newScore >= MAX_TEACHER_SCORE ? '\n⚠️ Bakiye limitine ulaştın! Ödeme talebi oluştur.' : ''
+            alert(`✅ Ders tamamlandı!\n+${actualEarned} puan kazandın.\n(${poolReturn} puan öğrenci havuzuna iade edildi)${limitMsg}`)
         } else {
             alert('✅ Ders tamamlandı!')
         }
@@ -1063,6 +1109,32 @@ onMounted(() => { db = getFirestore(); onAuthStateChanged($auth, async (user) =>
 .score-card {
     display: flex;
     flex-direction: column;
+}
+
+.score-progress-bar {
+    width: 100%;
+    max-width: 280px;
+    height: 6px;
+    background: #1a1a1a;
+    border-radius: 3px;
+    margin-top: 8px;
+    overflow: hidden;
+}
+.score-progress-fill {
+    height: 100%;
+    background: linear-gradient(90deg, #0055ff, #0088ff);
+    border-radius: 3px;
+    transition: width 0.5s ease;
+}
+.progress-warning {
+    background: linear-gradient(90deg, #f59e0b, #ef4444) !important;
+}
+.score-limit-warning {
+    color: #ef4444;
+    font-size: 0.78rem;
+    font-weight: 600;
+    margin-top: 6px;
+    animation: pulse 1.5s infinite;
 }
 
 .score-label {
