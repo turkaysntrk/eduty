@@ -84,6 +84,9 @@
                 <button @click="setTab('donations')" :class="{ active: activeTab === 'donations' }">
                     <span class="icon">💙</span> Bağışlar
                 </button>
+                <button @click="setTab('vault')" :class="{ active: activeTab === 'vault' }">
+                    <span class="icon">🏦</span> Ana Kasa
+                </button>
                 <button @click="setTab('revenue')" :class="{ active: activeTab === 'revenue' }">
                     <span class="icon">💰</span> Gelir Raporu
                 </button>
@@ -372,6 +375,81 @@
                     </div>
                 </div>
 
+                <!-- ===== ANA KASA ===== -->
+                <div v-if="activeTab === 'vault'" class="animate-fade">
+                    <h2 class="section-title">Ana Kasa</h2>
+
+                    <!-- Bakiye kartı -->
+                    <div class="vault-hero-card">
+                        <div class="vh-left">
+                            <div class="vh-icon">🏦</div>
+                            <div>
+                                <div class="vh-label">Mevcut Bakiye</div>
+                                <div class="vh-balance" :class="{ 'vault-low': vaultData.totalBalance < 100 }">
+                                    {{ (vaultData.totalBalance || 0).toLocaleString('tr-TR') }}
+                                    <span>Puan</span>
+                                </div>
+                                <div class="vh-warn" v-if="vaultData.totalBalance < 100">
+                                    ⚠️ Kasa kritik seviyede! Testler pasife geçti.
+                                </div>
+                            </div>
+                        </div>
+                        <div class="vh-stats">
+                            <div class="vh-stat">
+                                <span class="vh-val green-val">{{ (vaultData.totalIn || 0).toLocaleString('tr-TR') }}</span>
+                                <span class="vh-lab">Toplam Giren</span>
+                                <small>Bağışçılar + Öğretmen İadesi</small>
+                            </div>
+                            <div class="vh-divider"></div>
+                            <div class="vh-stat">
+                                <span class="vh-val" style="color:#ef4444">{{ (vaultData.totalOut || 0).toLocaleString('tr-TR') }}</span>
+                                <span class="vh-lab">Toplam Çıkan</span>
+                                <small>Öğrenci Test Ödülleri</small>
+                            </div>
+                            <div class="vh-divider"></div>
+                            <div class="vh-stat">
+                                <span class="vh-val" style="color:#f59e0b">{{ vaultCommission.toLocaleString('tr-TR') }}</span>
+                                <span class="vh-lab">Platform Geliri</span>
+                                <small>%8 Komisyon (birikimli)</small>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- İşlem geçmişi -->
+                    <h3 class="recent-title" style="margin-top:25px;">Son İşlemler</h3>
+                    <div class="table-wrapper">
+                        <table class="data-table">
+                            <thead>
+                                <tr>
+                                    <th>Tür</th>
+                                    <th>Açıklama</th>
+                                    <th>Miktar</th>
+                                    <th>Kişi</th>
+                                    <th>Tarih</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr v-for="tx in vaultTransactions" :key="tx.id">
+                                    <td>
+                                        <span class="status-pill" :class="tx.type === 'IN' ? 'pill-done' : 'pill-pending'">
+                                            {{ tx.type === 'IN' ? '⬆️ Giriş' : '⬇️ Çıkış' }}
+                                        </span>
+                                    </td>
+                                    <td class="td-email">{{ tx.reason || '—' }}</td>
+                                    <td class="td-score" :style="tx.type === 'IN' ? 'color:#10b981' : 'color:#ef4444'">
+                                        {{ tx.type === 'IN' ? '+' : '-' }}{{ (tx.amount || 0).toLocaleString('tr-TR') }}
+                                    </td>
+                                    <td class="td-email">{{ tx.fromName || tx.toName || '—' }}</td>
+                                    <td class="td-date">{{ formatTimestamp(tx.createdAt) }}</td>
+                                </tr>
+                                <tr v-if="vaultTransactions.length === 0">
+                                    <td colspan="5" class="empty-row">Henüz işlem yok.</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
                 <!-- ===== GELİR RAPORU ===== -->
                 <div v-if="activeTab === 'revenue'" class="animate-fade">
                     <h2 class="section-title">Platform Gelir Raporu</h2>
@@ -462,6 +540,7 @@ import {
     getFirestore, doc, getDoc, getDocs, updateDoc, deleteDoc,
     collection, query, orderBy, where, serverTimestamp
 } from 'firebase/firestore'
+import { getVaultStats, getVaultTransactions } from '~/utils/mainVault.js'
 
 const router = useRouter()
 const { $auth } = useNuxtApp()
@@ -481,6 +560,17 @@ const allTeachers = ref([])
 const allTests = ref([])
 const allDonations = ref([])
 const distributionHistory = ref([])
+
+// Ana Kasa
+const vaultData = ref({ totalBalance: 0, totalIn: 0, totalOut: 0 })
+const vaultTransactions = ref([])
+const vaultCommission = computed(() =>
+    allDonations.value.reduce((a, d) => {
+        const gross = d.totalPoints || d.points || 0
+        const net = d.points || 0
+        return a + (gross - net)
+    }, 0)
+)
 
 // Filtreler
 const userSearch = ref('')
@@ -599,6 +689,10 @@ const fetchAll = async () => {
             grossPoints
         }
     })
+
+    // Ana Kasa istatistikleri ve işlem geçmişi
+    vaultData.value = await getVaultStats(db)
+    vaultTransactions.value = await getVaultTransactions(db, 50)
 }
 
 // ── Öğretmen yayın toggle ──
@@ -992,4 +1086,25 @@ onMounted(() => {
     .header-stats { flex-wrap: wrap; }
     .hs-item { min-width: 90px; padding: 10px 14px; }
 }
+/* ── Ana Kasa ── */
+.vault-hero-card {
+    background: linear-gradient(135deg, #0a1020, #0d1830);
+    border: 1px solid #1e3050; border-radius: 16px;
+    padding: 25px; margin-bottom: 20px;
+    display: flex; gap: 30px; flex-wrap: wrap;
+}
+.vh-left { display: flex; align-items: center; gap: 16px; min-width: 220px; }
+.vh-icon { font-size: 3rem; }
+.vh-label { font-size: 0.72rem; color: #3a6080; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 6px; }
+.vh-balance { font-size: 2rem; font-weight: 800; color: #10b981; }
+.vh-balance span { font-size: 0.9rem; color: #666; }
+.vault-low { color: #ef4444 !important; }
+.vh-warn { color: #ef4444; font-size: 0.78rem; margin-top: 6px; font-weight: 600; }
+.vh-stats { display: flex; flex: 1; align-items: center; background: rgba(0,0,0,0.3); border-radius: 12px; overflow: hidden; }
+.vh-stat { flex: 1; display: flex; flex-direction: column; align-items: center; padding: 14px; }
+.vh-val { font-size: 1.4rem; font-weight: 800; color: #5b8dd9; }
+.vh-lab { font-size: 0.7rem; color: #3a6080; margin-top: 3px; }
+.vh-stat small { font-size: 0.62rem; color: #2a4060; margin-top: 2px; }
+.vh-divider { width: 1px; height: 50px; background: #1e2d4a; flex-shrink: 0; }
+
 </style>

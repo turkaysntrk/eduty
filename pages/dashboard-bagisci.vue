@@ -42,10 +42,9 @@
                     :class="{ active: activeTab === 'donate' }">
                     <span class="icon">💙</span> Bağış Yap
                 </button>
-                <button @click="{ activeTab = 'distribution'; isSidebarOpen = false }"
-                    :class="{ active: activeTab === 'distribution' }">
-                    <span class="icon">🎯</span> Puan Dağıtımı
-                    <span v-if="pendingPool > 0" class="pending-badge">{{ pendingPool }}</span>
+                <button @click="{ activeTab = 'vault'; isSidebarOpen = false }"
+                    :class="{ active: activeTab === 'vault' }">
+                    <span class="icon">🏦</span> Kasa Durumu
                 </button>
                 <button @click="{ activeTab = 'history'; isSidebarOpen = false }"
                     :class="{ active: activeTab === 'history' }">
@@ -160,138 +159,100 @@
                 </div>
 
                 <!-- ===== PUAN DAĞITIM SEKMESİ ===== -->
-                <div v-if="activeTab === 'distribution'" class="animate-fade">
-                    <h2 class="section-title">Puan Dağıtım Merkezi</h2>
+                <div v-if="activeTab === 'vault'" class="animate-fade">
+                    <h2 class="section-title">🏦 Kasa Durumu</h2>
 
-                    <!-- Havuz durumu -->
-                    <div class="pool-status-card">
-                        <div class="pool-left">
-                            <div class="pool-label">Dağıtılmayı Bekleyen Puan Havuzu</div>
-                            <div class="pool-value" :class="{ 'pool-empty': pendingPool === 0 }">
-                                {{ pendingPool.toLocaleString('tr-TR') }}
-                                <span>Puan</span>
-                            </div>
-                            <div class="pool-sub" v-if="pendingPool > 0">
-                                Bu puanlar bağışçılar tarafından aktarıldı ve öğrencilere dağıtılmayı bekliyor.
-                            </div>
-                            <div class="pool-sub empty-pool-msg" v-else>
-                                Şu an bekleyen puan yok. Yeni bir bağış yapıldığında burada görünecek.
+                    <div class="vault-status-card">
+                        <div class="vault-main">
+                            <div class="vault-icon">🏦</div>
+                            <div class="vault-info">
+                                <div class="vault-label">Ana Kasa Bakiyesi</div>
+                                <div class="vault-balance">{{ vaultStats.totalBalance?.toLocaleString('tr-TR') || 0 }} <span>Puan</span></div>
+                                <div class="vault-sub">Öğrencilerin test çözerek kazanabileceği puan</div>
                             </div>
                         </div>
-                        <div class="pool-right">
-                            <button class="btn-distribute"
-                                :class="{ 'loading': isDistributing, 'disabled': pendingPool === 0 }"
-                                :disabled="pendingPool === 0 || isDistributing" @click="triggerDistribution">
-                                <span v-if="isDistributing" class="btn-spinner"></span>
-                                <span v-else>🎯</span>
-                                {{ isDistributing ? 'Dağıtılıyor...' : 'Dağıtımı Başlat' }}
+                        <div class="vault-stats-row">
+                            <div class="vs-item">
+                                <span class="vs-val">{{ vaultStats.totalIn?.toLocaleString('tr-TR') || 0 }}</span>
+                                <span class="vs-lab">Toplam Giren</span>
+                            </div>
+                            <div class="vs-divider"></div>
+                            <div class="vs-item">
+                                <span class="vs-val">{{ vaultStats.totalOut?.toLocaleString('tr-TR') || 0 }}</span>
+                                <span class="vs-lab">Öğrencilere Dağıtılan</span>
+                            </div>
+                            <div class="vs-divider"></div>
+                            <div class="vs-item">
+                                <span class="vs-val">{{ estimatedStudentsCanHelp }}</span>
+                                <span class="vs-lab">Yardım Edebilecek Öğrenci</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- 🎯 DAĞIT BUTONU -->
+                    <div class="distribute-hero">
+                        <div class="dh-left">
+                            <div class="dh-icon">🎯</div>
+                            <div>
+                                <h3>Puanları Öğrencilere Dağıt</h3>
+                                <p>
+                                    Kasadaki <strong>{{ (vaultStats.totalBalance || 0).toLocaleString('tr-TR') }} puan</strong>
+                                    şu an öğrencilerin test çözmesini bekliyor.
+                                    Butona basarak puanları aktif hale getir ve öğrencilerin kazanmaya başlamasını sağla!
+                                </p>
+                                <div class="dh-impact" v-if="(vaultStats.totalBalance || 0) > 0">
+                                    💡 Bu puanlarla yaklaşık <strong>{{ estimatedStudentsCanHelp }} öğrenci</strong> ders alabilir.
+                                </div>
+                            </div>
+                        </div>
+                        <div class="dh-right">
+                            <button
+                                class="btn-distribute-hero"
+                                :class="{ 'btn-dist-loading': isDonating, 'btn-dist-empty': (vaultStats.totalBalance || 0) === 0 }"
+                                :disabled="(vaultStats.totalBalance || 0) === 0 || isDonating"
+                                @click="celebrateDistribute"
+                            >
+                                <span v-if="isDonating" class="btn-spinner"></span>
+                                <span v-else-if="distributeSuccess">🎉 Dağıtıldı!</span>
+                                <span v-else-if="(vaultStats.totalBalance || 0) === 0">⏸ Kasa Boş</span>
+                                <span v-else>🚀 Dağıtımı Başlat</span>
                             </button>
-                            <p class="distribute-note">
-                                Puanlar öğrencilerin başarı oranına göre orantılı dağıtılır.
-                            </p>
+                            <small v-if="(vaultStats.totalBalance || 0) > 0" class="dh-note">
+                                Puanlar öğrencilerin test çözdükçe otomatik aktarılır.
+                            </small>
                         </div>
                     </div>
 
-                    <!-- Son dağıtım sonucu -->
-                    <div v-if="lastDistributionResult" class="dist-result-card"
-                        :class="lastDistributionResult.success ? 'result-success' : 'result-error'">
-                        <div v-if="lastDistributionResult.success">
-                            <h3>✅ Dağıtım Tamamlandı!</h3>
-                            <div class="dist-result-stats">
-                                <div class="dr-stat">
-                                    <span class="dr-val">{{ lastDistributionResult.totalDistributed.toLocaleString('tr-TR') }}</span>
-                                    <span class="dr-lab">Puan Dağıtıldı</span>
-                                </div>
-                                <div class="dr-stat">
-                                    <span class="dr-val">{{ lastDistributionResult.studentCount }}</span>
-                                    <span class="dr-lab">Öğrenci Kazandı</span>
-                                </div>
-                                <div class="dr-stat">
-                                    <span class="dr-val">{{ lastDistributionResult.processedDonations }}</span>
-                                    <span class="dr-lab">Bağış İşlendi</span>
+                    <div class="vault-info-box">
+                        <h3>💡 Bağışınız Nasıl Çalışır?</h3>
+                        <div class="vault-steps">
+                            <div class="vault-step">
+                                <span class="step-num">1</span>
+                                <div>
+                                    <strong>Bağış Yaparsınız</strong>
+                                    <p>Ödemenizin %92'si Ana Kasa'ya aktarılır, %8'i platform giderlerine ayrılır.</p>
                                 </div>
                             </div>
-                            <!-- Kırılım tablosu -->
-                            <div class="breakdown-table" v-if="lastDistributionResult.breakdown?.length > 0">
-                                <h4>Öğrenci Kırılımı</h4>
-                                <div class="breakdown-header">
-                                    <span>Öğrenci</span>
-                                    <span>Başarı</span>
-                                    <span>Kazanılan</span>
-                                    <span>Yeni Toplam</span>
-                                </div>
-                                <div class="breakdown-row" v-for="row in lastDistributionResult.breakdown"
-                                    :key="row.uid">
-                                    <span class="br-name">{{ row.name }}</span>
-                                    <span class="br-rate">
-                                        <div class="rate-bar">
-                                            <div class="rate-fill" :style="{ width: row.successRate + '%' }"></div>
-                                        </div>
-                                        %{{ row.successRate }}
-                                    </span>
-                                    <span class="br-earned">+{{ row.pointsReceived }}</span>
-                                    <span class="br-total">{{ row.newTotal.toLocaleString('tr-TR') }}</span>
+                            <div class="vault-step">
+                                <span class="step-num">2</span>
+                                <div>
+                                    <strong>Öğrenci Test Çözer</strong>
+                                    <p>Her test çözümünde öğrenci başarı oranına göre kasadan puan kazanır.</p>
                                 </div>
                             </div>
-                        </div>
-                        <div v-else>
-                            <h3>⚠️ Dağıtım Yapılamadı</h3>
-                            <p>{{ lastDistributionResult.error }}</p>
-                        </div>
-                    </div>
-
-                    <!-- Algoritma açıklaması -->
-                    <div class="algo-explainer">
-                        <h3>📐 Dağıtım Algoritması Nasıl Çalışır?</h3>
-                        <div class="algo-steps">
-                            <div class="algo-step">
-                                <div class="step-num">1</div>
-                                <div class="step-text">
-                                    <strong>Havuz toplanır</strong><br>
-                                    Tüm dağıtılmamış bağış puanları tek havuzda birleştirilir.
+                            <div class="vault-step">
+                                <span class="step-num">3</span>
+                                <div>
+                                    <strong>Öğrenci Ders Alır</strong>
+                                    <p>Kazandığı puanla öğretmenlerden ücretsiz ders alır.</p>
                                 </div>
                             </div>
-                            <div class="algo-step">
-                                <div class="step-num">2</div>
-                                <div class="step-text">
-                                    <strong>Öğrenciler sıralanır</strong><br>
-                                    En az 1 test çözmüş öğrenciler başarı oranlarına göre ağırlıklandırılır.
+                            <div class="vault-step">
+                                <span class="step-num">4</span>
+                                <div>
+                                    <strong>Kasa Yenilenir</strong>
+                                    <p>Öğretmenler ders ücretinin %20'sini kasaya iade eder — döngü devam eder.</p>
                                 </div>
-                            </div>
-                            <div class="algo-step">
-                                <div class="step-num">3</div>
-                                <div class="step-text">
-                                    <strong>Orantılı dağıtım</strong><br>
-                                    Her öğrenci payı = (kendi başarı ağırlığı / toplam ağırlık) × havuz puanı
-                                </div>
-                            </div>
-                            <div class="algo-step">
-                                <div class="step-num">4</div>
-                                <div class="step-text">
-                                    <strong>Herkes kazanır</strong><br>
-                                    Düşük başarılı öğrenci de minimum pay alır — kimse sıfır almaz.
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-
-                    <!-- Geçmiş dağıtımlar -->
-                    <div class="dist-history-section" v-if="distributionHistory.length > 0">
-                        <h3>Geçmiş Dağıtımlar</h3>
-                        <div class="dist-history-list">
-                            <div class="dist-history-item" v-for="dh in distributionHistory" :key="dh.id">
-                                <div class="dh-left">
-                                    <span class="dh-icon">🎯</span>
-                                    <div>
-                                        <h4>{{ dh.totalPoints?.toLocaleString('tr-TR') }} Puan Dağıtıldı</h4>
-                                        <small>{{ dh.studentCount }} öğrenci · {{ dh.processedDonations }} bağış
-                                            işlendi</small>
-                                        <small class="dh-date" v-if="dh.createdAt?.seconds">
-                                            {{ new Date(dh.createdAt.seconds * 1000).toLocaleString('tr-TR') }}
-                                        </small>
-                                    </div>
-                                </div>
-                                <span class="dh-badge">Tamamlandı</span>
                             </div>
                         </div>
                     </div>
@@ -309,7 +270,7 @@ import { ref, onMounted, computed } from 'vue'
 import { useRouter } from 'vue-router'
 import { onAuthStateChanged, signOut } from 'firebase/auth'
 import { getFirestore, doc, getDoc, collection, query, where, getDocs, addDoc, serverTimestamp } from 'firebase/firestore'
-import { distributePoints, fetchPendingPool, fetchDistributionHistory } from '~/utils/distributionEngine.js'
+import { addToVault, getVaultStats } from '~/utils/mainVault.js'
 
 const router = useRouter()
 const { $auth } = useNuxtApp()
@@ -330,9 +291,35 @@ const customAmount = ref(null)
 
 // Dağıtım motoru state
 const pendingPool = ref(0)
-const isDistributing = ref(false)
-const lastDistributionResult = ref(null)
-const distributionHistory = ref([])
+const vaultStats = ref({ totalBalance: 0, totalIn: 0, totalOut: 0 })
+const distributeSuccess = ref(false)
+const estimatedStudentsCanHelp = computed(() => {
+    const balance = vaultStats.value.totalBalance || 0
+    return Math.floor(balance / 25)
+})
+
+// Dağıt butonu — bağışçıya iyi hissettiren aksiyon
+const celebrateDistribute = async () => {
+    if (!db) db = getFirestore()
+    isDonating.value = true
+    distributeSuccess.value = false
+    try {
+        await new Promise(resolve => setTimeout(resolve, 1200))
+        vaultStats.value = await getVaultStats(db)
+        distributeSuccess.value = true
+        setTimeout(() => { distributeSuccess.value = false }, 3000)
+        alert(
+            `🎉 Harika! Puanlar aktif!\n\n` +
+            `✅ Kasadaki ${(vaultStats.value.totalBalance || 0).toLocaleString('tr-TR')} puan öğrencilere açık\n` +
+            `👨‍🎓 Öğrenciler test çözdükçe puanları kazanmaya devam edecek\n` +
+            `💙 Katkınız için teşekkürler!`
+        )
+    } catch(e) {
+        console.error(e)
+    } finally {
+        isDonating.value = false
+    }
+}
 
 // Gerçek istatistikler - Firestore'dan doldurulur
 const distributedPoints = ref(0)
@@ -352,6 +339,13 @@ const packages = [
 const isDonating = ref(false)
 const COMMISSION_RATE = 0.08  // %8 platform payı — bağışçıya gösterilmez
 
+// Ortalama kaç öğrenciye yardım dokunacağını hesapla
+const estimatedStudentsHelped = (points) => {
+    const netPoints = Math.floor(points * (1 - COMMISSION_RATE))
+    // Ortalama test başına 25 puan varsayarak
+    return Math.floor(netPoints / 25)
+}
+
 const processDonation = async (amount, packageName, totalPoints) => {
     if (!$auth.currentUser) { alert('Giriş yapmalısınız.'); return }
     const numAmount = parseInt(amount)
@@ -359,26 +353,59 @@ const processDonation = async (amount, packageName, totalPoints) => {
 
     const pointsTotal = totalPoints || numAmount
     const studentPoints = Math.floor(pointsTotal * (1 - COMMISSION_RATE))
+    const estStudents = estimatedStudentsHelped(pointsTotal)
+    const commissionPoints = pointsTotal - studentPoints
 
-    if (!confirm(`${packageName} paketi için ${numAmount} ₺ bağış yapılacak.\n${pointsTotal.toLocaleString('tr-TR')} puan öğrencilere aktarılacak.\nOnaylıyor musunuz?`)) return
+    if (!confirm(
+        `📦 ${packageName} Paketi\n\n` +
+        `💳 Ödeme: ${numAmount} ₺\n` +
+        `🎯 Puan Havuzuna: ${studentPoints.toLocaleString('tr-TR')} puan\n` +
+        `🏛️ Platform Giderleri: ${commissionPoints} puan (%8)\n` +
+        `👨‍🎓 Tahminen ${estStudents}+ öğrenciye yardım dokunacak\n\n` +
+        `Onaylıyor musunuz?`
+    )) return
+
     if (!db) db = getFirestore()
     isDonating.value = true
     try {
+        // 1. Donations koleksiyonuna kayıt (geçmiş için)
         await addDoc(collection(db, "donations"), {
             donorId: $auth.currentUser.uid,
             donorName: userDisplayName.value || $auth.currentUser.email || 'Bağışçı',
             amount: numAmount,
-            points: studentPoints,
-            totalPoints: pointsTotal,
-            packageName: packageName,
-            distributed: false,
+            points: studentPoints,        // kasaya giden net puan
+            totalPoints: pointsTotal,     // bağışçının gördüğü
+            commissionPoints,
+            packageName,
+            distributed: true,            // artık direkt kasaya gidiyor
+            vaultDeposit: true,
             createdAt: new Date().toISOString()
         })
-        alert(`🎉 Bağışınız alındı!\n${pointsTotal.toLocaleString('tr-TR')} puan öğrencilere aktarılmak üzere havuza eklendi.`)
+
+        // 2. Ana Kasaya direkt ekle
+        const vaultResult = await addToVault(
+            db,
+            studentPoints,
+            `Bağış: ${packageName} (${numAmount}₺)`,
+            $auth.currentUser.uid,
+            userDisplayName.value || $auth.currentUser.email || 'Bağışçı'
+        )
+
+        if (!vaultResult.success) {
+            throw new Error('Kasa güncellenemedi: ' + vaultResult.error)
+        }
+
+        alert(
+            `🎉 Bağışınız Ana Kasaya Eklendi!\n\n` +
+            `✅ ${studentPoints.toLocaleString('tr-TR')} puan öğrenci havuzuna aktarıldı\n` +
+            `👨‍🎓 Yaklaşık ${estStudents}+ öğrenci bu puanı kullanabilecek\n` +
+            `📊 Etkiyi "İstatistikler" sekmesinden takip edebilirsiniz`
+        )
+
         customAmount.value = null
         await fetchDonationHistory()
         await fetchRealStats()
-        activeTab.value = 'distribution'
+        activeTab.value = 'stats'
     } catch (error) {
         console.error("Bağış hatası:", error)
         if (error.code === 'permission-denied') {
@@ -481,8 +508,8 @@ onMounted(() => {
                 }
 
                 await fetchDonationHistory();
-                // Dağıtım motoru verilerini yükle
-                await loadDistributionHistory()
+                // Kasa istatistiklerini yükle
+                vaultStats.value = await getVaultStats(db)
                 await fetchRealStats()
             }
         } else {
@@ -1505,4 +1532,69 @@ onMounted(() => {
     font-size: 0.75rem;
     font-weight: 600;
 }
+/* ── Dağıt Butonu ── */
+.distribute-hero {
+    background: linear-gradient(135deg, #0a1a0a, #0d1a10);
+    border: 1px solid #1a3a1a;
+    border-radius: 16px; padding: 25px;
+    display: flex; align-items: center;
+    justify-content: space-between;
+    gap: 20px; flex-wrap: wrap;
+    margin-bottom: 20px;
+}
+.dh-left { display: flex; align-items: flex-start; gap: 16px; flex: 1; }
+.dh-icon { font-size: 2.5rem; flex-shrink: 0; }
+.dh-left h3 { color: white; font-size: 1rem; margin-bottom: 8px; }
+.dh-left p { color: #888; font-size: 0.85rem; line-height: 1.6; margin: 0 0 8px; }
+.dh-impact { color: #00c853; font-size: 0.82rem; }
+.dh-right { display: flex; flex-direction: column; align-items: center; gap: 8px; flex-shrink: 0; }
+.btn-distribute-hero {
+    background: linear-gradient(135deg, #00c853, #00a844);
+    color: white; border: none;
+    padding: 16px 32px; border-radius: 12px;
+    font-size: 1rem; font-weight: 800;
+    cursor: pointer; transition: 0.2s;
+    white-space: nowrap; min-width: 180px;
+    box-shadow: 0 4px 20px rgba(0,200,83,0.3);
+    display: flex; align-items: center; justify-content: center; gap: 8px;
+}
+.btn-distribute-hero:hover { transform: translateY(-2px); box-shadow: 0 8px 25px rgba(0,200,83,0.4); }
+.btn-dist-loading { background: #333 !important; box-shadow: none !important; cursor: not-allowed !important; }
+.btn-dist-empty { background: #1a1a1a !important; color: #444 !important; box-shadow: none !important; cursor: not-allowed !important; }
+.dh-note { font-size: 0.72rem; color: #555; text-align: center; max-width: 180px; }
+
+/* ── Kasa Durumu ── */
+.vault-status-card {
+    background: linear-gradient(135deg, #0a1020, #0d1830);
+    border: 1px solid #1e3050;
+    border-radius: 16px; padding: 25px; margin-bottom: 25px;
+}
+.vault-main { display: flex; align-items: center; gap: 20px; margin-bottom: 20px; }
+.vault-icon { font-size: 3rem; }
+.vault-label { font-size: 0.78rem; color: #666; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 6px; }
+.vault-balance { font-size: 2.2rem; font-weight: 800; color: #00c853; }
+.vault-balance span { font-size: 1rem; color: #888; }
+.vault-sub { font-size: 0.78rem; color: #555; margin-top: 4px; }
+.vault-stats-row { display: flex; background: rgba(0,0,0,0.3); border-radius: 12px; overflow: hidden; }
+.vs-item { flex: 1; display: flex; flex-direction: column; align-items: center; padding: 12px; }
+.vs-val { font-size: 1.3rem; font-weight: 800; color: #00c853; }
+.vs-lab { font-size: 0.65rem; color: #555; margin-top: 3px; text-align: center; }
+.vs-divider { width: 1px; background: #1a1a1a; flex-shrink: 0; }
+
+.vault-info-box {
+    background: #111; border: 1px solid #1a1a1a;
+    border-radius: 14px; padding: 25px;
+}
+.vault-info-box h3 { color: white; font-size: 1rem; margin-bottom: 20px; }
+.vault-steps { display: flex; flex-direction: column; gap: 15px; }
+.vault-step { display: flex; gap: 15px; align-items: flex-start; }
+.step-num {
+    width: 28px; height: 28px; background: #00c853;
+    color: black; border-radius: 50%; display: flex;
+    align-items: center; justify-content: center;
+    font-weight: 800; font-size: 0.85rem; flex-shrink: 0;
+}
+.vault-step strong { display: block; color: white; font-size: 0.88rem; margin-bottom: 3px; }
+.vault-step p { color: #666; font-size: 0.8rem; line-height: 1.5; margin: 0; }
+
 </style>

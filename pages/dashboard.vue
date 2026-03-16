@@ -213,6 +213,7 @@
                             </div>
                             <div class="result-points" v-if="!currentTest?.practiceOnly">
                                 <span v-if="testResult.alreadyCompleted" class="no-pts">⚠️ Bu testi daha önce çözdün — tekrar puan verilmez</span>
+                                <span v-else-if="testResult.vaultEmpty" class="no-pts">⏸ Puan havuzu şu an boş — bağışçılar doldurunca puan alacaksın</span>
                                 <span v-else-if="testResult.finalPoints > 0">+{{ testResult.finalPoints }} puan kazandın 🎉</span>
                                 <span v-else class="no-pts">⚠️ Kamera izni olmadığı için puan yok</span>
                             </div>
@@ -419,7 +420,13 @@
                                     </div>
                                 </div>
 
-                                <button class="btn-start-test" @click="openTestRunner(test)">Testi Başlat</button>
+                                <button class="btn-start-test" 
+                                    @click="openTestRunner(test)"
+                                    :disabled="isVaultEmpty"
+                                    :class="{ 'btn-vault-empty': isVaultEmpty }"
+                                    :title="isVaultEmpty ? 'Puan havuzu boş, testler geçici olarak pasif' : ''">
+                                    {{ isVaultEmpty ? '⏸ Havuz Boş' : 'Testi Başlat' }}
+                                </button>
                             </div>
                         </div>
                     </div>
@@ -608,7 +615,8 @@
 import { ref, reactive, computed, onMounted, nextTick } from 'vue'
 import { useRouter } from 'vue-router'
 import { onAuthStateChanged, signOut, updateProfile } from 'firebase/auth'
-import { getFirestore, doc, getDoc, updateDoc, collection, getDocs, query, where, addDoc, onSnapshot, orderBy, serverTimestamp, deleteField } from 'firebase/firestore'
+import { getFirestore, doc, getDoc, updateDoc, collection, getDocs, query, where, addDoc, onSnapshot, orderBy, serverTimestamp, deleteField, runTransaction } from 'firebase/firestore'
+import { getVaultBalance, withdrawFromVault } from '~/utils/mainVault.js'
 
 const router = useRouter()
 const { $auth } = useNuxtApp()
@@ -662,6 +670,10 @@ const completedTestIds = ref({})
 // Günlük test sayaçları
 const dailyTestCount = ref(0)
 const dailyTestPoints = ref(0)
+
+// Ana Kasa bakiyesi — kasa boşsa testler pasif
+const vaultBalance = ref(0)
+const isVaultEmpty = computed(() => vaultBalance.value <= 0)
 
 // Test sonuç state
 const testResult = ref(null)     // null | { successPercent, earnedPoints, finalPoints, ... }
@@ -1240,51 +1252,114 @@ const finishTest = async () => {
     stopTabWatcher()
     stopCameraStream()
 
-    // Firestore'a kaydet — done:1
-    if (db && $auth.currentUser) {
+    // Firestore'a kaydet — kasadan atomic çekim
+    if (db && $auth.currentUser && finalPoints > 0) {
         try {
             const MAX_STUDENT_SCORE = 5000
             const userRef = doc(db, 'users', $auth.currentUser.uid)
             const snap = await getDoc(userRef)
             const current = snap.data() || {}
             const currentScore = current.score || 0
-            // 5000 puan limitini aş, fazlasını ekleme
-            const scoreAfter = Math.min(currentScore + finalPoints, MAX_STUDENT_SCORE)
-            const actualEarned = scoreAfter - currentScore  // gerçekten eklenen
-            const newScore = scoreAfter
-            const newCount = (current.completedTestCount || 0) + 1
-            // Günlük sayaçlar
-            const todayStr = new Date().toISOString().slice(0, 10)
-            const isSameDay = current.dailyTestDate === todayStr
-            const newDailyCount = isSameDay ? (current.dailyTestCount || 0) + 1 : 1
-            const newDailyPoints = isSameDay ? (current.dailyTestPoints || 0) + actualEarned : actualEarned
-            await updateDoc(userRef, {
-                score: newScore,
-                completedTestCount: newCount,
-                dailyTestDate: todayStr,
-                dailyTestCount: newDailyCount,
-                dailyTestPoints: newDailyPoints,
-                [`completedTests.${currentTest.value.id}`]: {
-                    done: 1,
-                    completedAt: new Date().toISOString(),
-                    successPercent,
-                    earnedPoints: actualEarned,
-                    cameraUsed: cameraOk
+
+            // 5000 limitini kontrol et
+            if (currentScore >= MAX_STUDENT_SCORE) {
+                // Limit dolmuş — kasa etkilenmiyor
+            } else {
+                const scoreAfter = Math.min(currentScore + finalPoints, MAX_STUDENT_SCORE)
+                const actualEarned = scoreAfter - currentScore
+
+                // ── Kasadan atomic çekim ──
+                const vaultResult = await withdrawFromVault(
+                    db,
+                    actualEarned,
+                    `Test ödülü: ${currentTest.value.title}`,
+                    $auth.currentUser.uid,
+                    current.displayName || current.email || 'Öğrenci'
+                )
+
+                if (!vaultResult.success) {
+                    if (vaultResult.error === 'INSUFFICIENT_FUNDS') {
+                        // Kasa boş — puansız tamamla ama testi kaydet
+                        vaultBalance.value = 0
+                        await updateDoc(userRef, {
+                            completedTestCount: (current.completedTestCount || 0) + 1,
+                            [`completedTests.${currentTest.value.id}`]: {
+                                done: 1,
+                                completedAt: new Date().toISOString(),
+                                successPercent,
+                                earnedPoints: 0,
+                                cameraUsed: cameraOk,
+                                vaultEmpty: true
+                            }
+                        })
+                        completedTestCount.value = (current.completedTestCount || 0) + 1
+                        completedLessons.value = completedTestCount.value
+                        testResult.value = {
+                            successPercent, correctCount, wrongCount, emptyCount,
+                            finalPoints: 0, cameraOk,
+                            vaultEmpty: true,
+                            questionReview: buildReview(parseInt(currentTest.value?.questionCount || 0), currentTest.value?.answerKey || [])
+                        }
+                        isShowingResult.value = true
+                        return
+                    }
+                    throw new Error(vaultResult.error)
                 }
-            })
-            studentScore.value = newScore
-            completedTestCount.value = newCount
-            completedLessons.value = newCount
-            dailyTestCount.value = newDailyCount
-            dailyTestPoints.value = newDailyPoints
-            completedTestIds.value[currentTest.value.id] = { done: 1, successPercent, earnedPoints: actualEarned }
-            // Limite ulaştıysa bildir
-            if (currentScore < MAX_STUDENT_SCORE && newScore >= MAX_STUDENT_SCORE) {
-                setTimeout(() => alert('🎯 Tebrikler! Maksimum 5.000 puana ulaştın. Artık test çözmeye devam edebilirsin ama puan kazanamazsın.'), 500)
+
+                // Kasa çekimi başarılı — öğrenciye ekle
+                const newCount = (current.completedTestCount || 0) + 1
+                const todayStr = new Date().toISOString().slice(0, 10)
+                const isSameDay = current.dailyTestDate === todayStr
+                const newDailyCount = isSameDay ? (current.dailyTestCount || 0) + 1 : 1
+                const newDailyPoints = isSameDay ? (current.dailyTestPoints || 0) + actualEarned : actualEarned
+
+                await updateDoc(userRef, {
+                    score: scoreAfter,
+                    completedTestCount: newCount,
+                    dailyTestDate: todayStr,
+                    dailyTestCount: newDailyCount,
+                    dailyTestPoints: newDailyPoints,
+                    [`completedTests.${currentTest.value.id}`]: {
+                        done: 1,
+                        completedAt: new Date().toISOString(),
+                        successPercent,
+                        earnedPoints: actualEarned,
+                        cameraUsed: cameraOk
+                    }
+                })
+
+                studentScore.value = scoreAfter
+                completedTestCount.value = newCount
+                completedLessons.value = newCount
+                dailyTestCount.value = newDailyCount
+                dailyTestPoints.value = newDailyPoints
+                vaultBalance.value = vaultResult.newBalance || 0
+                completedTestIds.value[currentTest.value.id] = { done: 1, successPercent, earnedPoints: actualEarned }
+
+                if (currentScore < MAX_STUDENT_SCORE && scoreAfter >= MAX_STUDENT_SCORE) {
+                    setTimeout(() => alert('🎯 Tebrikler! Maksimum 5.000 puana ulaştın!'), 500)
+                }
             }
         } catch (e) {
             console.error('Puan kaydedilemedi:', e)
         }
+    } else if (db && $auth.currentUser && finalPoints === 0) {
+        // Kamera izni yok — sadece testi tamamlandı kaydet
+        try {
+            const userRef = doc(db, 'users', $auth.currentUser.uid)
+            const snap = await getDoc(userRef)
+            const current = snap.data() || {}
+            await updateDoc(userRef, {
+                completedTestCount: (current.completedTestCount || 0) + 1,
+                [`completedTests.${currentTest.value.id}`]: {
+                    done: 1, completedAt: new Date().toISOString(),
+                    successPercent, earnedPoints: 0, cameraUsed: false
+                }
+            })
+            completedTestCount.value = (current.completedTestCount || 0) + 1
+            completedLessons.value = completedTestCount.value
+            completedTestIds.value[currentTest.value.id] = { done: 1, successPercent, earnedPoints: 0 }
+        } catch(e) { console.error(e) }
     }
 
     // Sonuç ekranını göster — testten çıkma, sonuçları gör
@@ -1371,6 +1446,8 @@ onMounted(() => {
                     await fetchFavorites(savedFavIds)
                     await fetchBookings()
                     fetchChats()
+                    // Ana Kasa bakiyesini yükle
+                    vaultBalance.value = await getVaultBalance(db)
                 } catch (e) {
                     console.error('Veri yükleme hatası:', e)
                 }
@@ -1945,6 +2022,13 @@ onMounted(() => {
     font-weight: 600;
     transition: 0.3s;
     width: 100%;
+}
+
+.btn-vault-empty {
+    border-color: #444 !important;
+    color: #555 !important;
+    cursor: not-allowed !important;
+    background: #111 !important;
 }
 
 .btn-start-test:hover {

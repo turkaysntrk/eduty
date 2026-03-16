@@ -494,6 +494,7 @@ import { ref, reactive, computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { onAuthStateChanged, signOut, updateProfile } from 'firebase/auth'
 import { getFirestore, doc, getDoc, updateDoc, collection, addDoc, query, where, getDocs, onSnapshot, orderBy, serverTimestamp, deleteField } from 'firebase/firestore'
+import { addToVault } from '~/utils/mainVault.js'
 
 const router = useRouter(); const { $auth } = useNuxtApp(); let db;
 const isSidebarOpen = ref(false); const isLoading = ref(true); const isTeacher = ref(false); const activeTab = ref('calendar'); const userDisplayName = ref(''); const userEmail = ref(''); const userBranch = ref(''); const userSchoolLevel = ref(''); const teacherScore = ref(0); const pastLessons = ref([]); const myTests = ref([]);
@@ -649,7 +650,7 @@ const completeLesson = async (booking) => {
                 return
             }
 
-            // %20 havuza iade, %80 öğretmene
+            // %20 kasaya iade, %80 öğretmene
             const poolReturn = Math.floor(booking.lessonPrice * 0.20)
             const teacherEarned = booking.lessonPrice - poolReturn
             // Limite göre gerçekte eklenecek puanı hesapla
@@ -659,22 +660,19 @@ const completeLesson = async (booking) => {
             await updateDoc(doc(db, "users", $auth.currentUser.uid), { score: newScore })
             teacherScore.value = newScore
 
-            // Havuza iade edilen puanı donations koleksiyonuna yaz
+            // %20 iade direkt Ana Kasaya gider
             if (poolReturn > 0) {
-                await addDoc(collection(db, 'donations'), {
-                    donorId: 'system_pool_return',
-                    donorName: 'Sistem — Ders İadesi',
-                    amount: 0,
-                    points: poolReturn,
-                    totalPoints: poolReturn,
-                    packageName: 'Ders Tamamlama İadesi',
-                    distributed: false,
-                    createdAt: new Date().toISOString()
-                })
+                await addToVault(
+                    db,
+                    poolReturn,
+                    `Ders iadesi: ${booking.studentName || 'Öğrenci'} - ${booking.day} ${booking.time}`,
+                    $auth.currentUser.uid,
+                    userDisplayName.value || 'Öğretmen'
+                )
             }
 
             const limitMsg = newScore >= MAX_TEACHER_SCORE ? '\n⚠️ Bakiye limitine ulaştın! Ödeme talebi oluştur.' : ''
-            alert(`✅ Ders tamamlandı!\n+${actualEarned} puan kazandın.\n(${poolReturn} puan öğrenci havuzuna iade edildi)${limitMsg}`)
+            alert(`✅ Ders tamamlandı!\n+${actualEarned} puan kazandın.\n(${poolReturn} puan Ana Kasaya iade edildi)${limitMsg}`)
         } else {
             alert('✅ Ders tamamlandı!')
         }
