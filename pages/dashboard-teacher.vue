@@ -734,11 +734,10 @@ onMounted(() => { db = getFirestore(); onAuthStateChanged($auth, async (user) =>
 .dashboard-container {
     display: flex;
     min-height: 100vh;
-    background-color: #0a0a0a;
+    background-color: #060d1f;
     color: white;
-    font-family: 'Montserrat', sans-serif;
+    font-family: 'DM Sans', 'Montserrat', sans-serif;
     padding-top: 0;
-    /* Mobilde padding sıfırlandı */
 }
 
 /* Sidebar Logo */
@@ -753,34 +752,35 @@ onMounted(() => { db = getFirestore(); onAuthStateChanged($auth, async (user) =>
     flex-direction: row;
     align-items: center;
     text-decoration: none;
-    gap: 15px;
+    gap: 12px;
 }
 
 .sidebar-logo-img {
     height: 40px;
     width: auto;
+    filter: drop-shadow(0 0 8px rgba(56, 189, 248, 0.4));
 }
 
 .eduty-text {
     font-size: 1.8rem;
     font-weight: 800;
-    letter-spacing: 1px;
+    letter-spacing: 2px;
     display: flex;
     gap: 1px;
-    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    font-family: 'DM Sans', 'Segoe UI', sans-serif;
 }
 
 .eduty-text span:nth-child(1),
 .eduty-text span:nth-child(2) {
-    color: #0055ff;
-    text-shadow: 0 0 10px rgb(0, 85, 255, 0.3);
+    color: #4d94ff;
+    text-shadow: 0 0 12px rgba(77, 148, 255, 0.5);
 }
 
 .eduty-text span:nth-child(3),
 .eduty-text span:nth-child(4),
 .eduty-text span:nth-child(5) {
-    color: #003bb0;
-    text-shadow: 0 0 10px rgb(0, 59, 176, 0.3);
+    color: #38bdf8;
+    text-shadow: 0 0 12px rgba(56, 189, 248, 0.4);
 }
 
 /* Mobil Toggle Button */
@@ -815,8 +815,8 @@ onMounted(() => { db = getFirestore(); onAuthStateChanged($auth, async (user) =>
 /* SIDEBAR STYLES */
 .sidebar {
     width: 280px;
-    background-color: #121212;
-    border-right: 1px solid #222;
+    background: linear-gradient(160deg, #080f25 0%, #0a1228 100%);
+    border-right: 1px solid rgba(56, 189, 248, 0.12);
     display: flex;
     flex-direction: column;
     padding: 40px 20px;
@@ -827,7 +827,7 @@ onMounted(() => { db = getFirestore(); onAuthStateChanged($auth, async (user) =>
     z-index: 100;
     flex-shrink: 0;
     scrollbar-width: thin;
-    scrollbar-color: #333 #121212;
+    scrollbar-color: #1a2a4a #080f25;
 }
 
 .main-content {
@@ -865,18 +865,18 @@ onMounted(() => { db = getFirestore(); onAuthStateChanged($auth, async (user) =>
 
 .sidebar-nav button:hover,
 .sidebar-nav button.active {
-    background: #0055ff;
-    color: white;
+    background: rgba(77, 148, 255, 0.15);
+    color: #4d94ff;
 }
 
 .nav-link-home:hover {
     color: white;
-    background: #222;
+    background: rgba(255,255,255,0.06);
 }
 
 .sidebar-divider {
     height: 1px;
-    background: #222;
+    background: rgba(56, 189, 248, 0.1);
     margin: 10px 0;
 }
 
@@ -902,15 +902,15 @@ onMounted(() => { db = getFirestore(); onAuthStateChanged($auth, async (user) =>
     justify-content: space-between;
     align-items: center;
     margin-bottom: 40px;
-    background: linear-gradient(90deg, #111, #1a1a1a);
+    background: linear-gradient(135deg, #080f25 0%, #0d1a3a 100%);
     padding: 30px;
     border-radius: 16px;
-    border: 1px solid #222;
+    border: 1px solid rgba(56, 189, 248, 0.12);
     flex-wrap: wrap;
     gap: 20px;
     position: relative;
     z-index: 10;
-    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
+    box-shadow: 0 8px 32px rgba(0, 20, 80, 0.3);
 }
 
 /* RESPONSIVE AYARLAR */
@@ -931,7 +931,7 @@ onMounted(() => { db = getFirestore(); onAuthStateChanged($auth, async (user) =>
         box-shadow: 5px 0 15px rgba(0, 0, 0, 0.5);
         height: 100%;
         overflow-y: auto;
-        background: #121212;
+        background: linear-gradient(160deg, #080f25 0%, #0a1228 100%);
     }
 
     .sidebar.open {
@@ -1022,7 +1022,7 @@ onMounted(() => { db = getFirestore(); onAuthStateChanged($auth, async (user) =>
     flex-direction: column;
     justify-content: center;
     align-items: center;
-    background: #0a0a0a;
+    background: #060d1f;
     color: white;
 }
 
@@ -1055,7 +1055,7 @@ onMounted(() => { db = getFirestore(); onAuthStateChanged($auth, async (user) =>
     width: 90px;
     height: 90px;
     border-radius: 50%;
-    border: 3px solid #0055ff;
+    border: 3px solid #4d94ff;
     object-fit: cover;
     margin-bottom: 10px;
 }
@@ -1098,7 +1098,7 @@ onMounted(() => { db = getFirestore(); onAuthStateChanged($auth, async (user) =>
 }
 
 .user-branch-info {
-    color: #0055ff;
+    color: #4d94ff;
     font-weight: bold;
     font-size: 0.85rem;
     margin-top: 5px;
@@ -1120,7 +1120,7 @@ onMounted(() => { db = getFirestore(); onAuthStateChanged($auth, async (user) =>
 }
 .score-progress-fill {
     height: 100%;
-    background: linear-gradient(90deg, #0055ff, #0088ff);
+    background: linear-gradient(90deg, #4d94ff, #38bdf8);
     border-radius: 3px;
     transition: width 0.5s ease;
 }
@@ -1144,7 +1144,7 @@ onMounted(() => { db = getFirestore(); onAuthStateChanged($auth, async (user) =>
 .score-value {
     font-size: 2.5rem;
     font-weight: 800;
-    color: #0055ff;
+    color: #4d94ff;
 }
 
 .score-value span {

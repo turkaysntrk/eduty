@@ -290,11 +290,27 @@ const initJitsi = async () => {
             disableDeepLinking: true,
             prejoinPageEnabled: false,
             enableWelcomePage: false,
+            enableNoisyMicDetection: false,
+            // Güvenilir STUN/TURN sunucuları — bağlantı sorununu çözer
+            p2p: {
+                enabled: true,
+                stunServers: [
+                    { urls: 'stun:stun.l.google.com:19302' },
+                    { urls: 'stun:stun1.l.google.com:19302' },
+                ]
+            },
             toolbarButtons: [
-                'microphone', 'camera', 'desktop',
-                'fullscreen', 'fodeviceselection',
-                'settings', 'videoquality'
+                'microphone',
+                'camera',
+                'desktop',           // ekran paylaşımı
+                'fullscreen',
+                'fodeviceselection',
+                'settings',
+                'videoquality',
+                'tileview',
             ],
+            // Kamera/mikrofon izinlerini zorla sor
+            disableInitialGUM: false,
         },
         interfaceConfigOverwrite: {
             SHOW_JITSI_WATERMARK: false,
@@ -307,6 +323,7 @@ const initJitsi = async () => {
             DISABLE_JOIN_LEAVE_NOTIFICATIONS: true,
             DEFAULT_BACKGROUND: '#0a0a0a',
             APP_NAME: 'Eduty Meets',
+            MOBILE_APP_PROMO: false,
         },
         userInfo: {
             displayName: currentUserName.value,
@@ -319,19 +336,34 @@ const initJitsi = async () => {
     jitsiApi.addEventListener('videoConferenceJoined', () => {
         jitsiReady.value = true
         startTimer()
+        // Kendimiz dahil gerçek katılımcı sayısını al
+        updateParticipantCount()
     })
 
     jitsiApi.addEventListener('participantJoined', () => {
-        participantCount.value++
+        updateParticipantCount()
     })
 
     jitsiApi.addEventListener('participantLeft', () => {
-        if (participantCount.value > 1) participantCount.value--
+        updateParticipantCount()
     })
 
     jitsiApi.addEventListener('videoConferenceLeft', () => {
         endLesson()
     })
+}
+
+// ── Gerçek katılımcı sayısını güncelle (kendisi dahil) ──
+const updateParticipantCount = () => {
+    if (!jitsiApi) return
+    try {
+        // getParticipantsInfo kendisi dahil tüm katılımcıları döner
+        const participants = jitsiApi.getParticipantsInfo()
+        participantCount.value = participants.length
+    } catch(e) {
+        // Fallback: manuel say
+        participantCount.value = Math.max(1, participantCount.value)
+    }
 }
 
 // ── Süre sayacı ──
@@ -485,7 +517,13 @@ onMounted(() => {
         const snap = await getDoc(doc(db, 'users', user.uid))
         if (snap.exists()) {
             const data = snap.data()
-            currentUserName.value = data.displayName || user.email
+            // Farklı alan isimlerini kontrol et
+            currentUserName.value = 
+                data.displayName || 
+                data.name ||
+                (data.firstName ? data.firstName + (data.lastName ? ' ' + data.lastName : '') : null) ||
+                user.displayName ||
+                user.email
             // Booking bilgisini çek
             const bookingId = roomId.value
             try {

@@ -130,18 +130,45 @@ onUnmounted(() => {
   text-shadow: 1px 1px 5px rgba(0, 0, 0, 0.8);
 }
 
-/* --- INFO SECTION (SİYAH ALAN) --- */
+/* --- INFO SECTION --- */
 .info-section {
-  background-color: #000000;
+  background: linear-gradient(160deg, #060d1f 0%, #0a1628 60%, #050f22 100%);
   color: #ffffff;
-  padding: 80px 20px;
+  padding: 100px 20px;
   display: flex;
   justify-content: center;
   text-align: center;
+  position: relative;
+  overflow: hidden;
+}
+
+/* Dekoratif arka plan nokta deseni */
+.info-section::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background-image: radial-gradient(circle at 1px 1px, rgba(56, 189, 248, 0.06) 1px, transparent 0);
+  background-size: 36px 36px;
+  pointer-events: none;
+}
+
+/* Üstten gelen mavi ışık */
+.info-section::after {
+  content: '';
+  position: absolute;
+  top: -60px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 600px;
+  height: 300px;
+  background: radial-gradient(ellipse, rgba(26, 107, 255, 0.12) 0%, transparent 70%);
+  pointer-events: none;
 }
 
 .welcome-text {
   max-width: 800px;
+  position: relative;
+  z-index: 1;
 }
 
 .clickable-title {
@@ -150,33 +177,35 @@ onUnmounted(() => {
 }
 
 .welcome-text h2 {
-  font-size: 2.5rem;
-  margin-bottom: 10px;
-  font-family: 'Times New Roman', Times, serif;
+  font-size: 2.6rem;
+  margin-bottom: 12px;
+  font-family: 'Playfair Display', 'Times New Roman', serif;
   color: white;
   transition: color 0.3s ease;
+  font-weight: 700;
 }
 
 .clickable-title:hover h2 {
-  color: #0055ff;
-  /* Logo mavisi */
+  color: #38bdf8;
 }
 
 .blue-line {
-  width: 60px;
+  width: 56px;
   height: 4px;
-  background: #274a90;
-  margin: 0 auto 30px;
+  background: linear-gradient(90deg, #1a6bff, #38bdf8);
+  margin: 0 auto 32px;
+  border-radius: 99px;
 }
 
 .welcome-text p {
-  font-size: 1.2rem;
-  line-height: 1.8;
-  color: #cccccc;
+  font-size: 1.15rem;
+  line-height: 1.85;
+  color: rgba(255, 255, 255, 0.65);
   margin-bottom: 40px;
+  font-family: 'DM Sans', sans-serif;
 }
 
-/* --- YENİ BUTON STİLİ --- */
+/* --- BUTON --- */
 .action-area {
   margin-top: 30px;
 }
@@ -185,25 +214,26 @@ onUnmounted(() => {
   display: inline-flex;
   align-items: center;
   gap: 10px;
-  padding: 12px 35px;
-  border: 1px solid #333;
+  padding: 13px 36px;
+  border: 1.5px solid rgba(56, 189, 248, 0.4);
   border-radius: 30px;
-  background-color: transparent;
+  background: rgba(26, 107, 255, 0.08);
   color: #fff;
-  font-size: 1rem;
+  font-size: 0.95rem;
   font-weight: 600;
   text-decoration: none;
   transition: all 0.3s ease;
-  letter-spacing: 1px;
+  letter-spacing: 0.5px;
+  font-family: 'DM Sans', sans-serif;
+  backdrop-filter: blur(4px);
 }
 
 .btn-about:hover {
-  background-color: #0055ff;
-  /* Primary Blue */
-  border-color: #0055ff;
+  background: linear-gradient(135deg, #1a6bff, #0a4fd6);
+  border-color: #1a6bff;
   color: white;
   transform: translateY(-3px);
-  box-shadow: 0 5px 15px rgba(0, 85, 255, 0.3);
+  box-shadow: 0 8px 24px rgba(26, 107, 255, 0.4);
 }
 
 .arrow {

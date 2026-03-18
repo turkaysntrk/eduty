@@ -163,7 +163,11 @@
 
             <div class="test-runner-body">
                 <div class="pdf-container" ref="pdfContainer">
-                    <iframe :src="currentTest?.pdfUrl || '/sample.pdf'" class="pdf-frame"></iframe>
+                    <iframe 
+                        :src="currentTest?.pdfUrl ? 'https://docs.google.com/viewer?url=' + encodeURIComponent(currentTest.pdfUrl) + '&embedded=true' : ''"
+                        class="pdf-frame"
+                        allow="autoplay"
+                    ></iframe>
                     <canvas ref="drawCanvas" class="drawing-canvas" @mousedown="startDrawing" @mousemove="draw"
                         @mouseup="stopDrawing" @mouseleave="stopDrawing"></canvas>
                 </div>
@@ -1056,6 +1060,7 @@ const stopTabWatcher = () => {
         clearInterval(tabCountdownInterval)
         tabCountdownInterval = null
     }
+    document.title = 'Eduty'
 }
 
 const handleVisibilityChange = () => {
@@ -1064,10 +1069,16 @@ const handleVisibilityChange = () => {
         // Kullanıcı sekme dışına çıktı
         tabOutStart = Date.now()
         tabWarningActive.value = true
+        // Sekme adını hemen güncelle
+        document.title = `⚠️ ${tabTimeLeft.value} sn sonra test sonlanacak...`
         if (!tabCountdownInterval) {
             tabCountdownInterval = setInterval(() => {
                 tabTimeLeft.value -= 1
-                if (tabTimeLeft.value <= 0) {
+                // Sekme adını saniye sayacıyla güncelle
+                if (tabTimeLeft.value > 0) {
+                    document.title = `⚠️ ${tabTimeLeft.value} sn sonra test sonlanacak...`
+                } else {
+                    document.title = '⛔ Testiniz sonlandırılmıştır'
                     tabTimeLeft.value = 0
                     clearInterval(tabCountdownInterval)
                     tabCountdownInterval = null
@@ -1076,12 +1087,13 @@ const handleVisibilityChange = () => {
             }, 1000)
         }
     } else {
-        // Kullanıcı sekmeye döndü — sayacı dondur ama sıfırlama
+        // Kullanıcı sekmeye döndü — sayacı dondur, sekme adını sıfırla
         if (tabCountdownInterval) {
             clearInterval(tabCountdownInterval)
             tabCountdownInterval = null
         }
         tabWarningActive.value = false
+        document.title = 'Eduty'
         // tabTimeLeft değeri korunur — bir sonraki çıkışta kaldığı yerden devam eder
     }
 }
@@ -1090,6 +1102,7 @@ const autoFailTest = () => {
     testDisqualified.value = true
     stopTabWatcher()
     stopCameraStream()
+    document.title = 'Eduty'
     alert('⛔ Süre doldu! Sekme dışında çok fazla süre geçirdin. Test puansız kapandı.')
     isTakingTest.value = false
 }
@@ -1465,11 +1478,10 @@ onMounted(() => {
 .dashboard-container {
     display: flex;
     min-height: 100vh;
-    background-color: #0a0a0a;
+    background-color: #060d1f;
     color: white;
-    font-family: 'Montserrat', sans-serif;
+    font-family: 'DM Sans', 'Montserrat', sans-serif;
     padding-top: 0;
-    /* Padding kaldırıldı, mobil uyumu için */
 }
 
 /* SIDEBAR LOGO */
@@ -1484,34 +1496,35 @@ onMounted(() => {
     flex-direction: row;
     align-items: center;
     text-decoration: none;
-    gap: 15px;
+    gap: 12px;
 }
 
 .sidebar-logo-img {
     height: 40px;
     width: auto;
+    filter: drop-shadow(0 0 8px rgba(56, 189, 248, 0.4));
 }
 
 .eduty-text {
     font-size: 1.8rem;
     font-weight: 800;
-    letter-spacing: 1px;
+    letter-spacing: 2px;
     display: flex;
     gap: 1px;
-    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    font-family: 'DM Sans', 'Segoe UI', sans-serif;
 }
 
 .eduty-text span:nth-child(1),
 .eduty-text span:nth-child(2) {
-    color: #0055ff;
-    text-shadow: 0 0 10px rgb(0, 85, 255, 0.3);
+    color: #4d94ff;
+    text-shadow: 0 0 12px rgba(77, 148, 255, 0.5);
 }
 
 .eduty-text span:nth-child(3),
 .eduty-text span:nth-child(4),
 .eduty-text span:nth-child(5) {
-    color: #003bb0;
-    text-shadow: 0 0 10px rgb(0, 59, 176, 0.3);
+    color: #38bdf8;
+    text-shadow: 0 0 12px rgba(56, 189, 248, 0.4);
 }
 
 /* MOBİL BUTON VE OVERLAY */
@@ -1546,8 +1559,8 @@ onMounted(() => {
 /* SIDEBAR STİLLERİ */
 .sidebar {
     width: 280px;
-    background-color: #121212;
-    border-right: 1px solid #222;
+    background: linear-gradient(160deg, #080f25 0%, #0a1228 100%);
+    border-right: 1px solid rgba(56, 189, 248, 0.12);
     display: flex;
     flex-direction: column;
     padding: 40px 20px;
@@ -1557,9 +1570,8 @@ onMounted(() => {
     overflow-y: auto;
     z-index: 100;
     flex-shrink: 0;
-    /* Scrollbar düzenlemesi */
     scrollbar-width: thin;
-    scrollbar-color: #333 #121212;
+    scrollbar-color: #1a2a4a #080f25;
 }
 
 /* Sidebar Navigation */
@@ -1591,18 +1603,18 @@ onMounted(() => {
 
 .sidebar-nav button:hover,
 .sidebar-nav button.active {
-    background: rgba(0, 85, 255, 0.1);
-    color: #0055ff;
+    background: rgba(77, 148, 255, 0.12);
+    color: #4d94ff;
 }
 
 .nav-link-home:hover {
     color: white;
-    background: #222;
+    background: rgba(255,255,255,0.06);
 }
 
 .sidebar-divider {
     height: 1px;
-    background: #222;
+    background: rgba(56, 189, 248, 0.1);
     margin: 10px 0;
 }
 
@@ -1634,7 +1646,7 @@ onMounted(() => {
         height: 100%;
         overflow-y: auto;
         /* İçerik taşarsa scroll olsun */
-        background: #121212;
+        background: linear-gradient(160deg, #080f25 0%, #0a1228 100%);
         /* Arkaplan rengini garantiye al */
     }
 
@@ -1670,7 +1682,7 @@ onMounted(() => {
     flex-direction: column;
     justify-content: center;
     align-items: center;
-    background: #0a0a0a;
+    background: #060d1f;
     color: white;
 }
 
@@ -1710,7 +1722,7 @@ onMounted(() => {
     width: 100px;
     height: 100px;
     border-radius: 50%;
-    border: 3px solid #0055ff;
+    border: 3px solid #4d94ff;
     object-fit: cover;
 }
 
@@ -1733,8 +1745,8 @@ onMounted(() => {
 }
 
 .edit-profile-btn:hover {
-    background: #0055ff;
-    border-color: #0055ff;
+    background: #4d94ff;
+    border-color: #4d94ff;
 }
 
 .rank-badge {
@@ -1822,13 +1834,14 @@ onMounted(() => {
     justify-content: space-between;
     align-items: center;
     margin-bottom: 40px;
-    background: linear-gradient(90deg, #111, #1a1a1a);
+    background: linear-gradient(135deg, #080f25 0%, #0d1a3a 100%);
     padding: 30px;
     border-radius: 16px;
-    border: 1px solid #222;
+    border: 1px solid rgba(56, 189, 248, 0.12);
     flex-wrap: wrap;
     gap: 20px;
     position: relative;
+    box-shadow: 0 8px 32px rgba(0, 20, 80, 0.3);
 }
 
 .score-card {
@@ -1867,7 +1880,7 @@ onMounted(() => {
 .ssi-val {
     font-size: 1.3rem;
     font-weight: 800;
-    color: #0055ff;
+    color: #4d94ff;
     line-height: 1;
     margin-bottom: 3px;
 }
@@ -1911,14 +1924,14 @@ onMounted(() => {
     width: 100%;
     max-width: 280px;
     height: 6px;
-    background: #1a1a1a;
+    background: rgba(56, 189, 248, 0.1);
     border-radius: 3px;
     margin-top: 8px;
     overflow: hidden;
 }
 .score-progress-fill {
     height: 100%;
-    background: linear-gradient(90deg, #0055ff, #0088ff);
+    background: linear-gradient(90deg, #4d94ff, #38bdf8);
     border-radius: 3px;
     transition: width 0.5s ease;
 }
@@ -1932,7 +1945,7 @@ onMounted(() => {
 .score-value {
     font-size: 2.5rem;
     font-weight: 800;
-    color: #0055ff;
+    color: #4d94ff;
 }
 
 .score-value span {
@@ -1941,7 +1954,7 @@ onMounted(() => {
 }
 
 /* q-item artık score-card içinde .ssi-* ile değiştirildi */
-.q-val { display: block; font-size: 1.5rem; font-weight: 700; color: #0055ff; }
+.q-val { display: block; font-size: 1.5rem; font-weight: 700; color: #4d94ff; }
 .q-lab { font-size: 0.8rem; color: #666; }
 
 /* Diğer Bileşenler */

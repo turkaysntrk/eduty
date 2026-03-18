@@ -112,6 +112,8 @@ onUnmounted(() => {
 </style>
 
 <style scoped>
+@import url('https://fonts.googleapis.com/css2?family=Playfair+Display:wght@700;900&family=DM+Sans:wght@400;500;600&display=swap');
+
 /* --- ARKA PLAN AYARLARI --- */
 .page-bg {
   position: fixed;
@@ -131,23 +133,22 @@ onUnmounted(() => {
   left: 0;
   width: 100%;
   height: 100%;
-  /* Üstten alta doğru koyulaşan gradient */
-  background: linear-gradient(to bottom, rgba(5, 5, 5, 0.75), rgba(0, 0, 0, 0.98));
+  background: linear-gradient(to bottom, rgba(4, 8, 20, 0.8), rgba(4, 10, 25, 0.97));
   z-index: 1;
 }
 
 .relative-z {
   position: relative;
-  z-index: 2; /* İçeriği arka planın üstüne çıkarır */
+  z-index: 2;
 }
 
-/* --- GENEL SAYFA AYARLARI --- */
+/* --- GENEL SAYFA --- */
 .about-page {
   min-height: 100vh;
   padding-top: 140px;
   padding-bottom: 0;
-  color: #f4f4f4; /* --text-light */
-  font-family: 'Montserrat', sans-serif; /* --font-main */
+  color: #f0f6ff;
+  font-family: 'DM Sans', 'Montserrat', sans-serif;
   position: relative;
 }
 
@@ -164,19 +165,21 @@ onUnmounted(() => {
 }
 
 .main-title {
-  font-family: 'Times New Roman', Times, serif; /* --font-serif */
-  font-size: 2.5rem;
+  font-family: 'Playfair Display', 'Times New Roman', serif;
+  font-size: 2.8rem;
   color: #ffffff;
-  margin-bottom: 10px;
-  text-shadow: 0 2px 10px rgba(0,0,0,0.5);
+  margin-bottom: 14px;
+  text-shadow: 0 2px 20px rgba(26, 107, 255, 0.3);
+  font-weight: 900;
 }
 
 .blue-line {
-  width: 60px;
-  height: 3px;
-  background: #0055ff; /* --primary-color */
+  width: 56px;
+  height: 4px;
+  background: linear-gradient(90deg, #1a6bff, #38bdf8);
   margin: 0 auto;
-  box-shadow: 0 0 10px rgba(0, 85, 255, 0.5);
+  border-radius: 99px;
+  box-shadow: 0 0 16px rgba(26, 107, 255, 0.5);
 }
 
 /* --- METİN ALANI --- */
@@ -184,96 +187,96 @@ onUnmounted(() => {
   display: flex;
   justify-content: center;
   margin-bottom: 80px;
-  margin-top: 40px;
+  margin-top: 48px;
 }
 
 .text-content {
-  max-width: 950px;
+  max-width: 860px;
   text-align: center;
-  line-height: 1.8;
-  color: #dddddd;
-  font-size: 1.1rem;
-  text-shadow: 0 1px 2px rgba(0,0,0,0.8);
+  line-height: 1.85;
+  color: rgba(255, 255, 255, 0.65);
+  font-size: 1.05rem;
 }
 
 .intro-text {
   margin-bottom: 20px;
-  font-size: 1.25rem;
-  color: white;
+  font-size: 1.2rem;
+  color: rgba(255, 255, 255, 0.9);
 }
 
 @media (min-width: 1024px) {
-  .text-content {
-    width: 100%;
-  }
+  .text-content { width: 100%; }
 }
 
 .highlight {
-  color: #0055ff; /* --primary-color */
-  font-weight: 700;
-  text-shadow: 0 0 15px rgba(0, 85, 255, 0.4);
+  color: #38bdf8;
+  font-weight: 600;
+  text-shadow: 0 0 12px rgba(56, 189, 248, 0.35);
 }
 
-/* --- SİSTEM / KARTLAR ALANI --- */
+/* --- KARTLAR ALANI --- */
 .how-it-works {
   padding-bottom: 80px;
 }
 
 .section-heading {
   text-align: center;
-  font-family: 'Times New Roman', Times, serif;
+  font-family: 'Playfair Display', 'Times New Roman', serif;
   font-size: 2rem;
   margin-bottom: 50px;
-  color: #0055ff; /* --primary-color */
-  text-shadow: 0 0 10px rgba(0,0,0,0.5);
+  color: #ffffff;
+  font-weight: 700;
 }
 
 .cards-grid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
-  gap: 30px;
+  gap: 24px;
 }
 
 .info-card {
-  background: rgba(17, 17, 17, 0.8);
-  backdrop-filter: blur(5px);
-  border: 1px solid #333;
-  padding: 35px 30px;
-  border-radius: 12px;
+  background: rgba(10, 20, 50, 0.7);
+  backdrop-filter: blur(12px);
+  border: 1px solid rgba(56, 189, 248, 0.12);
+  padding: 36px 28px;
+  border-radius: 18px;
   text-align: center;
   transition: transform 0.3s ease, border-color 0.3s ease, box-shadow 0.3s ease;
 }
 
 .info-card:hover {
   transform: translateY(-8px);
-  border-color: #003bb0; /* --secondary-color */
-  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
-  background: rgba(17, 17, 17, 0.95);
+  border-color: rgba(56, 189, 248, 0.45);
+  box-shadow: 0 16px 48px rgba(26, 107, 255, 0.25);
+  background: rgba(10, 25, 65, 0.8);
 }
 
 .icon-box {
-  font-size: 3rem;
-  margin-bottom: 20px;
-  filter: drop-shadow(0 0 10px rgba(255,255,255,0.2));
+  font-size: 2.8rem;
+  margin-bottom: 18px;
+  display: block;
+  filter: drop-shadow(0 0 12px rgba(56, 189, 248, 0.3));
 }
 
 .info-card h3 {
-  font-family: 'Times New Roman', Times, serif;
-  color: white;
-  font-size: 1.5rem;
-  margin-bottom: 15px;
+  font-family: 'Playfair Display', 'Times New Roman', serif;
+  color: #ffffff;
+  font-size: 1.35rem;
+  margin-bottom: 14px;
+  font-weight: 700;
 }
 
 .info-card p {
-  color: #ccc;
-  font-size: 1rem;
-  line-height: 1.7;
+  color: rgba(255, 255, 255, 0.6);
+  font-size: 0.97rem;
+  line-height: 1.75;
+  font-family: 'DM Sans', sans-serif;
 }
 
-/* --- KAPANIŞ / CTA ALANI --- */
+/* --- KAPANIŞ / CTA --- */
 .closing-section {
   position: relative;
-  height: 400px;
+  height: 420px;
   background-image: url('/img/ana_sayfa_fotoğrafı.png');
   background-size: cover;
   background-position: center;
@@ -283,17 +286,13 @@ onUnmounted(() => {
   justify-content: center;
   text-align: center;
   margin-top: 40px;
-  z-index: 3; /* En üstte durması için */
-  border-top: 1px solid #222;
+  z-index: 3;
 }
 
 .overlay {
   position: absolute;
-  top: 0;
-  left: 0;
-  width: 100%;
-  height: 100%;
-  background: rgba(0, 0, 0, 0.7);
+  inset: 0;
+  background: linear-gradient(to bottom, rgba(4, 10, 30, 0.65), rgba(4, 10, 30, 0.85));
 }
 
 .closing-content {
@@ -303,56 +302,48 @@ onUnmounted(() => {
 }
 
 .closing-content h2 {
-  font-family: 'Times New Roman', Times, serif;
-  font-size: 2.2rem;
+  font-family: 'Playfair Display', 'Times New Roman', serif;
+  font-size: 2.3rem;
   color: white;
-  margin-bottom: 15px;
-  text-shadow: 0 2px 10px black;
+  margin-bottom: 14px;
+  font-weight: 900;
+  text-shadow: 0 2px 20px rgba(0, 0, 0, 0.6);
 }
 
 .closing-content p {
   font-size: 1.1rem;
-  color: #ddd;
-  margin-bottom: 30px;
+  color: rgba(255, 255, 255, 0.75);
+  margin-bottom: 32px;
+  font-family: 'DM Sans', sans-serif;
 }
 
 .btn-glow {
   display: inline-block;
-  padding: 12px 35px;
-  background: #0055ff; /* --primary-color */
+  padding: 13px 38px;
+  background: linear-gradient(135deg, #1a6bff, #0a4fd6);
   color: white;
   font-weight: 600;
-  text-transform: uppercase;
-  letter-spacing: 1px;
+  letter-spacing: 0.5px;
   border-radius: 30px;
   text-decoration: none;
   transition: all 0.3s ease;
-  box-shadow: 0 0 20px rgba(0, 85, 255, 0.5);
-  font-family: 'Times New Roman', Times, serif;
+  box-shadow: 0 0 24px rgba(26, 107, 255, 0.5);
+  font-family: 'DM Sans', sans-serif;
+  font-size: 0.97rem;
 }
 
 .btn-glow:hover {
-  background: #003bb0; /* --secondary-color */
-  box-shadow: 0 0 30px rgba(0, 85, 255, 0.8);
-  transform: scale(1.05);
+  background: linear-gradient(135deg, #38bdf8, #1a6bff);
+  box-shadow: 0 0 36px rgba(56, 189, 248, 0.6);
+  transform: translateY(-3px) scale(1.04);
 }
 
-/* --- MOBİL UYUMLULUK --- */
+/* --- MOBİL --- */
 @media (max-width: 768px) {
-  .about-page {
-    padding-top: 120px;
-  }
-
-  .main-title {
-    font-size: 2rem;
-  }
-
-  .mission-section {
-    margin-top: 20px;
-  }
-
-  .text-content {
-    padding: 0 10px;
-  }
+  .about-page { padding-top: 110px; }
+  .main-title { font-size: 2rem; }
+  .mission-section { margin-top: 20px; }
+  .text-content { padding: 0 10px; }
+  .cards-grid { grid-template-columns: 1fr; gap: 18px; }
 }
 </style>

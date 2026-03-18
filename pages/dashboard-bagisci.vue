@@ -525,11 +525,10 @@ onMounted(() => {
 .dashboard-container {
     display: flex;
     min-height: 100vh;
-    background-color: #0a0a0a;
+    background-color: #060d1f;
     color: white;
-    font-family: 'Montserrat', sans-serif;
+    font-family: 'DM Sans', 'Montserrat', sans-serif;
     padding-top: 0;
-    /* Mobilde padding sıfırlandı */
 }
 
 /* Sidebar Logo */
@@ -544,34 +543,35 @@ onMounted(() => {
     flex-direction: row;
     align-items: center;
     text-decoration: none;
-    gap: 15px;
+    gap: 12px;
 }
 
 .sidebar-logo-img {
     height: 40px;
     width: auto;
+    filter: drop-shadow(0 0 8px rgba(56, 189, 248, 0.4));
 }
 
 .eduty-text {
     font-size: 1.8rem;
     font-weight: 800;
-    letter-spacing: 1px;
+    letter-spacing: 2px;
     display: flex;
     gap: 1px;
-    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    font-family: 'DM Sans', 'Segoe UI', sans-serif;
 }
 
 .eduty-text span:nth-child(1),
 .eduty-text span:nth-child(2) {
-    color: #0055ff;
-    text-shadow: 0 0 10px rgb(0, 85, 255, 0.3);
+    color: #4d94ff;
+    text-shadow: 0 0 12px rgba(77, 148, 255, 0.5);
 }
 
 .eduty-text span:nth-child(3),
 .eduty-text span:nth-child(4),
 .eduty-text span:nth-child(5) {
-    color: #003bb0;
-    text-shadow: 0 0 10px rgb(0, 59, 176, 0.3);
+    color: #38bdf8;
+    text-shadow: 0 0 12px rgba(56, 189, 248, 0.4);
 }
 
 /* Mobil Toggle Button */
@@ -609,14 +609,14 @@ onMounted(() => {
     flex-direction: column;
     justify-content: center;
     align-items: center;
-    background: #0a0a0a;
+    background: #060d1f;
     color: white;
 }
 
 .spinner {
     width: 40px;
     height: 40px;
-    border: 4px solid #333;
+    border: 4px solid #1a2a4a;
     border-top: 4px solid #00c853;
     border-radius: 50%;
     animation: spin 1s linear infinite;
@@ -624,20 +624,15 @@ onMounted(() => {
 }
 
 @keyframes spin {
-    0% {
-        transform: rotate(0deg);
-    }
-
-    100% {
-        transform: rotate(360deg);
-    }
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
 }
 
 /* Sidebar */
 .sidebar {
     width: 280px;
-    background-color: #121212;
-    border-right: 1px solid #222;
+    background: linear-gradient(160deg, #080f25 0%, #0a1228 100%);
+    border-right: 1px solid rgba(0, 200, 83, 0.12);
     display: flex;
     flex-direction: column;
     padding: 40px 20px;
@@ -648,7 +643,7 @@ onMounted(() => {
     z-index: 100;
     flex-shrink: 0;
     scrollbar-width: thin;
-    scrollbar-color: #333 #121212;
+    scrollbar-color: #1a2a4a #080f25;
 }
 
 .main-content {
@@ -737,12 +732,12 @@ onMounted(() => {
 
 .nav-link-home:hover {
     color: white;
-    background: #222;
+    background: rgba(255,255,255,0.06);
 }
 
 .sidebar-divider {
     height: 1px;
-    background: #222;
+    background: rgba(0, 200, 83, 0.1);
     margin: 10px 0;
 }
 
@@ -767,14 +762,15 @@ onMounted(() => {
     justify-content: space-between;
     align-items: center;
     margin-bottom: 40px;
-    background: linear-gradient(90deg, #111, #1a1a1a);
+    background: linear-gradient(135deg, #080f25 0%, #0a1a20 100%);
     padding: 30px;
     border-radius: 16px;
-    border: 1px solid #222;
+    border: 1px solid rgba(0, 200, 83, 0.12);
     flex-wrap: wrap;
     gap: 20px;
     position: relative;
     z-index: 10;
+    box-shadow: 0 8px 32px rgba(0, 20, 40, 0.3);
 }
 
 .score-card {
@@ -806,10 +802,10 @@ onMounted(() => {
 
 .q-item {
     text-align: center;
-    background: #000;
+    background: rgba(8, 15, 37, 0.9);
     padding: 15px 25px;
     border-radius: 12px;
-    border: 1px solid #222;
+    border: 1px solid rgba(0, 200, 83, 0.15);
 }
 
 .q-val {
@@ -842,7 +838,7 @@ onMounted(() => {
         box-shadow: 5px 0 15px rgba(0, 0, 0, 0.5);
         height: 100%;
         overflow-y: auto;
-        background: #121212;
+        background: linear-gradient(160deg, #080f25 0%, #0a1228 100%);
     }
 
     .sidebar.open {
@@ -876,10 +872,10 @@ onMounted(() => {
 }
 
 .stat-box {
-    background: #161616;
+    background: rgba(8, 15, 37, 0.8);
     padding: 25px;
     border-radius: 12px;
-    border: 1px solid #333;
+    border: 1px solid rgba(56, 189, 248, 0.1);
     text-align: center;
 }
 
@@ -909,10 +905,10 @@ onMounted(() => {
 }
 
 .impact-message {
-    background: linear-gradient(45deg, #161616, #1a1a1a);
+    background: linear-gradient(135deg, #080f25, #091a12);
     padding: 30px;
     border-radius: 16px;
-    border: 1px solid #333;
+    border: 1px solid rgba(0, 200, 83, 0.15);
     text-align: center;
     border-left: 5px solid #00c853;
 }
@@ -937,10 +933,10 @@ onMounted(() => {
     display: flex;
     justify-content: space-between;
     align-items: center;
-    background: #161616;
+    background: rgba(8, 15, 37, 0.8);
     padding: 20px;
     border-radius: 12px;
-    border: 1px solid #333;
+    border: 1px solid rgba(56, 189, 248, 0.1);
 }
 
 .h-left {
@@ -951,7 +947,7 @@ onMounted(() => {
 
 .h-icon {
     font-size: 1.5rem;
-    background: #222;
+    background: rgba(56, 189, 248, 0.08);
     width: 50px;
     height: 50px;
     display: flex;
@@ -1001,8 +997,8 @@ onMounted(() => {
 }
 
 .package-card {
-    background: #161616;
-    border: 1px solid #333;
+    background: rgba(8, 15, 37, 0.9);
+    border: 1px solid rgba(56, 189, 248, 0.1);
     padding: 30px;
     border-radius: 16px;
     text-align: center;

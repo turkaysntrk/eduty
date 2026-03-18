@@ -2,8 +2,30 @@
 // Bu sayfa Firebase auth kullandığı için SSR kapatılmıştır
 definePageMeta({ ssr: false })
 
-import { ref, reactive } from 'vue'
+import { ref, reactive, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
+
+const particlesBg = ref(null)
+
+onMounted(() => {
+  // Parçacıkları oluştur
+  const container = particlesBg.value
+  if (!container) return
+  for (let i = 0; i < 22; i++) {
+    const p = document.createElement('div')
+    p.className = 'particle'
+    const size = Math.random() * 3 + 1.5
+    p.style.cssText = `
+      width: ${size}px;
+      height: ${size}px;
+      left: ${Math.random() * 100}%;
+      bottom: ${Math.random() * 10}%;
+      animation-duration: ${4 + Math.random() * 6}s;
+      animation-delay: ${Math.random() * 6}s;
+    `
+    container.appendChild(p)
+  }
+})
 import { 
   signInWithEmailAndPassword, 
   createUserWithEmailAndPassword, 
@@ -176,12 +198,15 @@ const handleForgot = async () => {
 
 <template>
   <div class="auth-page">
+    <div class="particles-bg" ref="particlesBg"></div>
     <div class="auth-container">
       
       <div v-if="currentView === 'login'" class="auth-box">
         <div class="brand-header">
           <img src="/img/eduty_logo.png" alt="Logo" class="site-logo" />
-          <span class="site-name">EDUTY</span>
+          <div class="eduty-text">
+            <span>e</span><span>d</span><span>u</span><span>t</span><span>y</span>
+          </div>
         </div>
 
         <h1>Giriş Yap</h1>
@@ -221,7 +246,9 @@ const handleForgot = async () => {
       <div v-else-if="currentView === 'register'" class="auth-box register-box">
         <div class="brand-header">
           <img src="/img/eduty_logo.png" alt="Logo" class="site-logo" />
-          <span class="site-name">EDUTY</span>
+          <div class="eduty-text">
+            <span>e</span><span>d</span><span>u</span><span>t</span><span>y</span>
+          </div>
         </div>
 
         <div v-if="registerStep === 1">
@@ -386,7 +413,9 @@ const handleForgot = async () => {
       <div v-else-if="currentView === 'forgot'" class="auth-box">
         <div class="brand-header">
           <img src="/img/eduty_logo.png" alt="Logo" class="site-logo" />
-          <span class="site-name">EDUTY</span>
+          <div class="eduty-text">
+            <span>e</span><span>d</span><span>u</span><span>t</span><span>y</span>
+          </div>
         </div>
 
         <h1>Şifre Yenileme</h1>
@@ -409,28 +438,78 @@ const handleForgot = async () => {
 </template>
 
 <style scoped>
+@import url('https://fonts.googleapis.com/css2?family=Playfair+Display:wght@700;900&family=DM+Sans:wght@400;500;600&display=swap');
+
 /* Sayfa Genel Yapısı */
 .auth-page {
   min-height: 100vh;
-  padding: 80px 20px 40px; 
+  padding: 90px 20px 50px;
   display: flex;
   align-items: center;
   justify-content: center;
-  background-color: #050505;
+  background: linear-gradient(135deg, #060d1f, #0b1c42, #060d1f, #07152e, #0d1f4a, #060d1f);
+  background-size: 400% 400%;
+  animation: gradientShift 10s ease infinite;
+  position: relative;
+  overflow: hidden;
+}
+
+@keyframes gradientShift {
+  0%   { background-position: 0% 50%; }
+  50%  { background-position: 100% 50%; }
+  100% { background-position: 0% 50%; }
+}
+
+/* Nokta deseni (sabit) */
+.auth-page::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background-image: radial-gradient(circle at 1px 1px, rgba(56, 189, 248, 0.05) 1px, transparent 0);
+  background-size: 36px 36px;
+  pointer-events: none;
+  z-index: 0;
+}
+
+/* Parçacık kapsayıcı */
+.particles-bg {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 0;
+  overflow: hidden;
+}
+
+.particle {
+  position: absolute;
+  border-radius: 50%;
+  background: rgba(56, 189, 248, 0.7);
+  animation: floatUp linear infinite;
+  opacity: 0;
+}
+
+@keyframes floatUp {
+  0%   { transform: translateY(0) scale(1); opacity: 0; }
+  10%  { opacity: 1; }
+  85%  { opacity: 0.5; }
+  100% { transform: translateY(-100vh) scale(0.3); opacity: 0; }
 }
 
 .auth-container {
   width: 100%;
-  max-width: 450px; 
+  max-width: 460px;
+  position: relative;
+  z-index: 1;
 }
 
 .auth-box {
-  background: #111;
-  padding: 40px 30px;
-  border-radius: 12px;
-  border: 1px solid #222;
-  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
+  background: rgba(10, 18, 45, 0.85);
+  padding: 44px 34px;
+  border-radius: 20px;
+  border: 1px solid rgba(56, 189, 248, 0.15);
+  box-shadow: 0 24px 64px rgba(0, 20, 80, 0.5);
   text-align: center;
+  backdrop-filter: blur(16px);
 }
 
 .brand-header {
@@ -438,39 +517,55 @@ const handleForgot = async () => {
   align-items: center;
   justify-content: center;
   gap: 12px;
-  margin-bottom: 25px;
+  margin-bottom: 28px;
 }
 
 .site-logo {
-  height: 50px;
+  height: 44px;
   width: auto;
   object-fit: contain;
+  filter: drop-shadow(0 0 6px rgba(26, 107, 255, 0.35));
 }
 
-.site-name {
-  font-family: 'Times New Roman', Times, serif;
-  font-size: 1.5rem;
-  font-weight: 700;
-  color: #ffffff;
+.eduty-text {
+  font-size: 1.8rem;
+  font-weight: 800;
   letter-spacing: 2px;
-  text-transform: uppercase;
+  display: flex;
+  gap: 1px;
+  font-family: 'DM Sans', sans-serif;
+}
+
+.eduty-text span:nth-child(1),
+.eduty-text span:nth-child(2) {
+  color: #4d94ff;
+  text-shadow: 0 0 10px rgba(77, 148, 255, 0.4);
+}
+
+.eduty-text span:nth-child(3),
+.eduty-text span:nth-child(4),
+.eduty-text span:nth-child(5) {
+  color: #38bdf8;
+  text-shadow: 0 0 10px rgba(56, 189, 248, 0.3);
 }
 
 h1 {
-  font-family: 'Times New Roman', Times, serif;
-  font-size: 1.8rem;
-  margin-bottom: 10px;
+  font-family: 'Playfair Display', serif;
+  font-size: 1.75rem;
+  margin-bottom: 8px;
   color: #ffffff;
+  font-weight: 700;
 }
 
 .subtitle {
-  color: #888;
+  color: rgba(255, 255, 255, 0.45);
   font-size: 0.9rem;
-  margin-bottom: 30px;
+  margin-bottom: 28px;
+  font-family: 'DM Sans', sans-serif;
 }
 
 .input-group, .input-row {
-  margin-bottom: 15px;
+  margin-bottom: 14px;
 }
 
 .input-row.two-col {
@@ -480,27 +575,35 @@ h1 {
 
 input, select {
   width: 100%;
-  padding: 12px 15px;
-  background: #1a1a1a;
-  border: 1px solid #333;
-  border-radius: 8px;
+  padding: 12px 16px;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1.5px solid rgba(56, 189, 248, 0.15);
+  border-radius: 10px;
   color: white;
-  font-size: 1rem;
+  font-size: 0.95rem;
+  font-family: 'DM Sans', sans-serif;
   transition: 0.3s;
 }
 
+input::placeholder { color: rgba(255,255,255,0.3); }
+
 input:focus, select:focus {
   outline: none;
-  border-color: #0055ff;
+  border-color: #38bdf8;
+  background: rgba(56, 189, 248, 0.06);
+  box-shadow: 0 0 0 3px rgba(56, 189, 248, 0.1);
 }
+
+select option { background: #0a1228; color: white; }
 
 .login-options {
   display: flex;
   justify-content: space-between;
   align-items: center;
   margin-bottom: 20px;
-  font-size: 0.9rem;
-  color: #ccc;
+  font-size: 0.88rem;
+  color: rgba(255,255,255,0.55);
+  font-family: 'DM Sans', sans-serif;
 }
 
 .remember-me {
@@ -510,58 +613,62 @@ input:focus, select:focus {
   cursor: pointer;
 }
 
-.remember-me input {
-  width: auto;
-  margin: 0;
-}
+.remember-me input { width: auto; margin: 0; }
 
 .btn-primary {
   width: 100%;
-  padding: 12px;
-  background: #0055ff;
+  padding: 13px;
+  background: linear-gradient(135deg, #1a6bff, #0a4fd6);
   color: white;
   border: none;
-  border-radius: 8px;
+  border-radius: 10px;
   font-weight: 600;
+  font-family: 'DM Sans', sans-serif;
+  font-size: 0.97rem;
+  cursor: pointer;
+  margin-top: 10px;
+  transition: 0.3s;
+  box-shadow: 0 4px 16px rgba(26, 107, 255, 0.35);
+}
+
+.btn-primary:hover {
+  background: linear-gradient(135deg, #38bdf8, #1a6bff);
+  box-shadow: 0 6px 24px rgba(56, 189, 248, 0.4);
+  transform: translateY(-1px);
+}
+
+.btn-secondary {
+  width: 100%;
+  padding: 11px;
+  background: transparent;
+  color: rgba(255,255,255,0.45);
+  border: 1.5px solid rgba(255,255,255,0.1);
+  border-radius: 10px;
+  font-weight: 500;
+  font-family: 'DM Sans', sans-serif;
   cursor: pointer;
   margin-top: 10px;
   transition: 0.3s;
 }
 
-.btn-primary:hover {
-  background: #003bb0;
-}
-
-.btn-secondary {
-  width: 100%;
-  padding: 10px;
-  background: transparent;
-  color: #888;
-  border: 1px solid #333;
-  border-radius: 8px;
-  font-weight: 500;
-  cursor: pointer;
-  margin-top: 10px;
-}
 .btn-secondary:hover {
-  border-color: #666;
-  color: white;
+  border-color: rgba(255,255,255,0.35);
+  color: rgba(255,255,255,0.8);
 }
 
 .role-selector {
   display: flex;
   flex-direction: column;
-  gap: 15px;
+  gap: 14px;
   margin-bottom: 20px;
 }
 
 .role-card {
-  background: #1a1a1a;
-  border: 1px solid #333;
+  background: rgba(255,255,255,0.03);
+  border: 1.5px solid rgba(56, 189, 248, 0.12);
   padding: 20px;
-  border-radius: 10px;
+  border-radius: 14px;
   cursor: pointer;
-  text-align: left;
   transition: 0.3s;
   display: flex;
   flex-direction: column;
@@ -570,60 +677,66 @@ input:focus, select:focus {
 }
 
 .role-card:hover {
-  border-color: #0055ff;
-  background: #222;
+  border-color: rgba(56, 189, 248, 0.5);
+  background: rgba(26, 107, 255, 0.08);
+  transform: translateY(-2px);
+  box-shadow: 0 8px 24px rgba(26, 107, 255, 0.2);
 }
 
-.role-icon {
-  font-size: 2rem;
-  margin-bottom: 10px;
-}
+.role-icon { font-size: 2rem; margin-bottom: 10px; }
 
 .role-card h3 {
   color: white;
-  font-size: 1.1rem;
+  font-size: 1.05rem;
   margin-bottom: 5px;
+  font-family: 'Playfair Display', serif;
 }
 
 .role-card p {
-  color: #888;
-  font-size: 0.85rem;
+  color: rgba(255,255,255,0.45);
+  font-size: 0.84rem;
   margin: 0;
+  font-family: 'DM Sans', sans-serif;
 }
 
-.file-group {
-  text-align: left;
-}
+.file-group { text-align: left; }
+
 .file-group label {
   display: block;
-  font-size: 0.85rem;
-  color: #aaa;
-  margin-bottom: 5px;
-}
-.file-group input[type="file"] {
-  padding: 8px;
-  font-size: 0.9rem;
+  font-size: 0.84rem;
+  color: rgba(255,255,255,0.45);
+  margin-bottom: 6px;
+  font-family: 'DM Sans', sans-serif;
 }
 
+.file-group input[type="file"] { padding: 8px; font-size: 0.88rem; }
+
 .forgot-link, .switch-text a, .support-text a {
-  color: #0055ff;
+  color: #38bdf8;
   text-decoration: none;
+  transition: 0.2s;
+}
+
+.forgot-link:hover, .switch-text a:hover, .support-text a:hover {
+  color: white;
 }
 
 .auth-footer {
-  margin-top: 20px;
-  border-top: 1px solid #222;
-  padding-top: 15px;
+  margin-top: 22px;
+  border-top: 1px solid rgba(255,255,255,0.07);
+  padding-top: 18px;
 }
 
 .switch-text {
-  font-size: 0.9rem;
-  color: #888;
+  font-size: 0.88rem;
+  color: rgba(255,255,255,0.4);
   margin-bottom: 8px;
+  font-family: 'DM Sans', sans-serif;
 }
 
 .support-text {
-  font-size: 0.9rem;
-  color: #888;
+  font-size: 0.88rem;
+  color: rgba(255,255,255,0.4);
+  font-family: 'DM Sans', sans-serif;
 }
 </style>
