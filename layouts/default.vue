@@ -317,7 +317,6 @@ nav.scrolled {
 }
 
 .links a:hover,
-.links a.router-link-active,
 .links button:hover {
   color: white;
   background: rgba(56, 189, 248, 0.1);
@@ -325,6 +324,7 @@ nav.scrolled {
 
 .links a.router-link-active {
   color: #38bdf8;
+  background: transparent;
 }
 
 /* ===== NAV BUTONLAR ===== */

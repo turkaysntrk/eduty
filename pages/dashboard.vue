@@ -1716,6 +1716,7 @@ onMounted(() => {
     position: relative;
     display: inline-block;
     margin-bottom: 15px;
+    isolation: isolate; /* kendi stacking context oluşturur */
 }
 
 .avatar {
@@ -1724,6 +1725,9 @@ onMounted(() => {
     border-radius: 50%;
     border: 3px solid #4d94ff;
     object-fit: cover;
+    position: relative;
+    z-index: 1; /* profil fotoğrafı en altta */
+    display: block;
 }
 
 .edit-profile-btn {
@@ -1741,7 +1745,7 @@ onMounted(() => {
     align-items: center;
     justify-content: center;
     transition: 0.2s;
-    z-index: 2;
+    z-index: 3; /* edit butonu en üstte */
 }
 
 .edit-profile-btn:hover {
@@ -1759,36 +1763,52 @@ onMounted(() => {
     font-weight: 700;
     text-transform: uppercase;
     background: #333;
+    z-index: 10;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.6);
+    white-space: nowrap;
 }
 
+/* Rütbe badge renkleri — Karate kuşak sıralamasına göre */
+/* Acemi = Beyaz kuşak */
 .rank-1 {
-    background: #555;
-    color: white;
+    background: rgba(240, 240, 240, 0.85);
+    color: #1a1a1a;
+    border: 1.5px solid rgba(200, 200, 200, 0.9);
 }
 
+/* Hırslı = Sarı kuşak */
 .rank-2 {
-    background: #ff9800;
-    color: black;
+    background: rgba(234, 179, 8, 0.85);
+    color: #1a1a1a;
+    border: 1.5px solid rgba(234, 179, 8, 1);
 }
 
+/* Kalfa = Turuncu kuşak */
 .rank-3 {
-    background: #00bcd4;
-    color: black;
+    background: rgba(234, 88, 12, 0.85);
+    color: #ffffff;
+    border: 1.5px solid rgba(234, 88, 12, 1);
 }
 
+/* Usta = Yeşil kuşak */
 .rank-4 {
-    background: #9c27b0;
-    color: white;
+    background: rgba(22, 163, 74, 0.85);
+    color: #ffffff;
+    border: 1.5px solid rgba(22, 163, 74, 1);
 }
 
+/* Doçent = Mavi kuşak */
 .rank-5 {
-    background: #f44336;
-    color: white;
+    background: rgba(37, 99, 235, 0.85);
+    color: #ffffff;
+    border: 1.5px solid rgba(37, 99, 235, 1);
 }
 
+/* Profesör = Siyah kuşak */
 .rank-6 {
-    background: linear-gradient(45deg, #ffd700, #ff8c00);
-    color: black;
+    background: rgba(15, 15, 15, 0.9);
+    color: #fbbf24;
+    border: 1.5px solid rgba(251, 191, 36, 0.8);
 }
 
 .user-name {
@@ -1913,12 +1933,12 @@ onMounted(() => {
     letter-spacing: 0.5px;
     border: 1px solid currentColor;
 }
-.rank-1 { color: #888; border-color: #444; background: rgba(100,100,100,0.1); }
-.rank-2 { color: #f59e0b; border-color: rgba(245,158,11,0.4); background: rgba(245,158,11,0.08); }
-.rank-3 { color: #6366f1; border-color: rgba(99,102,241,0.4); background: rgba(99,102,241,0.08); }
-.rank-4 { color: #0ea5e9; border-color: rgba(14,165,233,0.4); background: rgba(14,165,233,0.08); }
-.rank-5 { color: #10b981; border-color: rgba(16,185,129,0.4); background: rgba(16,185,129,0.08); }
-.rank-6 { color: #f97316; border-color: rgba(249,115,22,0.4); background: rgba(249,115,22,0.08); }
+.rank-1 { color: #888; border-color: #555; background: rgba(220,220,220,0.1); }
+.rank-2 { color: #ca8a04; border-color: rgba(234,179,8,0.6); background: rgba(234,179,8,0.4); }
+.rank-3 { color: #ea580c; border-color: rgba(234,88,12,0.5); background: rgba(234,88,12,0.4); }
+.rank-4 { color: #16a34a; border-color: rgba(22,163,74,0.5); background: rgba(22,163,74,0.4); }
+.rank-5 { color: #3b82f6; border-color: rgba(59,130,246,0.5); background: rgba(59,130,246,0.4); }
+.rank-6 { color: #fbbf24; border-color: rgba(251,191,36,0.5); background: rgba(15,15,15,0.8); }
 
 .score-progress-bar {
     width: 100%;
