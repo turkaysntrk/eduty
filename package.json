@@ -12,6 +12,8 @@
     "nuxt": "^3.13.0"
   },
   "dependencies": {
-    "firebase": "^11.10.0"
+    "dompurify": "^3.4.13",
+    "firebase": "^11.10.0",
+    "marked": "^18.0.9"
   }
 }

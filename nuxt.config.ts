@@ -4,6 +4,7 @@ export default defineNuxtConfig({
 
   // ── Güvenlik: env değişkenlerini runtime config'e bağla ──
   runtimeConfig: {
+    geminiApiKey: process.env.GEMINI_API_KEY, // sadece backend'de erişilebilir, güvenli
     public: {
       firebaseApiKey: process.env.NUXT_PUBLIC_FIREBASE_API_KEY,
       firebaseAuthDomain: process.env.NUXT_PUBLIC_FIREBASE_AUTH_DOMAIN,

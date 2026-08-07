@@ -56,7 +56,8 @@
             <div class="modal-content booking-modal">
                 <div class="modal-header">
                     <h3>Ders Zamanı Seç</h3>
-                    <p>Öğretmen: <span class="highlight-text">{{ selectedTeacherForBooking?.displayName || selectedTeacherForBooking?.email }}</span></p>
+                    <p>Öğretmen: <span class="highlight-text">{{ selectedTeacherForBooking?.displayName ||
+                        selectedTeacherForBooking?.email }}</span></p>
                 </div>
                 <div class="scheduler-grid">
                     <div v-if="availableSlots.length === 0" class="no-slots">
@@ -163,11 +164,9 @@
 
             <div class="test-runner-body">
                 <div class="pdf-container" ref="pdfContainer">
-                    <iframe 
+                    <iframe
                         :src="currentTest?.pdfUrl ? 'https://docs.google.com/viewer?url=' + encodeURIComponent(currentTest.pdfUrl) + '&embedded=true' : ''"
-                        class="pdf-frame"
-                        allow="autoplay"
-                    ></iframe>
+                        class="pdf-frame" allow="autoplay"></iframe>
                     <canvas ref="drawCanvas" class="drawing-canvas" @mousedown="startDrawing" @mousemove="draw"
                         @mouseup="stopDrawing" @mouseleave="stopDrawing"></canvas>
                 </div>
@@ -197,7 +196,8 @@
                             <h4>Test Sonucu</h4>
                             <div class="result-score-row">
                                 <div class="rs-item">
-                                    <span class="rs-val" :class="testResult.successPercent >= 70 ? 'rs-good' : testResult.successPercent >= 40 ? 'rs-mid' : 'rs-bad'">
+                                    <span class="rs-val"
+                                        :class="testResult.successPercent >= 70 ? 'rs-good' : testResult.successPercent >= 40 ? 'rs-mid' : 'rs-bad'">
                                         %{{ testResult.successPercent }}
                                     </span>
                                     <span class="rs-lab">Başarı</span>
@@ -216,9 +216,12 @@
                                 </div>
                             </div>
                             <div class="result-points" v-if="!currentTest?.practiceOnly">
-                                <span v-if="testResult.alreadyCompleted" class="no-pts">⚠️ Bu testi daha önce çözdün — tekrar puan verilmez</span>
-                                <span v-else-if="testResult.vaultEmpty" class="no-pts">⏸ Puan havuzu şu an boş — bağışçılar doldurunca puan alacaksın</span>
-                                <span v-else-if="testResult.finalPoints > 0">+{{ testResult.finalPoints }} puan kazandın 🎉</span>
+                                <span v-if="testResult.alreadyCompleted" class="no-pts">⚠️ Bu testi daha önce çözdün —
+                                    tekrar puan verilmez</span>
+                                <span v-else-if="testResult.vaultEmpty" class="no-pts">⏸ Puan havuzu şu an boş —
+                                    bağışçılar doldurunca puan alacaksın</span>
+                                <span v-else-if="testResult.finalPoints > 0">+{{ testResult.finalPoints }} puan kazandın
+                                    🎉</span>
                                 <span v-else class="no-pts">⚠️ Kamera izni olmadığı için puan yok</span>
                             </div>
                             <div class="result-points practice-note" v-else>
@@ -227,14 +230,12 @@
                         </div>
 
                         <div class="questions-list result-list">
-                            <div v-for="(row, idx) in testResult.questionReview" :key="idx"
-                                class="opt-row result-row"
+                            <div v-for="(row, idx) in testResult.questionReview" :key="idx" class="opt-row result-row"
                                 :class="'row-' + row.status">
                                 <span class="q-no">{{ row.no }}.</span>
                                 <div class="opt-options">
                                     <button v-for="opt in ['A', 'B', 'C', 'D', 'E']" :key="opt"
-                                        :class="getResultClass(row, opt)"
-                                        disabled>
+                                        :class="getResultClass(row, opt)" disabled>
                                         {{ opt }}
                                     </button>
                                 </div>
@@ -277,7 +278,9 @@
                 </div>
                 <h3 class="user-name">{{ userDisplayName || 'Öğrenci' }}</h3>
                 <p class="user-email">{{ userEmail }}</p>
-                <p v-if="userGrade" class="user-grade-info">{{ userGrade === 'Mezun' || userGrade === 13 ? 'Mezun' : userGrade + '. Sınıf' }}</p>
+                <p v-if="userGrade" class="user-grade-info">{{ userGrade === 'Mezun' || userGrade === 13 ? 'Mezun' :
+                    userGrade +
+                    '. Sınıf' }}</p>
             </div>
 
             <nav class="sidebar-nav">
@@ -310,6 +313,16 @@
                     <span class="icon">💬</span> Mesajlar
                 </button>
 
+                <button @click="{ activeTab = 'messages'; isSidebarOpen = false }"
+                    :class="{ active: activeTab === 'messages' }">
+                    <span class="icon">💬</span> Mesajlar
+                </button>
+
+                <button @click="{ activeTab = 'ai-solve'; isSidebarOpen = false }"
+                    :class="{ active: activeTab === 'ai-solve' }">
+                    <span class="icon">🤖</span> AI ile Soru Çöz
+                </button>
+
                 <div class="sidebar-divider"></div>
 
                 <NuxtLink to="/" class="nav-link-home" @click="isSidebarOpen = false">
@@ -328,7 +341,9 @@
                         {{ studentScore }} <span>/ 5.000 Puan</span>
                     </div>
                     <div class="score-progress-bar">
-                        <div class="score-progress-fill" :style="{ width: Math.min((studentScore / 5000) * 100, 100) + '%' }"></div>
+                        <div class="score-progress-fill"
+                            :style="{ width: Math.min((studentScore / 5000) * 100, 100) + '%' }">
+                        </div>
                     </div>
                     <div class="score-stats-row">
                         <div class="score-stat-item">
@@ -344,7 +359,8 @@
                         </div>
                         <div class="score-stat-divider"></div>
                         <div class="score-stat-item">
-                            <span class="ssi-val daily-pts-val">{{ dailyTestPoints }}<span class="ssi-max">/150</span></span>
+                            <span class="ssi-val daily-pts-val">{{ dailyTestPoints }}<span
+                                    class="ssi-max">/150</span></span>
                             <span class="ssi-lab">Günlük Puan</span>
                         </div>
                     </div>
@@ -406,7 +422,9 @@
                             <div v-for="test in testsForSelectedSubject" :key="test.id" class="test-card">
                                 <div class="test-header">
                                     <span class="badge-subject">{{ test.subject }}</span>
-                                    <span class="badge-grade">{{ test.grade === 'Mezun' ? 'Mezun' : test.grade + '.Sınıf' }}</span>
+                                    <span class="badge-grade">{{ test.grade === 'Mezun' ? 'Mezun' : test.grade +
+                                        '.Sınıf'
+                                        }}</span>
                                 </div>
                                 <h3>{{ test.title }}</h3>
                                 <div class="test-meta">
@@ -424,9 +442,7 @@
                                     </div>
                                 </div>
 
-                                <button class="btn-start-test" 
-                                    @click="openTestRunner(test)"
-                                    :disabled="isVaultEmpty"
+                                <button class="btn-start-test" @click="openTestRunner(test)" :disabled="isVaultEmpty"
                                     :class="{ 'btn-vault-empty': isVaultEmpty }"
                                     :title="isVaultEmpty ? 'Puan havuzu boş, testler geçici olarak pasif' : ''">
                                     {{ isVaultEmpty ? '⏸ Havuz Boş' : 'Testi Başlat' }}
@@ -455,11 +471,11 @@
                                 <span class="day-number" :class="{ 'today': isToday(date) }">{{ date }}</span>
                                 <div class="day-events">
                                     <div v-for="booking in getBookingsForDate(date)" :key="booking.id"
-                                        class="event-pill" :class="{ 'pill-cancelled': booking.status?.includes('cancelled') }">
+                                        class="event-pill"
+                                        :class="{ 'pill-cancelled': booking.status?.includes('cancelled') }">
                                         <span class="pill-text">{{ booking.time }} {{ booking.teacherName }}</span>
                                         <template v-if="!booking.status?.includes('cancelled')">
-                                            <button class="pill-enter-btn"
-                                                @click.stop="enterLessonStudent(booking)"
+                                            <button class="pill-enter-btn" @click.stop="enterLessonStudent(booking)"
                                                 title="Derse Gir">🎥</button>
                                             <button class="pill-cancel-btn"
                                                 @click.stop="cancelBookingByStudent(booking)"
@@ -490,8 +506,7 @@
 
                     <div class="teachers-grid" v-if="filteredTeachers.length > 0">
                         <div v-for="teacher in filteredTeachers" :key="teacher.id" class="teacher-card">
-                            <button class="btn-heart"
-                                :class="{ active: isFavorite(teacher.id) }"
+                            <button class="btn-heart" :class="{ active: isFavorite(teacher.id) }"
                                 @click.stop="toggleFavorite(teacher)"
                                 :title="isFavorite(teacher.id) ? 'Favorilerden Çıkar' : 'Favorilere Ekle'">
                                 {{ isFavorite(teacher.id) ? '❤️' : '🤍' }}
@@ -505,8 +520,10 @@
                                 <span class="badge">{{ teacher.branch || 'Branş Belirtilmedi' }}</span>
                                 <p v-if="teacher.bio" class="t-bio">{{ teacher.bio }}</p>
                                 <div class="teacher-meta-row">
-                                    <span class="t-time">🕒 {{ hasAvailability(teacher) ? 'Müsait' : 'Müsait Değil' }}</span>
-                                    <span v-if="teacher.lessonPrice > 0" class="t-price">💎 {{ teacher.lessonPrice }} puan/ders</span>
+                                    <span class="t-time">🕒 {{ hasAvailability(teacher) ? 'Müsait' : 'Müsait Değil'
+                                        }}</span>
+                                    <span v-if="teacher.lessonPrice > 0" class="t-price">💎 {{ teacher.lessonPrice }}
+                                        puan/ders</span>
                                     <span v-else class="t-price-free">🎁 Ücretsiz</span>
                                 </div>
                                 <button class="btn-request" @click="openBookingModal(teacher)">Ders Talep Et</button>
@@ -527,7 +544,8 @@
                     <h2 class="section-title">Favori Öğretmenlerim</h2>
                     <div v-if="myFavorites.length > 0" class="teachers-grid">
                         <div v-for="teacher in myFavorites" :key="teacher.id" class="teacher-card">
-                            <button class="btn-heart active" @click.stop="toggleFavorite(teacher)" title="Favorilerden Çıkar">❤️</button>
+                            <button class="btn-heart active" @click.stop="toggleFavorite(teacher)"
+                                title="Favorilerden Çıkar">❤️</button>
                             <div class="teacher-img">
                                 <img :src="teacher.avatar?.uploadedImage || teacher.avatar?.selectedPreset || 'https://ui-avatars.com/api/?name=' + (teacher.displayName || 'T')"
                                     style="width:100%; height:100%; border-radius:50%; object-fit:cover;" />
@@ -537,10 +555,12 @@
                                 <span class="badge">{{ teacher.branch }}</span>
                                 <span v-if="!teacher.isPublished" class="badge-offline">🔒 Yayında Değil</span>
                                 <div class="teacher-meta-row">
-                                    <span v-if="teacher.lessonPrice > 0" class="t-price">💎 {{ teacher.lessonPrice }} puan/ders</span>
+                                    <span v-if="teacher.lessonPrice > 0" class="t-price">💎 {{ teacher.lessonPrice }}
+                                        puan/ders</span>
                                     <span v-else class="t-price-free">🎁 Ücretsiz</span>
                                 </div>
-                                <button class="btn-request" :class="{ 'btn-request-disabled': !teacher.isPublished }" @click="openBookingModal(teacher)">
+                                <button class="btn-request" :class="{ 'btn-request-disabled': !teacher.isPublished }"
+                                    @click="openBookingModal(teacher)">
                                     {{ teacher.isPublished ? 'Ders Talep Et' : '🔒 Yayında Değil' }}
                                 </button>
                                 <button class="btn-message" @click="startChat(teacher)">💬 Mesaj At</button>
@@ -610,6 +630,25 @@
                     </div>
                 </div>
 
+                <div v-if="activeTab === 'ai-solve'" class="animate-fade">
+                    <h2 class="section-title">AI ile Soru Çöz</h2>
+                    <p style="color:#888; margin-bottom: 20px;">Anlamadığın bir sorunun fotoğrafını yükle, AI
+                        adım adım
+                        çözsün. (Bu bir ödev yardımcısıdır, sınav puanı vermez.)</p>
+
+                    <input type="file" accept="image/*" @change="onAiFileChange" />
+                    <div v-if="aiImagePreviewUrl" style="margin-top:15px;">
+                        <img :src="aiImagePreviewUrl" style="max-width:300px; border-radius:10px;" />
+                    </div>
+
+                    <button class="btn-start-test" style="margin-top:15px;" @click="solveWithAi"
+                        :disabled="aiLoading || !aiImageBase64">
+                        {{ aiLoading ? 'Çözülüyor...' : 'Soruyu Çöz' }}
+                    </button>
+
+                    <div v-if="aiAnswer" class="ai-answer-box" v-html="formattedAiAnswer"></div>
+                </div>
+
             </section>
         </main>
     </div>
@@ -621,6 +660,44 @@ import { useRouter } from 'vue-router'
 import { onAuthStateChanged, signOut, updateProfile } from 'firebase/auth'
 import { getFirestore, doc, getDoc, updateDoc, collection, getDocs, query, where, addDoc, onSnapshot, orderBy, serverTimestamp, deleteField, runTransaction } from 'firebase/firestore'
 import { getVaultBalance, withdrawFromVault } from '~/utils/mainVault.js'
+import { marked } from 'marked'
+import DOMPurify from 'dompurify'
+// AI Soru Çözme
+const aiImageBase64 = ref('')
+const aiImagePreviewUrl = ref('')
+const aiAnswer = ref('')
+const aiLoading = ref(false)
+const formattedAiAnswer = computed(() => {
+    if (!aiAnswer.value) return ''
+    return DOMPurify.sanitize(marked.parse(aiAnswer.value))
+})
+
+function onAiFileChange(e) {
+    const file = e.target.files[0]
+    if (!file) return
+    const reader = new FileReader()
+    reader.onload = () => {
+        aiImageBase64.value = reader.result.split(',')[1]
+        aiImagePreviewUrl.value = reader.result
+    }
+    reader.readAsDataURL(file)
+}
+
+async function solveWithAi() {
+    aiLoading.value = true
+    aiAnswer.value = ''
+    try {
+        const res = await $fetch('/api/solve', {
+            method: 'POST',
+            body: { imageBase64: aiImageBase64.value }
+        })
+        aiAnswer.value = res.answer
+    } catch (err) {
+        aiAnswer.value = 'Bir hata oluştu, tekrar dener misin?'
+    } finally {
+        aiLoading.value = false
+    }
+}
 
 const router = useRouter()
 const { $auth } = useNuxtApp()
@@ -779,7 +856,7 @@ const fetchTests = async () => {
         const snap = await getDocs(collection(db, 'tests'))
         availableTests.value = snap.docs.map(d => ({ id: d.id, ...d.data() }))
         console.log('[fetchTests] Yüklenen test sayısı:', availableTests.value.length)
-    } catch(e) {
+    } catch (e) {
         console.error('[fetchTests] HATA:', e.code, e.message)
         // permission-denied ise Firebase Rules'ta tests koleksiyonu için okuma izni yok
     }
@@ -865,8 +942,8 @@ const monthNames = ["Ocak", "Şubat", "Mart", "Nisan", "Mayıs", "Haziran", "Tem
         if (b.bookingDate) {
             const bookDate = new Date(b.bookingDate)
             return bookDate.getFullYear() === d.getFullYear() &&
-                   bookDate.getMonth() === d.getMonth() &&
-                   bookDate.getDate() === d.getDate()
+                bookDate.getMonth() === d.getMonth() &&
+                bookDate.getDate() === d.getDate()
         }
         // Eski kayıtlar için: sadece gün adı + ilk oluşturulma haftasıyla eşleştir
         if (b.day !== dayName) return false
@@ -908,7 +985,7 @@ const addToFavoritesById = async (teacherId) => {
         await updateDoc(doc(db, 'users', $auth.currentUser.uid), {
             favoriteTeacherIds: myFavorites.value.map(f => f.id)
         })
-    } catch(e) {
+    } catch (e) {
         console.error('Favori kaydedilemedi:', e)
     }
 }
@@ -931,7 +1008,7 @@ const fetchFavorites = async (savedFavIds) => {
         myFavorites.value = snaps
             .filter(s => s.exists())
             .map(s => ({ id: s.id, ...s.data() }))
-    } catch(e) {
+    } catch (e) {
         console.error('Favoriler yüklenemedi:', e)
         // Fallback: realTeachers'dan eşleştir
         myFavorites.value = realTeachers.value.filter(t => savedFavIds.includes(t.id))
@@ -953,7 +1030,7 @@ const toggleFavorite = async (teacher) => {
         await updateDoc(doc(db, 'users', $auth.currentUser.uid), {
             favoriteTeacherIds: favoriteIds
         })
-    } catch(e) {
+    } catch (e) {
         console.error('Favori kaydedilemedi:', e)
     }
 }
@@ -995,7 +1072,7 @@ const cancelBookingByStudent = async (booking) => {
         await fetchBookings()
         alert('✅ Randevu iptal edildi.' + (price > 0 ? `
 ${price} puan iade edildi.` : ''))
-    } catch(e) {
+    } catch (e) {
         console.error(`İptal hatası (adım: ${step}):`, e)
         // Booking güncellendi ama sonraki adım patlıyorsa kullanıcıya doğruyu söyle
         if (step !== 'booking') {
@@ -1254,8 +1331,8 @@ const finishTest = async () => {
     const answerKey = currentTest.value?.answerKey || []
     const review = buildReview(totalQuestions, answerKey)
     const correctCount = review.filter(r => r.status === 'correct').length
-    const wrongCount   = review.filter(r => r.status === 'wrong').length
-    const emptyCount   = review.filter(r => r.status === 'empty').length
+    const wrongCount = review.filter(r => r.status === 'wrong').length
+    const emptyCount = review.filter(r => r.status === 'empty').length
     const successPercent = totalQuestions > 0 ? Math.round((correctCount / totalQuestions) * 100) : 0
     const earnedPoints = Math.round(50 * (successPercent / 100))
 
@@ -1372,7 +1449,7 @@ const finishTest = async () => {
             completedTestCount.value = (current.completedTestCount || 0) + 1
             completedLessons.value = completedTestCount.value
             completedTestIds.value[currentTest.value.id] = { done: 1, successPercent, earnedPoints: 0 }
-        } catch(e) { console.error(e) }
+        } catch (e) { console.error(e) }
     }
 
     // Sonuç ekranını göster — testten çıkma, sonuçları gör
@@ -1392,7 +1469,7 @@ const finishTest = async () => {
 const buildReview = (totalQuestions, answerKey) => {
     return Array.from({ length: totalQuestions }, (_, i) => {
         const no = i + 1
-        const userAnswer   = userAnswers.value[i] || null
+        const userAnswer = userAnswers.value[i] || null
         const correctAnswer = answerKey[i] || null
         let status = 'empty'
         if (userAnswer) {
@@ -1609,7 +1686,7 @@ onMounted(() => {
 
 .nav-link-home:hover {
     color: white;
-    background: rgba(255,255,255,0.06);
+    background: rgba(255, 255, 255, 0.06);
 }
 
 .sidebar-divider {
@@ -1716,7 +1793,8 @@ onMounted(() => {
     position: relative;
     display: inline-block;
     margin-bottom: 15px;
-    isolation: isolate; /* kendi stacking context oluşturur */
+    isolation: isolate;
+    /* kendi stacking context oluşturur */
 }
 
 .avatar {
@@ -1726,7 +1804,8 @@ onMounted(() => {
     border: 3px solid #4d94ff;
     object-fit: cover;
     position: relative;
-    z-index: 1; /* profil fotoğrafı en altta */
+    z-index: 1;
+    /* profil fotoğrafı en altta */
     display: block;
 }
 
@@ -1745,7 +1824,8 @@ onMounted(() => {
     align-items: center;
     justify-content: center;
     transition: 0.2s;
-    z-index: 3; /* edit butonu en üstte */
+    z-index: 3;
+    /* edit butonu en üstte */
 }
 
 .edit-profile-btn:hover {
@@ -1875,7 +1955,7 @@ onMounted(() => {
     align-items: center;
     gap: 0;
     margin-top: 16px;
-    background: rgba(0,0,0,0.3);
+    background: rgba(0, 0, 0, 0.3);
     border: 1px solid #222;
     border-radius: 12px;
     overflow: hidden;
@@ -1918,7 +1998,9 @@ onMounted(() => {
     white-space: nowrap;
 }
 
-.daily-pts-val { color: #10b981 !important; }
+.daily-pts-val {
+    color: #10b981 !important;
+}
 
 .rank-display {
     display: flex;
@@ -1933,12 +2015,42 @@ onMounted(() => {
     letter-spacing: 0.5px;
     border: 1px solid currentColor;
 }
-.rank-1 { color: #888; border-color: #555; background: rgba(220,220,220,0.1); }
-.rank-2 { color: #ca8a04; border-color: rgba(234,179,8,0.6); background: rgba(234,179,8,0.4); }
-.rank-3 { color: #ea580c; border-color: rgba(234,88,12,0.5); background: rgba(234,88,12,0.4); }
-.rank-4 { color: #16a34a; border-color: rgba(22,163,74,0.5); background: rgba(22,163,74,0.4); }
-.rank-5 { color: #3b82f6; border-color: rgba(59,130,246,0.5); background: rgba(59,130,246,0.4); }
-.rank-6 { color: #fbbf24; border-color: rgba(251,191,36,0.5); background: rgba(15,15,15,0.8); }
+
+.rank-1 {
+    color: #888;
+    border-color: #555;
+    background: rgba(220, 220, 220, 0.1);
+}
+
+.rank-2 {
+    color: #ca8a04;
+    border-color: rgba(234, 179, 8, 0.6);
+    background: rgba(234, 179, 8, 0.4);
+}
+
+.rank-3 {
+    color: #ea580c;
+    border-color: rgba(234, 88, 12, 0.5);
+    background: rgba(234, 88, 12, 0.4);
+}
+
+.rank-4 {
+    color: #16a34a;
+    border-color: rgba(22, 163, 74, 0.5);
+    background: rgba(22, 163, 74, 0.4);
+}
+
+.rank-5 {
+    color: #3b82f6;
+    border-color: rgba(59, 130, 246, 0.5);
+    background: rgba(59, 130, 246, 0.4);
+}
+
+.rank-6 {
+    color: #fbbf24;
+    border-color: rgba(251, 191, 36, 0.5);
+    background: rgba(15, 15, 15, 0.8);
+}
 
 .score-progress-bar {
     width: 100%;
@@ -1949,6 +2061,7 @@ onMounted(() => {
     margin-top: 8px;
     overflow: hidden;
 }
+
 .score-progress-fill {
     height: 100%;
     background: linear-gradient(90deg, #4d94ff, #38bdf8);
@@ -1974,8 +2087,17 @@ onMounted(() => {
 }
 
 /* q-item artık score-card içinde .ssi-* ile değiştirildi */
-.q-val { display: block; font-size: 1.5rem; font-weight: 700; color: #4d94ff; }
-.q-lab { font-size: 0.8rem; color: #666; }
+.q-val {
+    display: block;
+    font-size: 1.5rem;
+    font-weight: 700;
+    color: #4d94ff;
+}
+
+.q-lab {
+    font-size: 0.8rem;
+    color: #666;
+}
 
 /* Diğer Bileşenler */
 .section-title {
@@ -2113,10 +2235,11 @@ onMounted(() => {
     transition: border-color 0.3s, box-shadow 0.3s, transform 0.3s;
     overflow: visible;
 }
+
 .teacher-card:hover {
     border-color: #0055ff;
     transform: translateY(-3px);
-    box-shadow: 0 8px 25px rgba(0,85,255,0.12);
+    box-shadow: 0 8px 25px rgba(0, 85, 255, 0.12);
 }
 
 /* Kalp butonu — sağ üst köşe */
@@ -2124,7 +2247,7 @@ onMounted(() => {
     position: absolute;
     top: 12px;
     right: 12px;
-    background: rgba(0,0,0,0.5);
+    background: rgba(0, 0, 0, 0.5);
     border: 1px solid #333;
     border-radius: 50%;
     width: 34px;
@@ -2138,8 +2261,17 @@ onMounted(() => {
     z-index: 2;
     backdrop-filter: blur(4px);
 }
-.btn-heart:hover { transform: scale(1.2); border-color: #ef4444; background: rgba(239,68,68,0.15); }
-.btn-heart.active { border-color: #ef4444; background: rgba(239,68,68,0.15); }
+
+.btn-heart:hover {
+    transform: scale(1.2);
+    border-color: #ef4444;
+    background: rgba(239, 68, 68, 0.15);
+}
+
+.btn-heart.active {
+    border-color: #ef4444;
+    background: rgba(239, 68, 68, 0.15);
+}
 
 /* Öğretmen biyografi */
 .t-bio {
@@ -2163,8 +2295,17 @@ onMounted(() => {
     margin: 6px 0;
 }
 
-.t-price { font-size: 0.8rem; color: #a78bfa; font-weight: 600; }
-.t-price-free { font-size: 0.8rem; color: #34d399; font-weight: 600; }
+.t-price {
+    font-size: 0.8rem;
+    color: #a78bfa;
+    font-weight: 600;
+}
+
+.t-price-free {
+    font-size: 0.8rem;
+    color: #34d399;
+    font-weight: 600;
+}
 
 .teacher-img {
     font-size: 2.5rem;
@@ -2956,7 +3097,7 @@ onMounted(() => {
     font-size: 0.8rem;
 }
 
-.calendar-grid-header > div {
+.calendar-grid-header>div {
     padding: 8px 2px;
     overflow: hidden;
     text-overflow: ellipsis;
@@ -3016,27 +3157,58 @@ onMounted(() => {
     gap: 4px;
     position: relative;
 }
-.pill-text { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; flex: 1; }
+
+.pill-text {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    flex: 1;
+}
+
 .pill-cancel-btn {
-    background: transparent; border: none;
-    color: rgba(255,255,255,0.7);
-    font-size: 0.6rem; cursor: pointer;
-    padding: 0; line-height: 1; flex-shrink: 0; transition: 0.15s;
+    background: transparent;
+    border: none;
+    color: rgba(255, 255, 255, 0.7);
+    font-size: 0.6rem;
+    cursor: pointer;
+    padding: 0;
+    line-height: 1;
+    flex-shrink: 0;
+    transition: 0.15s;
 }
+
 .pill-enter-btn {
-    background: transparent; border: none;
-    color: rgba(255,255,255,0.85);
-    font-size: 0.7rem; cursor: pointer;
-    padding: 0; line-height: 1; flex-shrink: 0; transition: 0.15s;
+    background: transparent;
+    border: none;
+    color: rgba(255, 255, 255, 0.85);
+    font-size: 0.7rem;
+    cursor: pointer;
+    padding: 0;
+    line-height: 1;
+    flex-shrink: 0;
+    transition: 0.15s;
 }
-.pill-enter-btn:hover { transform: scale(1.3); }
-.pill-cancel-btn:hover { color: #fca5a5; transform: scale(1.3); }
+
+.pill-enter-btn:hover {
+    transform: scale(1.3);
+}
+
+.pill-cancel-btn:hover {
+    color: #fca5a5;
+    transform: scale(1.3);
+}
+
 .event-pill.pill-cancelled {
     background: #333;
     text-decoration: line-through;
     opacity: 0.6;
 }
-.pill-cancelled-label { font-size: 0.58rem; color: #ef4444; flex-shrink: 0; }
+
+.pill-cancelled-label {
+    font-size: 0.58rem;
+    color: #ef4444;
+    flex-shrink: 0;
+}
 
 .teacher-actions-mini {
     display: flex;
@@ -3409,4 +3581,44 @@ onMounted(() => {
     border-radius: 4px;
 }
 
+/* AI cevap kutusu (markdown render) */
+.ai-answer-box {
+    margin-top: 20px;
+    background: #111;
+    padding: 20px;
+    border-radius: 10px;
+    color: #ddd;
+    line-height: 1.7;
+}
+
+.ai-answer-box h1,
+.ai-answer-box h2,
+.ai-answer-box h3 {
+    color: #fff;
+    margin: 16px 0 8px;
+}
+
+.ai-answer-box strong {
+    color: #fff;
+}
+
+.ai-answer-box ul,
+.ai-answer-box ol {
+    padding-left: 22px;
+    margin: 8px 0;
+}
+
+.ai-answer-box li {
+    margin: 4px 0;
+}
+
+.ai-answer-box hr {
+    border: none;
+    border-top: 1px solid #333;
+    margin: 16px 0;
+}
+
+.ai-answer-box p {
+    margin: 8px 0;
+}
 </style>
