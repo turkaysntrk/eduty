@@ -1,20 +1,92 @@
-export default defineEventHandler(async (event) => {
-    const config = useRuntimeConfig()
-    const body = await readBody(event) // { imageBase64: "...", question: "isteğe bağlı metin" }
+// ─────────────────────────────────────────────────────────────
+// Mod bazlı system prompt'lar.
+// Yeni bir mod eklemek istersen buraya bir anahtar daha eklemen yeterli.
+// ─────────────────────────────────────────────────────────────
+const SYSTEM_PROMPTS_BASE = {
+    fast: [
+        'Bu bir TYT/AYT sorusudur. Soruyu HIZLI ÇÖZÜM modunda çöz:',
+        '- Cevabı mümkün olduğunca kısa ve net tut, gereksiz uzun açıklama yapma.',
+        '- Sadece temel çözüm adımlarını göster, ekstra yorum ekleme.',
+        '- Sonunda net bir cevap ver.',
+        'Amaç: öğrencinin hızlıca kontrol edebileceği, sade bir çözüm.'
+    ].join('\n'),
 
+    detailed: [
+        'Bu bir TYT/AYT sorusudur. Soruyu DETAYLI ÇÖZÜM modunda, bir öğretmen gibi çöz:',
+        '- Soruyu dikkatle analiz et.',
+        '- Çözüm yöntemini adım adım açıkla.',
+        '- Neden bu yöntemin kullanıldığını belirt.',
+        '- Sorudaki kritik noktalara ve dikkat edilmesi gereken yerlere değin.',
+        '- Mümkünse sonucu tekrar kontrol et.',
+        '- Amaç öğrencinin konuyu gerçekten anlaması; sadece cevabı vermek yetmez.',
+        'Sonunda net bir final cevabı ver.'
+    ].join('\n')
+}
+
+// ─────────────────────────────────────────────────────────────
+// "Eduty formatı" — öğretici, düzenli cevap yapısı.
+// Her iki moda da eklenir; model bunu ZORUNLU değil, uygun olduğunda kullanır.
+// Markdown başlıkları (##) kullanılır çünkü frontend zaten marked + DOMPurify
+// ile markdown'ı render edip .ai-answer-box h1/h2/h3 stiliyle gösteriyor.
+// ─────────────────────────────────────────────────────────────
+const EDUTY_FORMAT_GUIDE = [
+    '',
+    'Eduty formatı (yalnızca konuyu gerçekten anlatmaya değer, öğretici bir soruysa kullan):',
+    '## Konu Başlığı',
+    'Cevabın hangi konuya ait olduğunu kısa ve net şekilde belirt (ör. "Newton\'un Hareket Yasaları").',
+    '## Kritik Bilgi',
+    'Öğrencinin mutlaka bilmesi gereken ana bilgiyi kısa ve belirgin şekilde ver. Gereksiz uzatma.',
+    '## Dikkat Edilmesi Gereken Yer',
+    'Bu konuda sık yapılan hataları, karıştırılan noktaları veya sınavda önemli olabilecek ayrıntıları, öğrencinin seviyesine uygun ve anlaşılır şekilde belirt.',
+    '',
+    'Bu başlıkları ZORUNLU tutma: soru çok kısa/basit ise (tek işlem, doğrudan hesaplama, evet/hayır gibi) başlık açma, sadece doğrudan ve sade bir çözüm ver. Yapıyı yalnızca gerçekten faydalı olduğu durumlarda kullan.'
+].join('\n')
+
+const SYSTEM_PROMPTS = {
+    fast: SYSTEM_PROMPTS_BASE.fast + '\n' + EDUTY_FORMAT_GUIDE,
+    detailed: SYSTEM_PROMPTS_BASE.detailed + '\n' + EDUTY_FORMAT_GUIDE
+}
+
+// ─────────────────────────────────────────────────────────────
+// "Daha basit anlat" için ayrı bir prompt.
+// Görsel gerekmez: var olan cevap metnini girdi olarak alıp
+// aynı Gemini modeliyle daha sade bir dille yeniden yazdırır.
+// ─────────────────────────────────────────────────────────────
+const SIMPLIFY_PROMPT = [
+    'Aşağıda bir öğrenciye verilmiş bir soru çözümü/açıklaması var.',
+    'Bunu, konuyu hiç bilmeyen veya zorlanan bir öğrencinin kolayca anlayabileceği şekilde,',
+    'günlük dille, gerekirse basit bir örnek veya benzetme kullanarak yeniden anlat.',
+    'Ders kitabı dilinden kaçın, sanki karşısında oturmuş sözlü anlatıyormuşsun gibi yaz.',
+    'Gereksiz uzatma; sade ve anlaşılır ol. Sonunda net bir özet/cevap ver.'
+].join('\n')
+
+// ─────────────────────────────────────────────────────────────
+// Mod bazlı model seçimi.
+// Şimdilik ikisi de aynı model. İleride 'detailed' için Gemini Pro'ya
+// geçmek istersen sadece bu satırı değiştirmen yeterli.
+// ─────────────────────────────────────────────────────────────
+const MODEL_BY_MODE = {
+    fast: 'gemini-3.6-flash',
+    detailed: 'gemini-3.6-flash'
+}
+
+const DEFAULT_MODE = 'fast'
+
+function resolveMode(rawMode) {
+    return rawMode === 'detailed' || rawMode === 'fast' ? rawMode : DEFAULT_MODE
+}
+
+function resolveAction(rawAction) {
+    return rawAction === 'simplify' ? 'simplify' : 'solve'
+}
+
+async function callGemini(config, model, parts) {
     const response = await fetch(
-        `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.6-flash:generateContent?key=${config.geminiApiKey}`,
+        `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${config.geminiApiKey}`,
         {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-                contents: [{
-                    parts: [
-                        { text: 'Bu bir TYT/AYT sorusu. Soruyu çöz, adım adım anlat, sonunda net bir cevap ver.' },
-                        { inline_data: { mime_type: 'image/jpeg', data: body.imageBase64 } }
-                    ]
-                }]
-            })
+            body: JSON.stringify({ contents: [{ parts }] })
         }
     )
 
@@ -22,10 +94,69 @@ export default defineEventHandler(async (event) => {
 
     if (!response.ok || data.error) {
         console.error('[solve] Gemini hata döndü:', JSON.stringify(data))
-        return { answer: 'Cevap alınamadı, tekrar dener misin?' }
+        return null
     }
 
-    const answer = data.candidates?.[0]?.content?.parts?.[0]?.text ?? 'Cevap alınamadı, tekrar dener misin?'
+    const candidate = data.candidates?.[0]
+    const finishReason = candidate?.finishReason
 
-    return { answer }
+    // Gemini, özellikle uzun/çok adımlı (detaylı) cevaplarda içeriği birden
+    // fazla "part" halinde döndürebilir. Sadece parts[0]'ı okumak, cevabın
+    // bir kısmının (hatta tamamının) sessizce kaybolmasına yol açıyordu.
+    const combinedText = (candidate?.content?.parts ?? [])
+        .map(p => p?.text ?? '')
+        .join('')
+        .trim()
+
+    if (!combinedText) {
+        console.error('[solve] Gemini boş/eksik cevap döndü. finishReason:', finishReason, JSON.stringify(data))
+        return null
+    }
+
+    return combinedText
+}
+
+// Mevcut akış: fotoğraftaki soruyu, seçilen moda göre çöz. (DEĞİŞTİRİLMEDİ)
+async function handleSolve(config, body) {
+    const mode = resolveMode(body.mode)
+    const systemPrompt = SYSTEM_PROMPTS[mode]
+    const model = MODEL_BY_MODE[mode]
+
+    const answer = await callGemini(config, model, [
+        { text: systemPrompt },
+        { inline_data: { mime_type: 'image/jpeg', data: body.imageBase64 } }
+    ])
+
+    return { answer: answer ?? 'Cevap alınamadı, tekrar dener misin?', mode }
+}
+
+// Yeni akış: "Daha basit anlat" — var olan cevabı görsel olmadan, sadece
+// metin girdisiyle daha sade bir dille yeniden anlattırır.
+async function handleSimplify(config, body) {
+    const previousAnswer = (body.previousAnswer || '').trim()
+
+    if (!previousAnswer) {
+        return { answer: 'Basitleştirilecek bir cevap bulunamadı, tekrar dener misin?', action: 'simplify' }
+    }
+
+    const model = MODEL_BY_MODE.fast // basitleştirme hafif bir görev, hızlı model yeterli
+
+    const answer = await callGemini(config, model, [
+        { text: `${SIMPLIFY_PROMPT}\n\n---\nÖnceki cevap:\n${previousAnswer}` }
+    ])
+
+    return { answer: answer ?? 'Basitleştirilemedi, tekrar dener misin?', action: 'simplify' }
+}
+
+export default defineEventHandler(async (event) => {
+    const config = useRuntimeConfig()
+    const body = await readBody(event) // { imageBase64, mode: "fast"|"detailed", action?: "solve"|"simplify", previousAnswer? }
+
+    const action = resolveAction(body.action)
+
+    if (action === 'simplify') {
+        return await handleSimplify(config, body)
+    }
+
+    return await handleSolve(config, body)
 })

@@ -313,14 +313,14 @@
                     <span class="icon">💬</span> Mesajlar
                 </button>
 
-                <button @click="{ activeTab = 'messages'; isSidebarOpen = false }"
-                    :class="{ active: activeTab === 'messages' }">
-                    <span class="icon">💬</span> Mesajlar
-                </button>
-
                 <button @click="{ activeTab = 'ai-solve'; isSidebarOpen = false }"
                     :class="{ active: activeTab === 'ai-solve' }">
                     <span class="icon">🤖</span> AI ile Soru Çöz
+                </button>
+
+                <button @click="{ activeTab = 'ai-feedback-history'; isSidebarOpen = false; fetchFeedbackHistory() }"
+                    :class="{ active: activeTab === 'ai-feedback-history' }">
+                    <span class="icon">📋</span> Geri Bildirimlerim
                 </button>
 
                 <div class="sidebar-divider"></div>
@@ -636,17 +636,110 @@
                         adım adım
                         çözsün. (Bu bir ödev yardımcısıdır, sınav puanı vermez.)</p>
 
+                    <div class="ai-mode-header">
+                        <span class="ai-mode-label">Ders</span>
+                    </div>
+                    <select v-model="aiSubject" class="modal-select">
+                        <option value="" disabled>Ders seç</option>
+                        <option v-for="l in lessons" :key="l" :value="l">{{ l }}</option>
+                    </select>
+
+                    <div class="ai-mode-header">
+                        <span class="ai-mode-label">Çözüm Modu</span>
+                        <button type="button" class="ai-mode-info-btn" @click="isAiModeInfoOpen = !isAiModeInfoOpen"
+                            aria-label="Mod bilgisi">?</button>
+                    </div>
+                    <div v-if="isAiModeInfoOpen" class="ai-mode-info-box">
+                        <p><strong>⚡ Hızlı Çözüm:</strong> Kısa, sade ve hızlı bir çözüm. Günlük, kolay/orta
+                            seviyeli sorular ve hızlı kontrol için uygundur.</p>
+                        <p><strong>🧠 Detaylı Çözüm:</strong> Adım adım, öğretici ve gerekçeli bir çözüm. Zor
+                            veya anlamakta zorlandığın sorular için uygundur.</p>
+                    </div>
+
+                    <div class="ai-mode-select">
+                        <button type="button" class="ai-mode-card" :class="{ active: aiMode === 'fast' }"
+                            @click="aiMode = 'fast'">
+                            <span class="ai-mode-icon">⚡</span>
+                            <span class="ai-mode-title">Hızlı Çözüm</span>
+                            <span class="ai-mode-desc">Günlük sorular için hızlı ve kısa çözüm</span>
+                        </button>
+                        <button type="button" class="ai-mode-card" :class="{ active: aiMode === 'detailed' }"
+                            @click="aiMode = 'detailed'">
+                            <span class="ai-mode-icon">🧠</span>
+                            <span class="ai-mode-title">Detaylı Çözüm</span>
+                            <span class="ai-mode-desc">Zor sorular için daha ayrıntılı ve öğretici çözüm</span>
+                        </button>
+                    </div>
+
                     <input type="file" accept="image/*" @change="onAiFileChange" />
                     <div v-if="aiImagePreviewUrl" style="margin-top:15px;">
                         <img :src="aiImagePreviewUrl" style="max-width:300px; border-radius:10px;" />
                     </div>
 
                     <button class="btn-start-test" style="margin-top:15px;" @click="solveWithAi"
-                        :disabled="aiLoading || !aiImageBase64">
+                        :disabled="aiLoading || !aiImageBase64 || !aiSubject">
                         {{ aiLoading ? 'Çözülüyor...' : 'Soruyu Çöz' }}
                     </button>
 
-                    <div v-if="aiAnswer" class="ai-answer-box" v-html="formattedAiAnswer"></div>
+                    <div v-if="aiAnswer" class="ai-answer-box animate-fade" v-html="formattedAiAnswer"></div>
+
+                    <button v-if="aiAnswer" type="button" class="btn-simplify" @click="simplifyAiAnswer"
+                        :disabled="aiSimplifying || aiLoading">
+                        💡 {{ aiSimplifying ? 'Basitleştiriliyor...' : 'Daha basit anlat' }}
+                    </button>
+
+                    <div v-if="aiAnswerId" class="ai-feedback-row">
+                        <Transition name="feedback-fade" mode="out-in">
+                            <div v-if="!aiFeedback" key="ask" class="ai-feedback-ask">
+                                <span class="ai-feedback-label">Bu cevap faydalı oldu mu?</span>
+                                <div class="ai-feedback-buttons">
+                                    <button type="button" class="ai-feedback-btn" :disabled="aiFeedbackSaving"
+                                        @click="submitAiFeedback('useful')">
+                                        👍 Faydalı
+                                    </button>
+                                    <button type="button" class="ai-feedback-btn" :disabled="aiFeedbackSaving"
+                                        @click="submitAiFeedback('not_useful')">
+                                        👎 Faydalı değil
+                                    </button>
+                                </div>
+                            </div>
+                            <div v-else key="done" class="ai-feedback-done">
+                                <span class="ai-feedback-tick">✓</span>
+                                <div class="ai-feedback-done-text">
+                                    <strong>Geri bildiriminiz için teşekkürler!</strong>
+                                    <small>Gelişmemize katkıda bulundunuz.</small>
+                                </div>
+                            </div>
+                        </Transition>
+                    </div>
+                </div>
+
+                <div v-if="activeTab === 'ai-feedback-history'" class="animate-fade">
+                    <h2 class="section-title">Geri Bildirimlerim</h2>
+                    <p style="color:#888; margin-bottom: 20px;">AI cevaplarına verdiğin "Faydalı" / "Faydalı değil"
+                        geri bildirimlerin burada listelenir.</p>
+
+                    <select v-model="feedbackHistoryFilter" class="modal-select" style="margin-bottom:20px;">
+                        <option value="">Tüm Dersler</option>
+                        <option v-for="l in feedbackHistorySubjects" :key="l" :value="l">{{ l }}</option>
+                    </select>
+
+                    <div v-if="feedbackHistoryLoading" class="empty-state">Yükleniyor...</div>
+                    <div v-else-if="filteredFeedbackHistory.length === 0" class="empty-state">
+                        {{ feedbackHistoryFilter ? 'Bu ders için henüz geri bildirim yok.' : 'Henüz geri bildirim vermedin.' }}
+                    </div>
+                    <div v-else class="feedback-history-list">
+                        <div v-for="item in filteredFeedbackHistory" :key="item.id" class="feedback-history-item">
+                            <div class="fh-top">
+                                <span class="fh-subject">{{ item.subject || 'Belirtilmemiş' }}</span>
+                                <span class="fh-type" :class="item.feedback === 'useful' ? 'fh-useful' : 'fh-not-useful'">
+                                    {{ item.feedback === 'useful' ? '👍 Faydalı' : '👎 Faydalı değil' }}
+                                </span>
+                            </div>
+                            <p class="fh-preview">{{ item.answerPreview || 'Önizleme yok' }}</p>
+                            <span class="fh-date">{{ formatFeedbackDate(item.createdAt) }}</span>
+                        </div>
+                    </div>
                 </div>
 
             </section>
@@ -655,7 +748,7 @@
 </template>
 
 <script setup>
-import { ref, reactive, computed, onMounted, nextTick } from 'vue'
+import { ref, reactive, computed, onMounted, onUnmounted, nextTick } from 'vue'
 import { useRouter } from 'vue-router'
 import { onAuthStateChanged, signOut, updateProfile } from 'firebase/auth'
 import { getFirestore, doc, getDoc, updateDoc, collection, getDocs, query, where, addDoc, onSnapshot, orderBy, serverTimestamp, deleteField, runTransaction } from 'firebase/firestore'
@@ -667,9 +760,108 @@ const aiImageBase64 = ref('')
 const aiImagePreviewUrl = ref('')
 const aiAnswer = ref('')
 const aiLoading = ref(false)
+const aiMode = ref('fast') // 'fast' | 'detailed' — varsayılan: Hızlı Çözüm
+const isAiModeInfoOpen = ref(false)
+const aiSimplifying = ref(false)
+const aiSubject = ref('') // Geri bildirimi ders bazında ayırmak için seçilen ders
+const aiAnswerId = ref('') // Her yeni cevap için üretilen benzersiz kimlik
+const aiFeedback = ref('') // '' | 'useful' | 'not_useful' — mevcut cevap için
+const aiFeedbackSaving = ref(false)
+
+// Dashboard → Geri Bildirimlerim: öğrencinin verdiği tüm geri bildirimlerin listesi
+const feedbackHistory = ref([])
+const feedbackHistoryLoading = ref(false)
+const feedbackHistoryFilter = ref('') // '' = tüm dersler
+
+const feedbackHistorySubjects = computed(() => {
+    const set = new Set(feedbackHistory.value.map(f => f.subject).filter(Boolean))
+    return Array.from(set)
+})
+
+const filteredFeedbackHistory = computed(() => {
+    if (!feedbackHistoryFilter.value) return feedbackHistory.value
+    return feedbackHistory.value.filter(f => f.subject === feedbackHistoryFilter.value)
+})
+
+function formatFeedbackDate(ts) {
+    if (!ts) return ''
+    const date = ts.toDate ? ts.toDate() : new Date(ts)
+    if (isNaN(date.getTime())) return ''
+    return date.toLocaleString('tr-TR', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' })
+}
+
+// Firestore'daki 'aiFeedback' koleksiyonu zaten geri bildirim gönderirken kullanılıyor
+// (bkz. submitAiFeedback). Burada aynı koleksiyondan sadece mevcut öğrencinin
+// kayıtlarını çekiyoruz — ayrı bir veri modeli/koleksiyon oluşturmuyoruz.
+async function fetchFeedbackHistory() {
+    if (!$auth.currentUser) return
+    feedbackHistoryLoading.value = true
+    try {
+        if (!db) db = getFirestore()
+        const uid = $auth.currentUser.uid
+        const q = query(
+            collection(db, 'aiFeedback'),
+            where('studentId', '==', uid),
+            orderBy('createdAt', 'desc')
+        )
+        const snapshot = await getDocs(q)
+        feedbackHistory.value = snapshot.docs.map(d => ({ id: d.id, ...d.data() }))
+    } catch (e) {
+        console.error('Geri bildirim geçmişi alınamadı', e)
+    } finally {
+        feedbackHistoryLoading.value = false
+    }
+}
+
+// Firestore dokümanına kaydetmek için cevabın kısa, markdown'dan arındırılmış önizlemesi
+function buildAnswerPreview(text) {
+    if (!text) return ''
+    const plain = text.replace(/[#*`_>~-]/g, '').replace(/\s+/g, ' ').trim()
+    return plain.length > 140 ? plain.slice(0, 140) + '…' : plain
+}
 const formattedAiAnswer = computed(() => {
-    if (!aiAnswer.value) return ''
-    return DOMPurify.sanitize(marked.parse(aiAnswer.value))
+    if (!aiAnswerDisplay.value) return ''
+    return DOMPurify.sanitize(marked.parse(aiAnswerDisplay.value))
+})
+
+// ── AI cevabının ChatGPT benzeri akıcı "yazılma" animasyonu ──
+// Backend (/api/solve) streaming desteklemiyor, tek seferde tam cevabı dönüyor
+// (bkz. solve.post.ts). Bu yüzden gerçek token-stream yerine, tam cevap elimize
+// geçtikten sonra mevcut mimariye dokunmadan, frontend'de hafif bir "reveal"
+// animasyonu uyguluyoruz: metin parça parça açılıyor. Süre metne göre ölçekleniyor,
+// böylece kısa cevaplar hızlı, uzun cevaplar da makul bir sürede tamamlanıyor
+// (kullanıcıyı gereksiz bekletmiyor).
+const aiAnswerDisplay = ref('')
+let typewriterTimer = null
+
+function stopTypewriter() {
+    if (typewriterTimer) {
+        clearInterval(typewriterTimer)
+        typewriterTimer = null
+    }
+}
+
+function typewriterReveal(fullText) {
+    stopTypewriter()
+    aiAnswerDisplay.value = ''
+    if (!fullText) return
+    const TOTAL_STEPS = 60   // ~ akıcı, hızlı bir "yazılma" hissi için hedef adım sayısı
+    const STEP_MS = 14       // adım aralığı — çok yavaş olmasın diye kısa tutuldu
+    const charsPerStep = Math.max(2, Math.ceil(fullText.length / TOTAL_STEPS))
+    let index = 0
+    typewriterTimer = setInterval(() => {
+        index += charsPerStep
+        if (index >= fullText.length) {
+            aiAnswerDisplay.value = fullText
+            stopTypewriter()
+        } else {
+            aiAnswerDisplay.value = fullText.slice(0, index)
+        }
+    }, STEP_MS)
+}
+
+onUnmounted(() => {
+    stopTypewriter()
 })
 
 function onAiFileChange(e) {
@@ -683,19 +875,94 @@ function onAiFileChange(e) {
     reader.readAsDataURL(file)
 }
 
+function generateAnswerId() {
+    return `${Date.now()}_${Math.random().toString(36).slice(2, 10)}`
+}
+
 async function solveWithAi() {
     aiLoading.value = true
+    stopTypewriter()
     aiAnswer.value = ''
+    aiAnswerDisplay.value = ''
+    aiAnswerId.value = ''
+    aiFeedback.value = ''
     try {
         const res = await $fetch('/api/solve', {
             method: 'POST',
-            body: { imageBase64: aiImageBase64.value }
+            body: { imageBase64: aiImageBase64.value, mode: aiMode.value }
         })
         aiAnswer.value = res.answer
+        aiAnswerId.value = generateAnswerId()
+        typewriterReveal(res.answer)
     } catch (err) {
         aiAnswer.value = 'Bir hata oluştu, tekrar dener misin?'
+        typewriterReveal(aiAnswer.value)
     } finally {
         aiLoading.value = false
+    }
+}
+
+async function simplifyAiAnswer() {
+    if (!aiAnswer.value) return
+    aiSimplifying.value = true
+    try {
+        const res = await $fetch('/api/solve', {
+            method: 'POST',
+            body: { action: 'simplify', previousAnswer: aiAnswer.value }
+        })
+        aiAnswer.value = res.answer
+        // Basitleştirilmiş metin ayrı bir "cevap" sayılır: kendi geri bildirimini alabilmeli
+        aiAnswerId.value = generateAnswerId()
+        aiFeedback.value = ''
+        typewriterReveal(res.answer)
+    } catch (err) {
+        // Basitleştirme başarısız olursa mevcut cevap ve geri bildirim durumu olduğu gibi kalır
+    } finally {
+        aiSimplifying.value = false
+    }
+}
+
+// Geri bildirim: her (öğrenci, cevap) çifti için Firestore'da deterministik bir
+// doküman ID'si kullanılır (studentId_answerId). Aynı cevaba ikinci bir geri
+// bildirim, sadece frontend'de buton gizlenerek değil, runTransaction içinde
+// dokümanın zaten var olup olmadığı kontrol edilerek de engellenir.
+async function submitAiFeedback(type) {
+    if (!aiAnswer.value || !aiAnswerId.value) return
+    if (aiFeedback.value || aiFeedbackSaving.value) return
+    if (!$auth.currentUser) return
+
+    aiFeedbackSaving.value = true
+    const uid = $auth.currentUser.uid
+    try {
+        if (!db) db = getFirestore()
+        const feedbackRef = doc(db, 'aiFeedback', `${uid}_${aiAnswerId.value}`)
+
+        await runTransaction(db, async (tx) => {
+            const existing = await tx.get(feedbackRef)
+            if (existing.exists()) {
+                throw new Error('already-submitted')
+            }
+            tx.set(feedbackRef, {
+                studentId: uid,
+                subject: aiSubject.value || 'Belirtilmemiş',
+                answerId: aiAnswerId.value,
+                mode: aiMode.value,
+                feedback: type, // 'useful' | 'not_useful'
+                answerPreview: buildAnswerPreview(aiAnswer.value), // Dashboard'da önizleme için
+                createdAt: serverTimestamp()
+            })
+        })
+
+        aiFeedback.value = type
+    } catch (e) {
+        if (e && e.message === 'already-submitted') {
+            // Zaten kayıtlı — UI'ı kilitli göstermek için mevcut seçimi yansıt
+            aiFeedback.value = type
+        } else {
+            console.error('AI geri bildirimi kaydedilemedi', e)
+        }
+    } finally {
+        aiFeedbackSaving.value = false
     }
 }
 
@@ -1713,15 +1980,21 @@ onMounted(() => {
         position: fixed;
         left: 0;
         top: 0;
-        bottom: 0;
         width: 280px;
         z-index: 9999;
         /* Overlay'in üstünde */
         transform: translateX(-100%);
         transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
         box-shadow: 5px 0 15px rgba(0, 0, 0, 0.5);
-        height: 100%;
+        /* iPhone'da Safari'nin aşağı/yukarı kayan adres çubuğu, "top:0; bottom:0"
+           ile hesaplanan yüksekliği görünürken 0'a yakın bir değere düşürüp
+           menüyü içeriksiz gösterebiliyor (iPad ve masaüstünde bu davranış yok,
+           bu yüzden orada sorun görülmüyordu). 100dvh, adres çubuğu açık/kapalıyken
+           gerçek görünür yüksekliği kullanır; eski Safari'ler için 100vh fallback. */
+        height: 100vh;
+        height: 100dvh;
         overflow-y: auto;
+        -webkit-overflow-scrolling: touch;
         /* İçerik taşarsa scroll olsun */
         background: linear-gradient(160deg, #080f25 0%, #0a1228 100%);
         /* Arkaplan rengini garantiye al */
@@ -1729,6 +2002,31 @@ onMounted(() => {
 
     .sidebar.open {
         transform: translateX(0);
+    }
+
+    .sidebar-nav {
+        /* Nested flex + overflow:auto kombinasyonu bazı WebKit sürümlerinde
+           flex-grow'lu öğeyi 0 yüksekliğe sıkıştırabiliyor; menü butonlarının
+           her koşulda kendi içeriği kadar yer kaplamasını garantiye alır. */
+        flex-shrink: 0;
+        height: auto;
+        max-height: none;
+        overflow: visible;
+    }
+
+    /* GÜVENLİK AĞI: iPhone'da menü panelinin açılıp içinin boş görünmesi
+       sorunu bildirildiği için, olası harici/global bir CSS çakışmasına
+       (ör. assets/css/main.css içindeki genel bir kural) karşı menü
+       öğelerinin görünürlüğünü bu breakpoint'te explicit olarak zorluyoruz.
+       Bu kurallar sadece mobil/tablet genişliğinde (<=1024px) çalışır,
+       masaüstü görünümünü etkilemez. */
+    .sidebar-nav,
+    .sidebar-nav button,
+    .nav-link-home {
+        display: flex !important;
+        visibility: visible !important;
+        opacity: 1 !important;
+        pointer-events: auto !important;
     }
 
     .sidebar-overlay {
@@ -3579,6 +3877,312 @@ onMounted(() => {
     font-weight: bold;
     padding: 2px 6px;
     border-radius: 4px;
+}
+
+/* AI Soru Çözme — Mod Seçimi */
+.ai-mode-header {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 10px;
+}
+
+.ai-mode-label {
+    color: #ccc;
+    font-weight: 600;
+    font-size: 0.9rem;
+}
+
+.ai-mode-info-btn {
+    width: 20px;
+    height: 20px;
+    border-radius: 50%;
+    border: 1px solid #555;
+    background: transparent;
+    color: #999;
+    font-size: 0.75rem;
+    line-height: 1;
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    transition: 0.2s;
+}
+
+.ai-mode-info-btn:hover {
+    border-color: #0055ff;
+    color: #0055ff;
+}
+
+.ai-mode-info-box {
+    background: #161616;
+    border: 1px solid #333;
+    border-radius: 10px;
+    padding: 14px 16px;
+    margin-bottom: 15px;
+    color: #bbb;
+    font-size: 0.85rem;
+    line-height: 1.6;
+}
+
+.ai-mode-info-box p {
+    margin: 0 0 6px;
+}
+
+.ai-mode-info-box p:last-child {
+    margin-bottom: 0;
+}
+
+.ai-mode-info-box strong {
+    color: #fff;
+}
+
+.ai-mode-select {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+    gap: 15px;
+    margin-bottom: 20px;
+}
+
+.ai-mode-card {
+    background: #161616;
+    border: 1px solid #333;
+    border-radius: 12px;
+    padding: 16px;
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 4px;
+    text-align: left;
+    cursor: pointer;
+    transition: 0.3s;
+    color: #ccc;
+}
+
+.ai-mode-card:hover {
+    transform: translateY(-3px);
+    border-color: #0055ff;
+    box-shadow: 0 5px 15px rgba(0, 85, 255, 0.15);
+}
+
+.ai-mode-card.active {
+    border-color: #0055ff;
+    background: rgba(0, 85, 255, 0.08);
+}
+
+.ai-mode-icon {
+    font-size: 1.4rem;
+}
+
+.ai-mode-title {
+    font-weight: 700;
+    color: #fff;
+    font-size: 1rem;
+}
+
+.ai-mode-desc {
+    color: #888;
+    font-size: 0.8rem;
+}
+
+.btn-simplify {
+    margin-top: 12px;
+    background: #222;
+    border: 1px solid #444;
+    color: #ccc;
+    padding: 8px 16px;
+    border-radius: 8px;
+    cursor: pointer;
+    font-size: 0.85rem;
+    font-weight: 600;
+    transition: 0.3s;
+}
+
+.btn-simplify:hover:not(:disabled) {
+    background: #333;
+    border-color: #0055ff;
+    color: white;
+}
+
+.btn-simplify:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+}
+
+/* AI cevap geri bildirimi */
+.ai-feedback-row {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 10px;
+    margin-top: 14px;
+}
+
+.ai-feedback-label {
+    color: #888;
+    font-size: 0.85rem;
+}
+
+.ai-feedback-buttons {
+    display: flex;
+    gap: 8px;
+}
+
+.ai-feedback-btn {
+    background: #161616;
+    border: 1px solid #333;
+    color: #ccc;
+    padding: 6px 14px;
+    border-radius: 20px;
+    cursor: pointer;
+    font-size: 0.85rem;
+    transition: 0.3s;
+}
+
+.ai-feedback-btn:hover:not(:disabled) {
+    border-color: #0055ff;
+    color: white;
+}
+
+.ai-feedback-btn.active {
+    border-color: #0055ff;
+    background: rgba(0, 85, 255, 0.15);
+    color: white;
+}
+
+.ai-feedback-btn:disabled {
+    cursor: not-allowed;
+    opacity: 0.85;
+}
+
+.ai-feedback-ask {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 10px;
+}
+
+.ai-feedback-done {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+
+.ai-feedback-tick {
+    width: 34px;
+    height: 34px;
+    flex-shrink: 0;
+    border-radius: 50%;
+    background: rgba(76, 175, 80, 0.15);
+    border: 1px solid rgba(76, 175, 80, 0.4);
+    color: #4caf50;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.1rem;
+    font-weight: bold;
+    animation: feedbackTickPop 0.45s ease;
+}
+
+.ai-feedback-done-text {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+}
+
+.ai-feedback-done-text strong {
+    color: #4caf50;
+    font-size: 0.9rem;
+    font-weight: 600;
+}
+
+.ai-feedback-done-text small {
+    color: #888;
+    font-size: 0.78rem;
+}
+
+@keyframes feedbackTickPop {
+    from {
+        transform: scale(0.5);
+        opacity: 0;
+    }
+
+    to {
+        transform: scale(1);
+        opacity: 1;
+    }
+}
+
+/* Faydalı/Faydalı değil <-> Tick+teşekkür geçişi: yavaş, akıcı fade+slide */
+.feedback-fade-enter-active,
+.feedback-fade-leave-active {
+    transition: opacity 0.45s ease, transform 0.45s ease;
+}
+
+.feedback-fade-enter-from,
+.feedback-fade-leave-to {
+    opacity: 0;
+    transform: translateY(6px);
+}
+
+/* Dashboard → Geri Bildirimlerim listesi */
+.feedback-history-list {
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+}
+
+.feedback-history-item {
+    background: #161616;
+    border: 1px solid #333;
+    border-radius: 12px;
+    padding: 16px 18px;
+}
+
+.fh-top {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-bottom: 8px;
+}
+
+.fh-subject {
+    color: #4d94ff;
+    font-weight: 600;
+    font-size: 0.9rem;
+}
+
+.fh-type {
+    font-size: 0.8rem;
+    padding: 3px 10px;
+    border-radius: 20px;
+    border: 1px solid #333;
+}
+
+.fh-useful {
+    color: #4caf50;
+    border-color: rgba(76, 175, 80, 0.4);
+    background: rgba(76, 175, 80, 0.1);
+}
+
+.fh-not-useful {
+    color: #ff6b6b;
+    border-color: rgba(255, 107, 107, 0.4);
+    background: rgba(255, 107, 107, 0.1);
+}
+
+.fh-preview {
+    color: #ccc;
+    font-size: 0.88rem;
+    line-height: 1.5;
+    margin: 0 0 8px 0;
+}
+
+.fh-date {
+    color: #666;
+    font-size: 0.75rem;
 }
 
 /* AI cevap kutusu (markdown render) */
