@@ -93,6 +93,10 @@
                 <button @click="setTab('distributions')" :class="{ active: activeTab === 'distributions' }">
                     <span class="icon">🎯</span> Dağıtım Geçmişi
                 </button>
+                <button @click="setTab('ai-feedback')" :class="{ active: activeTab === 'ai-feedback' }">
+                    <span class="icon">🤖</span> AI Geri Bildirimleri
+                    <span class="nav-count">{{ aiFeedbackTotal }}</span>
+                </button>
 
                 <div class="sidebar-divider"></div>
 
@@ -516,6 +520,80 @@
                     </div>
                 </div>
 
+                <!-- ===== AI GERİ BİLDİRİMLERİ ===== -->
+                <!-- Öğrenciler kendi geri bildirim geçmişlerini göremez; bu veriler
+                     yalnızca burada, Admin Dashboard üzerinden görüntülenebilir. -->
+                <div v-if="activeTab === 'ai-feedback'" class="animate-fade">
+                    <h2 class="section-title">AI Geri Bildirimleri</h2>
+                    <div v-if="aiFeedbackLoadError" class="access-denied" style="padding:16px; margin-bottom:16px; border-radius:8px; background:rgba(239,68,68,0.08); border:1px solid rgba(239,68,68,0.35);">
+                        <p style="color:#ef4444; font-size:0.9rem; margin:0;">⚠️ {{ aiFeedbackLoadError }}</p>
+                    </div>
+                    <div class="donation-summary">
+                        <div class="ds-item">
+                            <span class="ds-val">{{ aiFeedbackTotal }}</span>
+                            <span class="ds-lab">Toplam Geri Bildirim</span>
+                        </div>
+                        <div class="ds-item">
+                            <span class="ds-val green-val">{{ aiFeedbackUsefulCount }}</span>
+                            <span class="ds-lab">👍 Faydalı</span>
+                        </div>
+                        <div class="ds-item">
+                            <span class="ds-val" style="color:#ef4444">{{ aiFeedbackNotUsefulCount }}</span>
+                            <span class="ds-lab">👎 Faydalı Değil</span>
+                        </div>
+                        <div class="ds-item">
+                            <span class="ds-val" style="color:#5b8dd9">%{{ aiFeedbackUsefulRate }}</span>
+                            <span class="ds-lab">Faydalı Oranı</span>
+                        </div>
+                    </div>
+
+                    <div class="section-header-row" style="margin-top:20px;">
+                        <div class="filter-row">
+                            <select v-model="aiFeedbackSubjectFilter" class="filter-select">
+                                <option value="">Tüm Dersler</option>
+                                <option v-for="l in aiFeedbackSubjects" :key="l" :value="l">{{ l }}</option>
+                            </select>
+                            <select v-model="aiFeedbackTypeFilter" class="filter-select">
+                                <option value="">Tüm Geri Bildirimler</option>
+                                <option value="useful">👍 Faydalı</option>
+                                <option value="not_useful">👎 Faydalı Değil</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <div class="table-wrapper" style="margin-top:14px;">
+                        <table class="data-table">
+                            <thead>
+                                <tr>
+                                    <th>Öğrenci</th>
+                                    <th>Ders</th>
+                                    <th>Mod</th>
+                                    <th>Geri Bildirim</th>
+                                    <th>Cevap Önizleme</th>
+                                    <th>Tarih</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr v-for="f in filteredAiFeedback" :key="f.id">
+                                    <td>{{ studentNameFor(f.studentId) }}</td>
+                                    <td><span class="badge-subject">{{ f.subject || 'Belirtilmemiş' }}</span></td>
+                                    <td class="td-email">{{ f.mode === 'detailed' ? '🧠 Detaylı' : '⚡ Hızlı' }}</td>
+                                    <td>
+                                        <span class="status-pill" :class="f.feedback === 'useful' ? 'pill-done' : 'pill-pending'">
+                                            {{ f.feedback === 'useful' ? '👍 Faydalı' : '👎 Faydalı Değil' }}
+                                        </span>
+                                    </td>
+                                    <td class="td-email">{{ f.answerPreview || '—' }}</td>
+                                    <td class="td-date">{{ formatTimestamp(f.createdAt) }}</td>
+                                </tr>
+                                <tr v-if="filteredAiFeedback.length === 0">
+                                    <td colspan="6" class="empty-row">Geri bildirim bulunamadı.</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
             </section>
         </main>
     </div>
@@ -560,6 +638,16 @@ const allTeachers = ref([])
 const allTests = ref([])
 const allDonations = ref([])
 const distributionHistory = ref([])
+
+// AI Geri Bildirimleri — öğrenciler bu veriyi kendi panellerinden göremez,
+// yalnızca Admin Dashboard üzerinden görüntülenir.
+const allAiFeedback = ref([])
+const aiFeedbackSubjectFilter = ref('')
+const aiFeedbackTypeFilter = ref('')
+// fetchAll() içindeki diğer sorgulardan biri (users/tests/donations vb.) hata verirse
+// zincir kırılıp aiFeedback hiç çekilmeyebiliyordu; bu yüzden kendi hata durumunu
+// ayrı tutuyoruz — böylece admin panelde "veri yok" ile "çekilemedi" birbirine karışmaz.
+const aiFeedbackLoadError = ref('')
 
 // Ana Kasa
 const vaultData = ref({ totalBalance: 0, totalIn: 0, totalOut: 0 })
@@ -618,6 +706,32 @@ const filteredUsers = computed(() => {
     })
 })
 
+// ── AI Geri Bildirimleri istatistikleri ──
+const aiFeedbackTotal = computed(() => allAiFeedback.value.length)
+const aiFeedbackUsefulCount = computed(() => allAiFeedback.value.filter(f => f.feedback === 'useful').length)
+const aiFeedbackNotUsefulCount = computed(() => allAiFeedback.value.filter(f => f.feedback === 'not_useful').length)
+const aiFeedbackUsefulRate = computed(() => {
+    if (aiFeedbackTotal.value === 0) return 0
+    return Math.round((aiFeedbackUsefulCount.value / aiFeedbackTotal.value) * 100)
+})
+const aiFeedbackSubjects = computed(() => {
+    const set = new Set(allAiFeedback.value.map(f => f.subject).filter(Boolean))
+    return Array.from(set)
+})
+const filteredAiFeedback = computed(() => {
+    return allAiFeedback.value.filter(f => {
+        const matchSubject = !aiFeedbackSubjectFilter.value || f.subject === aiFeedbackSubjectFilter.value
+        const matchType = !aiFeedbackTypeFilter.value || f.feedback === aiFeedbackTypeFilter.value
+        return matchSubject && matchType
+    })
+})
+// Geri bildirim dokümanları sadece studentId taşıdığı için, isim gösterimi
+// kullanıcı listesiyle eşleştirilerek yapılır
+const studentNameFor = (studentId) => {
+    const u = allUsers.value.find(x => x.id === studentId)
+    return u?.displayName || u?.email || 'Bilinmeyen Öğrenci'
+}
+
 // ── Sekmeler ──
 const setTab = (tab) => {
     activeTab.value = tab
@@ -645,54 +759,105 @@ const formatTimestamp = (val) => {
 }
 
 // ── Veri çekme ──
+// NOT: Önceden bu fonksiyondaki sorgular tek bir try/catch olmadan sırayla
+// çalıştırılıyordu. Zincirdeki herhangi bir sorgu (ör. bookings/distributions)
+// Firestore güvenlik kuralları yüzünden "permission-denied" hatası verirse,
+// fonksiyon orada duruyor ve zincirin en sonundaki AI Geri Bildirimleri sorgusu
+// hiç çalışmıyordu — admin diğer verileri görürken geri bildirimler sessizce boş
+// kalıyordu. Şimdi her bölüm kendi try/catch'i içinde, birbirinden bağımsız
+// çalışıyor: biri başarısız olsa da diğerleri (özellikle aiFeedback) etkilenmiyor
+// ve hata console'a düşüyor + admin'e görünür bir uyarı olarak gösteriliyor.
 const fetchAll = async () => {
     if (!db) db = getFirestore()
 
     // Kullanıcılar
-    const usersSnap = await getDocs(collection(db, 'users'))
-    allUsers.value = usersSnap.docs.map(d => ({ id: d.id, ...d.data() }))
-
-    // Öğretmenler
-    allTeachers.value = allUsers.value.filter(u => u.role === 'teacher')
+    try {
+        const usersSnap = await getDocs(collection(db, 'users'))
+        allUsers.value = usersSnap.docs.map(d => ({ id: d.id, ...d.data() }))
+        // Öğretmenler
+        allTeachers.value = allUsers.value.filter(u => u.role === 'teacher')
+    } catch (e) {
+        console.error('Kullanıcılar çekilemedi:', e)
+    }
 
     // Testler
-    const testsSnap = await getDocs(collection(db, 'tests'))
-    allTests.value = testsSnap.docs.map(d => ({ id: d.id, ...d.data() }))
+    try {
+        const testsSnap = await getDocs(collection(db, 'tests'))
+        allTests.value = testsSnap.docs.map(d => ({ id: d.id, ...d.data() }))
+    } catch (e) {
+        console.error('Testler çekilemedi:', e)
+    }
 
     // Bağışlar
-    const donSnap = await getDocs(collection(db, 'donations'))
-    allDonations.value = donSnap.docs.map(d => ({ id: d.id, ...d.data() }))
-        .sort((a, b) => new Date(b.createdAt || 0) - new Date(a.createdAt || 0))
+    try {
+        const donSnap = await getDocs(collection(db, 'donations'))
+        allDonations.value = donSnap.docs.map(d => ({ id: d.id, ...d.data() }))
+            .sort((a, b) => new Date(b.createdAt || 0) - new Date(a.createdAt || 0))
+    } catch (e) {
+        console.error('Bağışlar çekilemedi:', e)
+    }
 
     // Randevu sayısı
-    const bookSnap = await getDocs(collection(db, 'bookings'))
-    bookingCount.value = bookSnap.size
+    try {
+        const bookSnap = await getDocs(collection(db, 'bookings'))
+        bookingCount.value = bookSnap.size
+    } catch (e) {
+        console.error('Randevular çekilemedi:', e)
+    }
 
     // Dağıtım geçmişi
-    const distSnap = await getDocs(collection(db, 'distributions'))
-    const rawDists = distSnap.docs
-        .map(d => ({ id: d.id, ...d.data() }))
-        .sort((a, b) => (b.createdAt?.seconds || 0) - (a.createdAt?.seconds || 0))
+    try {
+        const distSnap = await getDocs(collection(db, 'distributions'))
+        const rawDists = distSnap.docs
+            .map(d => ({ id: d.id, ...d.data() }))
+            .sort((a, b) => (b.createdAt?.seconds || 0) - (a.createdAt?.seconds || 0))
 
-    // Her dağıtım için o dağıtımda işlenen bağışların komisyonunu hesapla
-    // Dağıtım logunda breakdown var — toplam dağıtılan puan = totalPoints
-    // Komisyon = o dağıtımdaki tüm donations'ın (totalPoints - points) toplamı
-    // Basit yaklaşım: dağıtılan net puana göre oranla komisyonu hesapla (%8 / %92)
-    distributionHistory.value = rawDists.map(d => {
-        const netPoints = d.totalPoints || 0
-        // net = %92, gross = net / 0.92, komisyon = gross - net
-        const grossPoints = netPoints > 0 ? Math.round(netPoints / 0.92) : 0
-        const calcCommission = grossPoints - netPoints
-        return {
-            ...d,
-            calcCommission,
-            grossPoints
-        }
-    })
+        // Her dağıtım için o dağıtımda işlenen bağışların komisyonunu hesapla
+        // Dağıtım logunda breakdown var — toplam dağıtılan puan = totalPoints
+        // Komisyon = o dağıtımdaki tüm donations'ın (totalPoints - points) toplamı
+        // Basit yaklaşım: dağıtılan net puana göre oranla komisyonu hesapla (%8 / %92)
+        distributionHistory.value = rawDists.map(d => {
+            const netPoints = d.totalPoints || 0
+            // net = %92, gross = net / 0.92, komisyon = gross - net
+            const grossPoints = netPoints > 0 ? Math.round(netPoints / 0.92) : 0
+            const calcCommission = grossPoints - netPoints
+            return {
+                ...d,
+                calcCommission,
+                grossPoints
+            }
+        })
+    } catch (e) {
+        console.error('Dağıtım geçmişi çekilemedi:', e)
+    }
 
     // Ana Kasa istatistikleri ve işlem geçmişi
-    vaultData.value = await getVaultStats(db)
-    vaultTransactions.value = await getVaultTransactions(db, 50)
+    try {
+        vaultData.value = await getVaultStats(db)
+        vaultTransactions.value = await getVaultTransactions(db, 50)
+    } catch (e) {
+        console.error('Ana Kasa verileri çekilemedi:', e)
+    }
+
+    // AI Geri Bildirimleri — öğrencilerin Eduty AI cevaplarına verdiği
+    // "Faydalı" / "Faydalı Değil" geri bildirimleri (sadece admin görebilir).
+    // Bu blok kasıtlı olarak kendi try/catch'inde: yukarıdaki bölümlerden biri
+    // hata verse bile bu sorgu her zaman çalışır. Hata durumunda kullanıcıya
+    // (ör. Firestore güvenlik kuralı eksikse) net bir mesaj gösterilir; veri
+    // gerçekten boşsa aiFeedbackLoadError boş kalır ve tablo "bulunamadı" der.
+    aiFeedbackLoadError.value = ''
+    try {
+        const aiFeedbackSnap = await getDocs(collection(db, 'aiFeedback'))
+        allAiFeedback.value = aiFeedbackSnap.docs
+            .map(d => ({ id: d.id, ...d.data() }))
+            .sort((a, b) => (b.createdAt?.seconds || 0) - (a.createdAt?.seconds || 0))
+    } catch (e) {
+        console.error('AI geri bildirimleri çekilemedi:', e)
+        allAiFeedback.value = []
+        aiFeedbackLoadError.value = e?.code === 'permission-denied'
+            ? 'Geri bildirimler okunamadı: Firestore güvenlik kuralları admin rolüne "aiFeedback" koleksiyonunu listeleme izni vermiyor. Firestore Rules dosyasında bu koleksiyon için admin okuma izni tanımlanmalı.'
+            : 'Geri bildirimler yüklenirken bir hata oluştu. Lütfen konsolu kontrol edin veya sayfayı yenileyin.'
+    }
 }
 
 // ── Öğretmen yayın toggle ──

@@ -61,6 +61,61 @@ const SIMPLIFY_PROMPT = [
 ].join('\n')
 
 // ─────────────────────────────────────────────────────────────
+// "İpucu" sistemi — cevabı DOĞRUDAN vermeyen, kademeli yönlendirme.
+// 3 seviye: her seviye bir öncekinden biraz daha somut olur, ama hiçbiri
+// son sayısal/nihai cevabı yazmaz. Önceki ipuçları prompt'a eklenir ki
+// model aynı şeyi tekrar etmesin, üzerine eklesin.
+// ─────────────────────────────────────────────────────────────
+const HINT_STAGE_GUIDES = {
+    1: [
+        'Bu bir İPUCU isteğidir (1. ve en hafif seviye). Öğrenciye sorunun cevabını KESİNLİKLE verme.',
+        '- Öğrenciyi doğru konuya/yönteme yönlendirecek çok genel, hafif bir ipucu ver.',
+        '- Hiçbir hesap, formül sonucu veya ara sonuç verme.',
+        '- 2-3 kısa cümleyi geçme.'
+    ].join('\n'),
+    2: [
+        'Bu bir İPUCU isteğidir (2. seviye). Öğrenciye sorunun cevabını KESİNLİKLE verme.',
+        'Öğrenci bir önceki (daha hafif) ipucuyla çözemedi. Şimdi biraz daha somut bir yönlendirme yap:',
+        '- Hangi adımdan başlanması gerektiğini veya hangi formül/kuralın kullanılacağını belirt.',
+        '- Yine de son sonucu ya da ara sonucu hesaplama; sadece yolu göster.',
+        '- Kısa ve öz ol, önceki ipucuyla aynı şeyi tekrar etme.'
+    ].join('\n'),
+    3: [
+        'Bu bir İPUCU isteğidir (son seviye, 3). Öğrenciye sorunun NİHAİ cevabını/sonucunu KESİNLİKLE yazma.',
+        '- Çözüm yolunu neredeyse tamamen, somut adımlarla anlat (hangi işlem, hangi sırayla).',
+        '- Son sayısal/nihai sonucu hesaplamadan bırak.',
+        '- Cevabın sonunda öğrenciye, bu adımları takip ederek sonucu kendisinin bulabileceğini, isterse tam çözümü de görebileceğini belirt.'
+    ].join('\n')
+}
+
+function buildHintPrompt(level, previousHints) {
+    const stageGuide = HINT_STAGE_GUIDES[level] || HINT_STAGE_GUIDES[1]
+    if (!previousHints || !previousHints.length) return stageGuide
+    const historyBlock = previousHints
+        .slice(0, 5)
+        .map((h, i) => `${i + 1}. ${h}`)
+        .join('\n')
+    return `${stageGuide}\n\nDaha önce öğrenciye verilen ipuçları (bunları AYNEN TEKRARLAMA, üzerine ekle):\n${historyBlock}`
+}
+
+// ─────────────────────────────────────────────────────────────
+// "Çözümümü Kontrol Et" — öğrencinin kendi çözümünü inceleyip,
+// doğru adımları onaylayan, hatayı DOĞRUDAN cevap vermeden adım
+// numarasıyla işaret eden bir prompt.
+// ─────────────────────────────────────────────────────────────
+const CHECK_PROMPT = [
+    'Bu bir "ÇÖZÜMÜMÜ KONTROL ET" isteğidir.',
+    'Öğrenci, ekteki soruyu kendi çözmüş ve kendi çözümünü sana gönderdi.',
+    'Görevin:',
+    '- Öğrencinin doğru yaptığı adımları kısaca onayla.',
+    '- Bir hata varsa, hatanın olduğu adımı numarasıyla işaret et (ör. "3. adımda bir sorun var").',
+    '- Doğru sonucu veya doğru cevabı DOĞRUDAN VERME; öğrencinin kendi hatasını fark etmesini sağlayacak',
+    '  şekilde yönlendir (ör. "Bu adımda işaret değişimine dikkat et.").',
+    '- Çözüm tamamen doğruysa bunu net şekilde belirt ve öğrenciyi kısaca tebrik et.',
+    'Kısa, net ve yapıcı ol; resmi bir ders kitabı dili kullanma.'
+].join('\n')
+
+// ─────────────────────────────────────────────────────────────
 // Mod bazlı model seçimi.
 // Şimdilik ikisi de aynı model. İleride 'detailed' için Gemini Pro'ya
 // geçmek istersen sadece bu satırı değiştirmen yeterli.
@@ -77,7 +132,13 @@ function resolveMode(rawMode) {
 }
 
 function resolveAction(rawAction) {
-    return rawAction === 'simplify' ? 'simplify' : 'solve'
+    if (rawAction === 'simplify' || rawAction === 'hint' || rawAction === 'check') return rawAction
+    return 'solve'
+}
+
+function resolveHintLevel(rawLevel) {
+    const n = Number(rawLevel)
+    return [1, 2, 3].includes(n) ? n : 1
 }
 
 async function callGemini(config, model, parts) {
@@ -148,6 +209,63 @@ async function handleSimplify(config, body) {
     return { answer: answer ?? 'Basitleştirilemedi, tekrar dener misin?', action: 'simplify' }
 }
 
+// Yeni akış: "İpucu" — soruyu tekrar görsel olarak alır (çünkü ipucu, sorunun
+// kendisine bakılarak verilir), ama cevabı DOĞRUDAN vermeyen kademeli bir
+// prompt kullanır. Aynı Gemini modeli ve aynı callGemini yardımcı fonksiyonu
+// kullanılır; yeni bir servis/model eklenmez.
+async function handleHint(config, body) {
+    const level = resolveHintLevel(body.hintLevel)
+    const previousHints = Array.isArray(body.previousHints) ? body.previousHints : []
+
+    if (!body.imageBase64) {
+        return { answer: 'İpucu için önce soru fotoğrafının yüklenmiş olması gerekiyor.', action: 'hint', hintLevel: level }
+    }
+
+    const model = MODEL_BY_MODE.fast // ipucu kısa ve hızlı bir görevdir
+
+    const answer = await callGemini(config, model, [
+        { text: buildHintPrompt(level, previousHints) },
+        { inline_data: { mime_type: 'image/jpeg', data: body.imageBase64 } }
+    ])
+
+    return { answer: answer ?? 'İpucu alınamadı, tekrar dener misin?', action: 'hint', hintLevel: level }
+}
+
+// Yeni akış: "Çözümümü Kontrol Et" — orijinal soru fotoğrafı + öğrencinin
+// kendi çözümü (metin ve/veya fotoğraf) birlikte modele gönderilir.
+// Doğrudan cevap vermeyen, yönlendirici bir prompt kullanır.
+async function handleCheck(config, body) {
+    const studentText = (body.studentSolutionText || '').trim()
+    const hasStudentImage = !!body.studentSolutionImageBase64
+
+    if (!studentText && !hasStudentImage) {
+        return { answer: 'Kontrol edebilmem için çözümünü yazman veya fotoğrafını yüklemen gerekiyor.', action: 'check' }
+    }
+
+    if (!body.imageBase64) {
+        return { answer: 'Çözümünü kontrol edebilmem için önce soru fotoğrafının yüklenmiş olması gerekiyor.', action: 'check' }
+    }
+
+    const model = MODEL_BY_MODE.detailed // hata tespiti, dikkatli okuma gerektirir
+
+    const parts = [
+        { text: CHECK_PROMPT },
+        { text: '\nSoru fotoğrafı aşağıdadır:' },
+        { inline_data: { mime_type: 'image/jpeg', data: body.imageBase64 } }
+    ]
+
+    if (hasStudentImage) {
+        parts.push({ text: '\nÖğrencinin çözüm fotoğrafı aşağıdadır:' })
+        parts.push({ inline_data: { mime_type: 'image/jpeg', data: body.studentSolutionImageBase64 } })
+    } else {
+        parts.push({ text: `\nÖğrencinin yazdığı çözüm:\n${studentText}` })
+    }
+
+    const answer = await callGemini(config, model, parts)
+
+    return { answer: answer ?? 'Çözümün kontrol edilemedi, tekrar dener misin?', action: 'check' }
+}
+
 export default defineEventHandler(async (event) => {
     const config = useRuntimeConfig()
     const body = await readBody(event) // { imageBase64, mode: "fast"|"detailed", action?: "solve"|"simplify", previousAnswer? }
@@ -156,6 +274,14 @@ export default defineEventHandler(async (event) => {
 
     if (action === 'simplify') {
         return await handleSimplify(config, body)
+    }
+
+    if (action === 'hint') {
+        return await handleHint(config, body)
+    }
+
+    if (action === 'check') {
+        return await handleCheck(config, body)
     }
 
     return await handleSolve(config, body)
