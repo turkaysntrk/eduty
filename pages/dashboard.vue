@@ -318,6 +318,11 @@
                     <span class="icon">🤖</span> Eduty AI
                 </button>
 
+                <button @click="{ activeTab = 'duty'; isSidebarOpen = false }"
+                    :class="{ active: activeTab === 'duty' }">
+                    <span class="icon">⚡</span> Duty
+                </button>
+
                 <div class="sidebar-divider"></div>
 
                 <NuxtLink to="/" class="nav-link-home" @click="isSidebarOpen = false">
@@ -329,7 +334,7 @@
         </aside>
 
         <main class="main-content">
-            <header class="content-header">
+            <header v-show="activeTab !== 'duty'" class="content-header">
                 <div class="score-card">
                     <span class="score-label">TOPLAM EDUTY PUANI</span>
                     <div class="score-value">
@@ -824,6 +829,11 @@
                             </div>
                         </Transition>
                     </div>
+                </div>
+
+                <!-- Duty: kısa öğrenme kartları akışı (components/duty/DutyFeed.vue) -->
+                <div v-if="activeTab === 'duty'">
+                    <DutyFeed />
                 </div>
 
             </section>

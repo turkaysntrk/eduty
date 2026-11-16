@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 260 110" width="260" height="110" role="img" aria-label="Atom notasyonu: A üstte, Z altta, X element sembolü">
+  <g font-family="'DM Sans','Segoe UI',Arial,sans-serif">
+    <text x="70" y="42" font-size="30" font-weight="700" fill="#4d94ff" text-anchor="middle">A</text>
+    <text x="70" y="92" font-size="30" font-weight="700" fill="#38bdf8" text-anchor="middle">Z</text>
+    <text x="118" y="75" font-size="64" font-weight="700" fill="#ffffff" text-anchor="middle">X</text>
+    <text x="150" y="40" font-size="14" fill="#c7d6f2">kütle numarası</text>
+    <text x="150" y="92" font-size="14" fill="#c7d6f2">atom numarası</text>
+  </g>
+</svg>

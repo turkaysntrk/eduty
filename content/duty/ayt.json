@@ -1,0 +1,501 @@
+[
+  {
+    "id": "duty_ayt_mat_0001",
+    "exam": "AYT",
+    "subject": "Matematik",
+    "topic": "Türev",
+    "type": "exception",
+    "title": "Türevliyse sürekli; peki tersi?",
+    "blocks": [
+      {
+        "kind": "text",
+        "text": "Bir noktada **türevli** olan fonksiyon o noktada **süreklidir**. Tersi doğru değildir."
+      },
+      {
+        "kind": "formula",
+        "text": "f(x) = |x|"
+      },
+      {
+        "kind": "list",
+        "items": [
+          "x = 0'da süreklidir.",
+          "x = 0'da sol türev −1, sağ türev +1 olduğundan türevsizdir (köşe noktası)."
+        ]
+      },
+      {
+        "kind": "callout",
+        "tone": "warning",
+        "text": "Süreksizse türevsizdir. Sürekli olmak, türevli olmak için yetmez."
+      }
+    ],
+    "tags": [
+      "türev",
+      "süreklilik"
+    ],
+    "status": "published",
+    "version": 1
+  },
+  {
+    "id": "duty_ayt_mat_0002",
+    "exam": "AYT",
+    "subject": "Matematik",
+    "topic": "Logaritma",
+    "type": "confusion",
+    "title": "log(x²) ile 2·log x aynı mı?",
+    "blocks": [
+      {
+        "kind": "formula",
+        "text": "log_a b için: a > 0, a ≠ 1, b > 0"
+      },
+      {
+        "kind": "text",
+        "text": "log(x²) ifadesi x ≠ 0 için tanımlıdır; **2·log x** ise yalnızca x > 0 için. Doğru dönüşüm: **log(x²) = 2·log|x|**."
+      },
+      {
+        "kind": "callout",
+        "tone": "warning",
+        "text": "x = −3 için log(x²) = log 9 tanımlıdır, ama log(−3) tanımsızdır."
+      }
+    ],
+    "tags": [
+      "logaritma",
+      "tanım kümesi"
+    ],
+    "status": "published",
+    "version": 1
+  },
+  {
+    "id": "duty_ayt_fiz_0001",
+    "exam": "AYT",
+    "subject": "Fizik",
+    "topic": "Elektrik ve manyetizma",
+    "type": "compare",
+    "title": "Elektrik alan mı, potansiyel mi?",
+    "blocks": [
+      {
+        "kind": "compare",
+        "left": {
+          "title": "Elektrik alan (E)",
+          "items": [
+            "Vektördür",
+            "Birimi N/C",
+            "E = F/q",
+            "Vektörel toplanır"
+          ]
+        },
+        "right": {
+          "title": "Potansiyel (V)",
+          "items": [
+            "Skalerdir",
+            "Birimi volt (J/C)",
+            "İşaretiyle cebirsel toplanır"
+          ]
+        }
+      },
+      {
+        "kind": "callout",
+        "tone": "info",
+        "text": "Eşit büyüklükte zıt iki yükün orta noktasında V = 0 ama E ≠ 0. Aynı işaretli iki eşit yükün orta noktasında E = 0 ama V ≠ 0."
+      }
+    ],
+    "tags": [
+      "elektrik alan",
+      "potansiyel"
+    ],
+    "status": "published",
+    "version": 1
+  },
+  {
+    "id": "duty_ayt_fiz_0002",
+    "exam": "AYT",
+    "subject": "Fizik",
+    "topic": "Dairesel hareket",
+    "type": "confusion",
+    "title": "Merkezcil kuvvet ayrı bir kuvvet midir?",
+    "blocks": [
+      {
+        "kind": "text",
+        "text": "Hayır. Merkezcil kuvvet, cisme etki eden kuvvetlerin **merkeze doğru bileşkesinin** adıdır."
+      },
+      {
+        "kind": "formula",
+        "text": "F_merkezcil = m·v² / r"
+      },
+      {
+        "kind": "list",
+        "items": [
+          "Serbest cisim diyagramına ayrıca “merkezcil kuvvet” çizilmez.",
+          "Sürtünmesiz yatay düzlemde ipe bağlı dönen cisimde merkezcil kuvvet ip gerilmesidir."
+        ]
+      }
+    ],
+    "tags": [
+      "merkezcil kuvvet",
+      "dairesel hareket"
+    ],
+    "status": "published",
+    "version": 1
+  },
+  {
+    "id": "duty_ayt_fiz_0003",
+    "exam": "AYT",
+    "subject": "Fizik",
+    "topic": "İtme ve momentum",
+    "type": "compare",
+    "title": "Esnek ve esnek olmayan çarpışma",
+    "blocks": [
+      {
+        "kind": "table",
+        "headers": [
+          "",
+          "Esnek",
+          "Esnek olmayan"
+        ],
+        "rows": [
+          [
+            "Momentum",
+            "Korunur",
+            "Korunur"
+          ],
+          [
+            "Kinetik enerji",
+            "Korunur",
+            "Korunmaz"
+          ],
+          [
+            "Toplam enerji",
+            "Korunur",
+            "Korunur"
+          ]
+        ]
+      },
+      {
+        "kind": "callout",
+        "tone": "info",
+        "text": "Momentum korunumu için sistemin dış kuvvetlerden yalıtılmış olması gerekir. Esnek olmayan çarpışmada kinetik enerjinin bir kısmı ısı vb. olur."
+      }
+    ],
+    "tags": [
+      "momentum",
+      "çarpışma",
+      "enerji korunumu"
+    ],
+    "status": "published",
+    "version": 1
+  },
+  {
+    "id": "duty_ayt_kim_0001",
+    "exam": "AYT",
+    "subject": "Kimya",
+    "topic": "Elektrokimya",
+    "type": "compare",
+    "title": "Anot ve katot: işaret mi, tepkime mi?",
+    "blocks": [
+      {
+        "kind": "table",
+        "headers": [
+          "",
+          "Pil",
+          "Elektroliz"
+        ],
+        "rows": [
+          [
+            "Anot",
+            "(−) kutup",
+            "(+) kutup"
+          ],
+          [
+            "Katot",
+            "(+) kutup",
+            "(−) kutup"
+          ],
+          [
+            "Anotta",
+            "Yükseltgenme",
+            "Yükseltgenme"
+          ],
+          [
+            "Katotta",
+            "İndirgenme",
+            "İndirgenme"
+          ]
+        ]
+      },
+      {
+        "kind": "callout",
+        "tone": "tip",
+        "text": "Kutup işareti değişir, tepkime türü değişmez: anotta yükseltgenme, katotta indirgenme."
+      }
+    ],
+    "tags": [
+      "anot",
+      "katot",
+      "pil",
+      "elektroliz"
+    ],
+    "status": "published",
+    "version": 1
+  },
+  {
+    "id": "duty_ayt_kim_0002",
+    "exam": "AYT",
+    "subject": "Kimya",
+    "topic": "Kimyasal denge",
+    "type": "confusion",
+    "title": "Katalizör dengeyi kaydırır mı?",
+    "blocks": [
+      {
+        "kind": "text",
+        "text": "Hayır. Katalizör ileri ve geri tepkime hızını **aynı oranda** artırır; denge daha çabuk kurulur ama denge konumu ve denge sabiti (K) değişmez."
+      },
+      {
+        "kind": "list",
+        "items": [
+          "K yalnızca sıcaklığa bağlıdır.",
+          "Derişim, basınç veya hacim değişimi dengeyi kaydırabilir ama K'yı değiştirmez.",
+          "Sıcaklık değişimi hem dengeyi kaydırır hem K'yı değiştirir."
+        ]
+      }
+    ],
+    "tags": [
+      "katalizör",
+      "Le Chatelier",
+      "denge sabiti"
+    ],
+    "status": "published",
+    "version": 1
+  },
+  {
+    "id": "duty_ayt_kim_0003",
+    "exam": "AYT",
+    "subject": "Kimya",
+    "topic": "Asitler ve bazlar",
+    "type": "confusion",
+    "title": "Kuvvetli asit ile derişik asit aynı mı?",
+    "blocks": [
+      {
+        "kind": "compare",
+        "left": {
+          "title": "Kuvvet",
+          "items": [
+            "Asidin ne kadar iyonlaştığını gösterir",
+            "Ka ile ilgilidir",
+            "HCl kuvvetli, CH₃COOH zayıf"
+          ]
+        },
+        "right": {
+          "title": "Derişim",
+          "items": [
+            "Birim hacimdeki madde miktarıdır",
+            "mol/L ile verilir",
+            "Kuvvetli asit seyreltik olabilir"
+          ]
+        }
+      },
+      {
+        "kind": "callout",
+        "tone": "warning",
+        "text": "0,001 M HCl kuvvetli ama seyreltiktir; 10 M CH₃COOH zayıf ama derişiktir."
+      }
+    ],
+    "tags": [
+      "asit",
+      "kuvvet",
+      "derişim"
+    ],
+    "status": "published",
+    "version": 1
+  },
+  {
+    "id": "duty_ayt_bio_0001",
+    "exam": "AYT",
+    "subject": "Biyoloji",
+    "topic": "Nükleik asitler ve protein sentezi",
+    "type": "compare",
+    "title": "Replikasyon, transkripsiyon, translasyon",
+    "blocks": [
+      {
+        "kind": "table",
+        "headers": [
+          "",
+          "Replikasyon",
+          "Transkripsiyon",
+          "Translasyon"
+        ],
+        "rows": [
+          [
+            "Kalıp",
+            "DNA",
+            "DNA",
+            "mRNA"
+          ],
+          [
+            "Ürün",
+            "DNA",
+            "RNA",
+            "Protein"
+          ],
+          [
+            "Yer (ökaryot)",
+            "Çekirdek",
+            "Çekirdek",
+            "Ribozom"
+          ]
+        ]
+      },
+      {
+        "kind": "callout",
+        "tone": "info",
+        "text": "Kodon mRNA'da, antikodon tRNA'dadır."
+      }
+    ],
+    "tags": [
+      "replikasyon",
+      "transkripsiyon",
+      "translasyon"
+    ],
+    "status": "published",
+    "version": 1
+  },
+  {
+    "id": "duty_ayt_bio_0002",
+    "exam": "AYT",
+    "subject": "Biyoloji",
+    "topic": "Kalıtım",
+    "type": "compare",
+    "title": "Eksik baskınlık ve ortak baskınlık",
+    "blocks": [
+      {
+        "kind": "compare",
+        "left": {
+          "title": "Eksik baskınlık",
+          "items": [
+            "Heterozigotta ara fenotip görülür",
+            "Kırmızı × beyaz akşam sefası → pembe",
+            "F₂'de fenotip oranı 1 : 2 : 1"
+          ]
+        },
+        "right": {
+          "title": "Ortak baskınlık",
+          "items": [
+            "İki alel de ayrı ayrı ifade edilir",
+            "Örnek: AB kan grubu",
+            "Heterozigotta iki özellik birlikte görülür"
+          ]
+        }
+      },
+      {
+        "kind": "callout",
+        "tone": "tip",
+        "text": "Eksik baskınlıkta ara bir özellik, ortak baskınlıkta iki özellik birden görülür."
+      }
+    ],
+    "tags": [
+      "eksik baskınlık",
+      "ortak baskınlık",
+      "kalıtım"
+    ],
+    "status": "published",
+    "version": 1
+  },
+  {
+    "id": "duty_ayt_edb_0001",
+    "exam": "AYT",
+    "subject": "Türk Dili ve Edebiyatı",
+    "topic": "Eski Türk edebiyatı",
+    "type": "compare",
+    "title": "Divan ve halk edebiyatı",
+    "blocks": [
+      {
+        "kind": "table",
+        "headers": [
+          "",
+          "Divan",
+          "Halk"
+        ],
+        "rows": [
+          [
+            "Ölçü",
+            "Aruz",
+            "Hece"
+          ],
+          [
+            "Nazım birimi",
+            "Beyit",
+            "Dörtlük"
+          ],
+          [
+            "Dil",
+            "Arapça-Farsça etkili Osmanlıca",
+            "Sade Türkçe"
+          ],
+          [
+            "Çevre",
+            "Saray, medrese",
+            "Halk, âşık, tekke"
+          ]
+        ]
+      }
+    ],
+    "tags": [
+      "divan",
+      "halk edebiyatı",
+      "aruz",
+      "hece"
+    ],
+    "status": "published",
+    "version": 1
+  },
+  {
+    "id": "duty_ayt_edb_0002",
+    "exam": "AYT",
+    "subject": "Türk Dili ve Edebiyatı",
+    "topic": "Divan edebiyatı",
+    "type": "compare",
+    "title": "Gazel, kaside, mesnevi",
+    "blocks": [
+      {
+        "kind": "table",
+        "headers": [
+          "",
+          "Gazel",
+          "Kaside",
+          "Mesnevi"
+        ],
+        "rows": [
+          [
+            "Uzunluk",
+            "5–15 beyit",
+            "33–99 beyit",
+            "Çok uzun"
+          ],
+          [
+            "Uyak",
+            "aa ba ca",
+            "aa ba ca",
+            "aa bb cc"
+          ],
+          [
+            "Konu",
+            "Aşk, doğa, şarap",
+            "Övgü",
+            "Hikâye"
+          ]
+        ]
+      },
+      {
+        "kind": "callout",
+        "tone": "info",
+        "text": "Gazelin ilk beyti matla, son beyti makta'dır."
+      }
+    ],
+    "tags": [
+      "gazel",
+      "kaside",
+      "mesnevi",
+      "nazım şekilleri"
+    ],
+    "status": "published",
+    "version": 1
+  }
+]

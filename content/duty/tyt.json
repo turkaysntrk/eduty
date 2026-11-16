@@ -1,0 +1,523 @@
+[
+  {
+    "id": "duty_tyt_mat_0001",
+    "exam": "TYT",
+    "subject": "Matematik",
+    "topic": "Sayılar",
+    "type": "exception",
+    "title": "1 asal mıdır? 2 hakkında ne söylenir?",
+    "blocks": [
+      {
+        "kind": "text",
+        "text": "Asal sayı, **tam olarak iki pozitif böleni** olan (1 ve kendisi) doğal sayıdır."
+      },
+      {
+        "kind": "list",
+        "items": [
+          "**1** asal değildir: tek pozitif böleni kendisidir.",
+          "**1** bileşik sayı da değildir.",
+          "**2** en küçük asal sayıdır ve tek çift asal sayıdır.",
+          "2'den büyük her çift sayının en az 3 böleni vardır (1, 2 ve kendisi), yani bileşiktir."
+        ]
+      },
+      {
+        "kind": "callout",
+        "tone": "tip",
+        "text": "Soruda “asal” geçiyorsa önce 1'i ve 2'yi kontrol et."
+      }
+    ],
+    "tags": [
+      "asal sayı",
+      "bölünebilme"
+    ],
+    "status": "published",
+    "version": 1
+  },
+  {
+    "id": "duty_tyt_mat_0002",
+    "exam": "TYT",
+    "subject": "Matematik",
+    "topic": "Üslü ve köklü ifadeler",
+    "type": "confusion",
+    "title": "√(x²) her zaman x midir?",
+    "blocks": [
+      {
+        "kind": "formula",
+        "text": "√(x²) = |x|"
+      },
+      {
+        "kind": "text",
+        "text": "Karekökün sonucu negatif olamaz. Bu yüzden x negatifken √(x²) = x yazmak **yanlıştır**."
+      },
+      {
+        "kind": "compare",
+        "left": {
+          "title": "x = 3",
+          "items": [
+            "√(3²) = √9 = 3",
+            "|3| = 3 olduğu için sonuç x'e eşit"
+          ]
+        },
+        "right": {
+          "title": "x = −3",
+          "items": [
+            "√((−3)²) = √9 = 3",
+            "Sonuç 3'tür; x = −3 değildir"
+          ]
+        }
+      },
+      {
+        "kind": "callout",
+        "tone": "warning",
+        "text": "(√x)² = x eşitliği ise yalnızca x ≥ 0 için tanımlıdır."
+      }
+    ],
+    "tags": [
+      "karekök",
+      "mutlak değer"
+    ],
+    "status": "published",
+    "version": 1
+  },
+  {
+    "id": "duty_tyt_mat_0003",
+    "exam": "TYT",
+    "subject": "Matematik",
+    "topic": "Permütasyon ve kombinasyon",
+    "type": "compare",
+    "title": "Permütasyon mu, kombinasyon mu?",
+    "blocks": [
+      {
+        "kind": "table",
+        "headers": [
+          "",
+          "Permütasyon",
+          "Kombinasyon"
+        ],
+        "rows": [
+          [
+            "Sıra",
+            "Önemlidir",
+            "Önemsizdir"
+          ],
+          [
+            "Soru tipi",
+            "Sıralama, başkan–yardımcı seçme",
+            "Grup, takım, komite seçme"
+          ],
+          [
+            "Formül",
+            "P(n,r) = n! / (n−r)!",
+            "C(n,r) = n! / (r!·(n−r)!)"
+          ]
+        ]
+      },
+      {
+        "kind": "text",
+        "text": "5 kişiden 2 kişilik komite: C(5,2) = 10. Aynı 5 kişiden başkan ve yardımcı: P(5,2) = 20."
+      },
+      {
+        "kind": "callout",
+        "tone": "info",
+        "text": "P(n,r) = C(n,r) · r!"
+      }
+    ],
+    "tags": [
+      "permütasyon",
+      "kombinasyon",
+      "sayma"
+    ],
+    "status": "published",
+    "version": 1
+  },
+  {
+    "id": "duty_tyt_fiz_0001",
+    "exam": "TYT",
+    "subject": "Fizik",
+    "topic": "Kuvvet ve hareket",
+    "type": "compare",
+    "title": "Kütle ile ağırlık aynı şey değil",
+    "blocks": [
+      {
+        "kind": "compare",
+        "left": {
+          "title": "Kütle",
+          "items": [
+            "Birimi kg",
+            "Skalerdir",
+            "Madde miktarını gösterir",
+            "Bulunduğu yere göre değişmez"
+          ]
+        },
+        "right": {
+          "title": "Ağırlık",
+          "items": [
+            "Birimi N (newton)",
+            "Vektördür, yere doğru",
+            "G = m·g",
+            "g'ye bağlıdır; Ay'da yaklaşık altıda bire düşer"
+          ]
+        }
+      },
+      {
+        "kind": "callout",
+        "tone": "tip",
+        "text": "Eşit kollu terazi kütleyi karşılaştırır, dinamometre ağırlığı ölçer."
+      }
+    ],
+    "tags": [
+      "kütle",
+      "ağırlık",
+      "skaler-vektör"
+    ],
+    "status": "published",
+    "version": 1
+  },
+  {
+    "id": "duty_tyt_fiz_0002",
+    "exam": "TYT",
+    "subject": "Fizik",
+    "topic": "Hareket",
+    "type": "confusion",
+    "title": "Sürat ile hız aynı mı?",
+    "blocks": [
+      {
+        "kind": "table",
+        "headers": [
+          "",
+          "Sürat",
+          "Hız"
+        ],
+        "rows": [
+          [
+            "Büyüklük",
+            "Skaler",
+            "Vektör"
+          ],
+          [
+            "Hesap",
+            "Toplam yol / süre",
+            "Yer değiştirme / süre"
+          ],
+          [
+            "Yön",
+            "Yoktur",
+            "Vardır"
+          ]
+        ]
+      },
+      {
+        "kind": "callout",
+        "tone": "warning",
+        "text": "Başladığı noktaya dönen koşucunun yer değiştirmesi 0'dır; ortalama hızı 0, ortalama sürati 0 değildir."
+      }
+    ],
+    "tags": [
+      "sürat",
+      "hız",
+      "yer değiştirme"
+    ],
+    "status": "published",
+    "version": 1
+  },
+  {
+    "id": "duty_tyt_kim_0001",
+    "exam": "TYT",
+    "subject": "Kimya",
+    "topic": "Atom yapısı",
+    "type": "compare",
+    "title": "İzotop, izoton, izobar",
+    "blocks": [
+      {
+        "kind": "image",
+        "src": "/duty/atom-notasyon.svg",
+        "alt": "Element sembolünün solunda üstte kütle numarası A, altta atom numarası Z yazılır",
+        "caption": "Nötron sayısı = A − Z"
+      },
+      {
+        "kind": "list",
+        "items": [
+          "**İzotop:** proton sayısı (Z) aynı, nötron sayısı farklı",
+          "**İzoton:** nötron sayısı aynı",
+          "**İzobar:** kütle numarası (A) aynı"
+        ]
+      },
+      {
+        "kind": "callout",
+        "tone": "tip",
+        "text": "¹²C ve ¹⁴C izotoptur: ikisinde de 6 proton vardır."
+      }
+    ],
+    "tags": [
+      "izotop",
+      "izoton",
+      "izobar",
+      "atom numarası"
+    ],
+    "status": "published",
+    "version": 1
+  },
+  {
+    "id": "duty_tyt_bio_0001",
+    "exam": "TYT",
+    "subject": "Biyoloji",
+    "topic": "Hücre bölünmeleri",
+    "type": "compare",
+    "title": "Mitoz ve mayoz karşılaştırması",
+    "blocks": [
+      {
+        "kind": "table",
+        "headers": [
+          "",
+          "Mitoz",
+          "Mayoz"
+        ],
+        "rows": [
+          [
+            "Ürün",
+            "2 hücre",
+            "4 hücre"
+          ],
+          [
+            "Kromozom",
+            "2n → 2n",
+            "2n → n"
+          ],
+          [
+            "Yer",
+            "Vücut hücreleri",
+            "Üreme ana hücreleri"
+          ],
+          [
+            "Görev",
+            "Büyüme, onarım",
+            "Gamet oluşumu"
+          ],
+          [
+            "Parça değişimi",
+            "Olmaz",
+            "Profaz I'de olabilir"
+          ]
+        ]
+      },
+      {
+        "kind": "callout",
+        "tone": "info",
+        "text": "Mayoz I'de homolog kromozomlar, mayoz II'de kardeş kromatitler ayrılır."
+      }
+    ],
+    "tags": [
+      "mitoz",
+      "mayoz",
+      "hücre bölünmesi"
+    ],
+    "status": "published",
+    "version": 1
+  },
+  {
+    "id": "duty_tyt_bio_0002",
+    "exam": "TYT",
+    "subject": "Biyoloji",
+    "topic": "Hücre",
+    "type": "confusion",
+    "title": "Prokaryot hücrede ribozom var mı?",
+    "blocks": [
+      {
+        "kind": "text",
+        "text": "Prokaryotlarda zarlı organel yoktur; ama protein sentezi için **ribozom vardır**."
+      },
+      {
+        "kind": "list",
+        "items": [
+          "**Var:** ribozom, hücre zarı, sitoplazma",
+          "**Yok:** çekirdek zarı, mitokondri, kloroplast, endoplazmik retikulum, Golgi, lizozom",
+          "Genetik madde sitoplazmadaki nükleoid bölgesindedir."
+        ]
+      },
+      {
+        "kind": "callout",
+        "tone": "warning",
+        "text": "Hücre duvarı: bakteride peptidoglikan, bitkide selüloz, mantarda kitin."
+      }
+    ],
+    "tags": [
+      "prokaryot",
+      "ökaryot",
+      "ribozom"
+    ],
+    "status": "published",
+    "version": 1
+  },
+  {
+    "id": "duty_tyt_edb_0001",
+    "exam": "TYT",
+    "subject": "Türk Dili ve Edebiyatı",
+    "topic": "Yazım kuralları",
+    "type": "tip",
+    "title": "“de/da” ne zaman ayrı yazılır?",
+    "blocks": [
+      {
+        "kind": "compare",
+        "left": {
+          "title": "Bağlaç: ayrı",
+          "items": [
+            "Ben de geldim.",
+            "Sen de gel.",
+            "Hep de/da yazılır; “te/ta” olmaz."
+          ]
+        },
+        "right": {
+          "title": "Bulunma eki: bitişik",
+          "items": [
+            "Evde kaldım.",
+            "Kitapta okudum.",
+            "Sert ünsüzden sonra te/ta olur."
+          ]
+        }
+      },
+      {
+        "kind": "callout",
+        "tone": "tip",
+        "text": "Dene: “de/da”yı çıkar. Cümle bozulmuyorsa bağlaçtır, ayrı yaz."
+      }
+    ],
+    "tags": [
+      "de/da",
+      "yazım"
+    ],
+    "status": "published",
+    "version": 1
+  },
+  {
+    "id": "duty_tyt_tar_0001",
+    "exam": "TYT",
+    "subject": "Tarih",
+    "topic": "İlk Türk-İslam devletleri ve Anadolu",
+    "type": "compare",
+    "title": "Malazgirt ve Miryokefalon: kim ne kazandırdı?",
+    "blocks": [
+      {
+        "kind": "table",
+        "headers": [
+          "",
+          "Malazgirt (1071)",
+          "Miryokefalon (1176)"
+        ],
+        "rows": [
+          [
+            "Devlet",
+            "Büyük Selçuklu",
+            "Anadolu Selçuklu"
+          ],
+          [
+            "Türk komutan",
+            "Alparslan",
+            "II. Kılıç Arslan"
+          ],
+          [
+            "Bizans",
+            "IV. Romanos Diogenes",
+            "I. Manuel Komnenos"
+          ],
+          [
+            "Sonuç",
+            "Anadolu'nun kapıları Türklere açıldı",
+            "Bizans'ın Anadolu'yu geri alma umudu bitti"
+          ]
+        ]
+      }
+    ],
+    "tags": [
+      "Malazgirt",
+      "Miryokefalon",
+      "Anadolu Selçuklu"
+    ],
+    "status": "published",
+    "version": 1
+  },
+  {
+    "id": "duty_tyt_cog_0001",
+    "exam": "TYT",
+    "subject": "Coğrafya",
+    "topic": "Dünya'nın hareketleri",
+    "type": "confusion",
+    "title": "Mevsimler Güneş'e yakınlıktan mı oluşur?",
+    "blocks": [
+      {
+        "kind": "text",
+        "text": "Hayır. Mevsimlerin nedeni **eksen eğikliği** (yaklaşık 23°27′) ve Dünya'nın **yıllık hareketidir**."
+      },
+      {
+        "kind": "list",
+        "items": [
+          "Dünya, Güneş'e en yakın konumdan (günberi) Ocak başında geçer; o sırada Kuzey Yarımküre'de kış yaşanır.",
+          "Eksen eğik olduğu için Güneş ışınlarının geliş açısı ve gece-gündüz süresi yıl boyunca değişir."
+        ]
+      },
+      {
+        "kind": "callout",
+        "tone": "tip",
+        "text": "Eksen eğik olmasaydı belirgin mevsimler oluşmazdı."
+      }
+    ],
+    "tags": [
+      "mevsimler",
+      "eksen eğikliği",
+      "yıllık hareket"
+    ],
+    "status": "published",
+    "version": 1
+  },
+  {
+    "id": "duty_tyt_tar_0002",
+    "exam": "TYT",
+    "subject": "Tarih",
+    "topic": "Millî Mücadele",
+    "type": "compare",
+    "title": "Mondros, Mudanya ve Lozan",
+    "blocks": [
+      {
+        "kind": "table",
+        "headers": [
+          "",
+          "Mondros",
+          "Mudanya",
+          "Lozan"
+        ],
+        "rows": [
+          [
+            "Tarih",
+            "30 Ekim 1918",
+            "11 Ekim 1922",
+            "24 Temmuz 1923"
+          ],
+          [
+            "Tür",
+            "Ateşkes",
+            "Ateşkes",
+            "Barış"
+          ],
+          [
+            "Anlamı",
+            "Osmanlı savaştan çekildi",
+            "Doğu Trakya boşaltıldı",
+            "Türkiye tanındı"
+          ]
+        ]
+      },
+      {
+        "kind": "callout",
+        "tone": "info",
+        "text": "Mütareke = ateşkes. Savaşı bitiren barış için ayrı bir antlaşma gerekir."
+      }
+    ],
+    "tags": [
+      "Mondros",
+      "Mudanya",
+      "Lozan",
+      "mütareke"
+    ],
+    "status": "published",
+    "version": 1
+  }
+]

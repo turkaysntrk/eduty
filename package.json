@@ -5,7 +5,8 @@
     "build": "nuxt build",
     "dev": "nuxt dev",
     "generate": "nuxt generate",
-    "preview": "nuxt preview"
+    "preview": "nuxt preview",
+    "test:duty": "node --test \"tests/duty/*.test.mjs\""
   },
   "devDependencies": {
     "@nuxt/devtools": "^1.0.0",
