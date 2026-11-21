@@ -147,10 +147,17 @@
                     </div>
                 </div>
                 <div class="tr-tools">
+                    <button @click="setTool('scroll')" :class="{ active: drawingTool === 'scroll' }"
+                        title="Gezin: PDF'i kaydır ve incele">🖐️</button>
                     <button @click="setTool('pen')" :class="{ active: drawingTool === 'pen' }" title="Kalem">✏️</button>
                     <button @click="setTool('eraser')" :class="{ active: drawingTool === 'eraser' }"
                         title="Silgi">🧹</button>
-                    <button @click="clearCanvas" title="Temizle">🗑️</button>
+                    <button @click="clearCanvas" title="Çizimleri temizle">🗑️</button>
+                    <span class="zoom-group" title="PDF yakınlaştırma">
+                        <button @click="zoomOut" :disabled="pdfZoom <= 1" title="Uzaklaştır">−</button>
+                        <span class="zoom-label" @click="zoomReset" title="Sıfırla">{{ Math.round(pdfZoom * 100) }}%</span>
+                        <button @click="zoomIn" :disabled="pdfZoom >= 3" title="Yakınlaştır">＋</button>
+                    </span>
                     <button class="btn-close-test" @click="confirmExitTest">Çıkış Yap</button>
                 </div>
             </div>
@@ -164,11 +171,16 @@
 
             <div class="test-runner-body">
                 <div class="pdf-container" ref="pdfContainer">
-                    <iframe
-                        :src="currentTest?.pdfUrl ? 'https://docs.google.com/viewer?url=' + encodeURIComponent(currentTest.pdfUrl) + '&embedded=true' : ''"
-                        class="pdf-frame" allow="autoplay"></iframe>
-                    <canvas ref="drawCanvas" class="drawing-canvas" @mousedown="startDrawing" @mousemove="draw"
-                        @mouseup="stopDrawing" @mouseleave="stopDrawing"></canvas>
+                    <div class="pdf-stage" :style="{ width: pdfZoom * 100 + '%', height: pdfZoom * 100 + '%' }">
+                        <div v-if="!pdfViewerSrc" class="pdf-missing">
+                            Bu testin PDF'i henüz yüklenmemiş. Lütfen öğretmenine haber ver.
+                        </div>
+                        <iframe v-else :src="pdfViewerSrc" class="pdf-frame" allow="autoplay"
+                            :style="{ width: 100 / pdfZoom + '%', height: 100 / pdfZoom + '%', transform: 'scale(' + pdfZoom + ')', transformOrigin: '0 0' }"></iframe>
+                        <canvas ref="drawCanvas" class="drawing-canvas"
+                            :class="{ 'draw-active': drawingTool !== 'scroll' }" @pointerdown="startDrawing"
+                            @pointermove="draw" @pointerup="stopDrawing" @pointercancel="stopDrawing"></canvas>
+                    </div>
                 </div>
                 <div class="optical-form">
 
@@ -630,7 +642,30 @@
                     </div>
                 </div>
 
-                <div v-if="activeTab === 'ai-solve'" class="eduty-ai-panel eduty-ai-enter">
+                <div v-if="activeTab === 'ai-solve'" class="ai-layout">
+                <aside class="ai-history" :class="{ open: aiHistoryOpen }">
+                    <button type="button" class="ai-history-new" @click="newAiQuestion">＋ Yeni soru</button>
+                    <button type="button" class="ai-history-toggle" @click="aiHistoryOpen = !aiHistoryOpen">
+                        🕘 Geçmiş sorularım ({{ aiHistory.length }})
+                    </button>
+                    <div class="ai-history-list">
+                        <p class="ai-history-heading">Geçmiş sorularım</p>
+                        <p v-if="aiHistoryLoading" class="ai-history-empty">Yükleniyor...</p>
+                        <p v-else-if="!aiHistory.length" class="ai-history-empty">
+                            Henüz kayıtlı soru yok. Çözdürdüğün sorular burada görünecek.</p>
+                        <div v-for="h in aiHistory" :key="h.id" class="ai-history-item"
+                            :class="{ active: h.id === activeHistoryId }" @click="openHistoryItem(h)">
+                            <img v-if="h.thumb" :src="h.thumb" alt="" class="ai-history-thumb" />
+                            <div class="ai-history-text">
+                                <strong>{{ h.title }}</strong>
+                                <small>{{ h.subject }} · {{ formatHistoryDate(h.createdAt) }}</small>
+                            </div>
+                            <button type="button" class="ai-history-del" title="Sil"
+                                @click.stop="deleteHistoryItem(h)">🗑️</button>
+                        </div>
+                    </div>
+                </aside>
+                <div class="eduty-ai-panel eduty-ai-enter">
                     <div class="eduty-ai-header">
                         <h2 class="section-title eduty-ai-title">
                             <span class="eai-eduty">Eduty</span><span class="eai-ai-wrap"><span
@@ -797,6 +832,8 @@
                             v-html="formattedAiCheckAnswer"></div>
                     </div>
 
+                    <p v-if="aiViewingHistory" class="ai-history-note">📚 Geçmişten açıldı. İpucu ve çözüm kontrolü
+                        için soruyu yeniden yükle.</p>
                     <div v-if="aiAnswer" class="ai-answer-box animate-fade" v-html="formattedAiAnswer"></div>
 
                     <button v-if="aiAnswer" type="button" class="btn-simplify" @click="simplifyAiAnswer"
@@ -830,6 +867,7 @@
                         </Transition>
                     </div>
                 </div>
+                </div>
 
                 <!-- Duty: kısa öğrenme kartları akışı (components/duty/DutyFeed.vue) -->
                 <div v-if="activeTab === 'duty'">
@@ -842,13 +880,12 @@
 </template>
 
 <script setup>
-import { ref, reactive, computed, onMounted, onUnmounted, nextTick } from 'vue'
+import { ref, reactive, computed, watch, onMounted, onUnmounted, nextTick } from 'vue'
 import { useRouter } from 'vue-router'
 import { onAuthStateChanged, signOut, updateProfile } from 'firebase/auth'
-import { getFirestore, doc, getDoc, updateDoc, collection, getDocs, query, where, addDoc, onSnapshot, orderBy, serverTimestamp, deleteField, runTransaction } from 'firebase/firestore'
+import { getFirestore, doc, getDoc, updateDoc, collection, getDocs, query, where, addDoc, onSnapshot, orderBy, serverTimestamp, deleteField, runTransaction, limit, deleteDoc } from 'firebase/firestore'
 import { getVaultBalance, withdrawFromVault } from '~/utils/mainVault.js'
-import { marked } from 'marked'
-import DOMPurify from 'dompurify'
+import { renderAiMarkdown } from '~/utils/aiMarkdown.js'
 // AI Soru Çözme
 const aiImageBase64 = ref('')
 const aiImagePreviewUrl = ref('')
@@ -883,12 +920,12 @@ const aiCheckAnswer = ref('')
 const aiCheckAnswerDisplay = ref('')
 const formattedAiCheckAnswer = computed(() => {
     if (!aiCheckAnswerDisplay.value) return ''
-    return DOMPurify.sanitize(marked.parse(aiCheckAnswerDisplay.value))
+    return renderAiMarkdown(aiCheckAnswerDisplay.value)
 })
 
 function renderHintMarkdown(text) {
     if (!text) return ''
-    return DOMPurify.sanitize(marked.parse(text))
+    return renderAiMarkdown(text)
 }
 
 // Yeni bir soru yüklendiğinde (veya panel kapatılıp yeniden açıldığında)
@@ -926,7 +963,7 @@ function buildAnswerPreview(text) {
 }
 const formattedAiAnswer = computed(() => {
     if (!aiAnswerDisplay.value) return ''
-    return DOMPurify.sanitize(marked.parse(aiAnswerDisplay.value))
+    return renderAiMarkdown(aiAnswerDisplay.value)
 })
 
 // ── AI cevabının ChatGPT benzeri akıcı "yazılma" animasyonu ──
@@ -1008,6 +1045,129 @@ onUnmounted(() => {
     checkTypewriter.stop()
 })
 
+// ── Geçmiş sorularım (users/{uid}/aiHistory) ──
+const AI_HISTORY_LIMIT = 50
+const aiHistory = ref([])
+const aiHistoryLoading = ref(false)
+const aiHistoryLoaded = ref(false)
+const aiHistoryOpen = ref(false)
+const activeHistoryId = ref('')
+const aiViewingHistory = ref(false)
+
+function formatHistoryDate(ts) {
+    try {
+        const d = ts?.toDate ? ts.toDate() : (ts ? new Date(ts) : new Date())
+        return d.toLocaleDateString('tr-TR', { day: 'numeric', month: 'short' })
+    } catch (_) { return '' }
+}
+
+// Soru fotoğrafını küçük bir önizlemeye çevirir (Firestore belge sınırı için)
+function createThumbnail(dataUrl, maxW = 480) {
+    return new Promise((resolve) => {
+        if (!dataUrl) return resolve('')
+        const img = new Image()
+        img.onload = () => {
+            try {
+                const scale = Math.min(1, maxW / img.width)
+                const c = document.createElement('canvas')
+                c.width = Math.round(img.width * scale)
+                c.height = Math.round(img.height * scale)
+                c.getContext('2d').drawImage(img, 0, 0, c.width, c.height)
+                let out = c.toDataURL('image/jpeg', 0.6)
+                if (out.length > 150000) out = c.toDataURL('image/jpeg', 0.4)
+                resolve(out.length <= 190000 ? out : '')
+            } catch (_) { resolve('') }
+        }
+        img.onerror = () => resolve('')
+        img.src = dataUrl
+    })
+}
+
+async function loadAiHistory() {
+    if (!$auth.currentUser) return
+    if (!db) db = getFirestore()
+    aiHistoryLoading.value = true
+    try {
+        const q = query(collection(db, 'users', $auth.currentUser.uid, 'aiHistory'), orderBy('createdAt', 'desc'), limit(AI_HISTORY_LIMIT + 1))
+        const snap = await getDocs(q)
+        const items = snap.docs.map(d => ({ id: d.id, ...d.data() }))
+        // Sınırı aşan en eski kaydı temizle
+        if (items.length > AI_HISTORY_LIMIT) {
+            const extra = items.pop()
+            deleteDoc(doc(db, 'users', $auth.currentUser.uid, 'aiHistory', extra.id)).catch(() => { })
+        }
+        aiHistory.value = items
+        aiHistoryLoaded.value = true
+    } catch (e) {
+        console.warn('[AI geçmişi] yüklenemedi:', e)
+    } finally {
+        aiHistoryLoading.value = false
+    }
+}
+
+async function saveAiHistory(title, answer) {
+    if (!$auth.currentUser || !answer) return
+    try {
+        if (!db) db = getFirestore()
+        const thumb = await createThumbnail(aiImagePreviewUrl.value)
+        const data = {
+            title: String(title || aiSubject.value || 'Soru').slice(0, 80),
+            subject: aiSubject.value || 'Belirtilmemiş',
+            mode: aiMode.value,
+            answer: String(answer).slice(0, 28000),
+            createdAt: serverTimestamp()
+        }
+        if (thumb) data.thumb = thumb
+        const ref_ = await addDoc(collection(db, 'users', $auth.currentUser.uid, 'aiHistory'), data)
+        activeHistoryId.value = ref_.id
+        await loadAiHistory()
+    } catch (e) {
+        console.warn('[AI geçmişi] kaydedilemedi:', e)
+    }
+}
+
+function openHistoryItem(h) {
+    stopTypewriter()
+    resetAiHelpers()
+    aiAnswer.value = h.answer
+    aiAnswerDisplay.value = h.answer
+    aiAnswerId.value = ''
+    aiFeedback.value = ''
+    aiImagePreviewUrl.value = h.thumb || ''
+    aiImageBase64.value = ''
+    if (h.subject && (lessons.value || []).includes(h.subject)) aiSubject.value = h.subject
+    if (h.mode) aiMode.value = h.mode
+    activeHistoryId.value = h.id
+    aiViewingHistory.value = true
+    aiHistoryOpen.value = false
+}
+
+function newAiQuestion() {
+    stopTypewriter()
+    resetAiHelpers()
+    aiAnswer.value = ''
+    aiAnswerDisplay.value = ''
+    aiAnswerId.value = ''
+    aiFeedback.value = ''
+    aiImagePreviewUrl.value = ''
+    aiImageBase64.value = ''
+    activeHistoryId.value = ''
+    aiViewingHistory.value = false
+    aiHistoryOpen.value = false
+}
+
+async function deleteHistoryItem(h) {
+    if (!confirm('Bu kayıt silinsin mi?')) return
+    try {
+        if (!db) db = getFirestore()
+        await deleteDoc(doc(db, 'users', $auth.currentUser.uid, 'aiHistory', h.id))
+        aiHistory.value = aiHistory.value.filter(x => x.id !== h.id)
+        if (activeHistoryId.value === h.id) newAiQuestion()
+    } catch (e) {
+        alert('Silinemedi: ' + e.message)
+    }
+}
+
 function onAiFileChange(e) {
     const file = e.target.files[0]
     if (!file) return
@@ -1016,6 +1176,8 @@ function onAiFileChange(e) {
         aiImageBase64.value = reader.result.split(',')[1]
         aiImagePreviewUrl.value = reader.result
         resetAiHelpers() // yeni soru = önceki ipucu/kontrol geçmişi geçersiz
+        aiViewingHistory.value = false
+        activeHistoryId.value = ''
     }
     reader.readAsDataURL(file)
 }
@@ -1052,7 +1214,9 @@ async function solveWithAi() {
         })
         aiAnswer.value = res.answer
         aiAnswerId.value = generateAnswerId()
+        aiViewingHistory.value = false
         typewriterReveal(res.answer)
+        if (res.ok) saveAiHistory(res.title, res.answer)
     } catch (err) {
         aiAnswer.value = 'Bir hata oluştu, tekrar dener misin?'
         typewriterReveal(aiAnswer.value)
@@ -1204,6 +1368,10 @@ const isLoading = ref(true)
 const isStudent = ref(false)
 const isSidebarOpen = ref(false) // Mobil menü durumu
 const activeTab = ref('stats')
+// Eduty AI sekmesi açılınca geçmişi yükle (activeTab tanımından SONRA olmalı)
+watch(activeTab, (t) => {
+    if (t === 'ai-solve' && !aiHistoryLoaded.value) loadAiHistory()
+})
 const userDisplayName = ref('')
 const userEmail = ref('')
 const userGrade = ref(null)
@@ -1235,9 +1403,19 @@ const availableSlots = ref([])
 // Test Runner State
 const isTakingTest = ref(false)
 const currentTest = ref(null)
+// PDF görüntüleyici adresi: Google Drive bağlantıları /preview ile, diğerleri doğrudan açılır
+const pdfViewerSrc = computed(() => {
+    const url = currentTest.value?.pdfUrl
+    if (!url || /^https?:\/\/(www\.)?example\.com/i.test(url)) return ''
+    const m = url.match(/drive\.google\.com\/(?:file\/d\/|open\?id=|uc\?(?:export=\w+&)?id=)([\w-]+)/)
+    if (m) return `https://drive.google.com/file/d/${m[1]}/preview`
+    return url
+})
 const userAnswers = ref([])
-const drawingTool = ref('pen')
+const drawingTool = ref('scroll') // 'scroll' | 'pen' | 'eraser'
+const pdfZoom = ref(1)
 const drawCanvas = ref(null)
+const CANVAS_RES = 2
 const isDrawing = ref(false)
 let ctx = null
 
@@ -1609,14 +1787,17 @@ const openTestRunner = async (test) => {
     isTakingTest.value = true
     await nextTick()
     // Canvas kurulumu
+    pdfZoom.value = 1
+    drawingTool.value = 'scroll'
     const canvas = drawCanvas.value
-    canvas.width = canvas.parentElement.clientWidth
-    canvas.height = canvas.parentElement.clientHeight
+    canvas.width = canvas.parentElement.clientWidth * CANVAS_RES
+    canvas.height = canvas.parentElement.clientHeight * CANVAS_RES
     ctx = canvas.getContext('2d')
     ctx.lineCap = 'round'
     ctx.lineJoin = 'round'
     ctx.strokeStyle = '#0055ff'
-    ctx.lineWidth = 2
+    ctx.globalCompositeOperation = 'source-over'
+    ctx.lineWidth = 2 * CANVAS_RES
     // Güvenlik sistemlerini başlat
     startTabWatcher()
     cameraPermissionState.value = 'asking'
@@ -1742,11 +1923,41 @@ const analyzeFrameWithAI = async (imageData) => {
     }
 }
 
-const startDrawing = (e) => { isDrawing.value = true; ctx.beginPath(); ctx.moveTo(e.offsetX, e.offsetY); }
-const draw = (e) => { if (!isDrawing.value) return; ctx.lineTo(e.offsetX, e.offsetY); ctx.stroke(); }
-const stopDrawing = () => { isDrawing.value = false; ctx.closePath(); }
-const setTool = (t) => { drawingTool.value = t; ctx.globalCompositeOperation = t === 'eraser' ? 'destination-out' : 'source-over'; ctx.lineWidth = t === 'eraser' ? 20 : 2; }
-const clearCanvas = () => ctx.clearRect(0, 0, drawCanvas.value.width, drawCanvas.value.height)
+// Çizim tuvali, PDF alanıyla birlikte ölçeklenir; koordinatlar tuval piksellerine çevrilir
+const canvasPoint = (e) => {
+    const c = drawCanvas.value
+    const r = c.getBoundingClientRect()
+    return { x: (e.clientX - r.left) * (c.width / r.width), y: (e.clientY - r.top) * (c.height / r.height) }
+}
+const startDrawing = (e) => {
+    if (!ctx || drawingTool.value === 'scroll') return
+    isDrawing.value = true
+    try { e.target.setPointerCapture(e.pointerId) } catch (_) { }
+    const p = canvasPoint(e)
+    ctx.beginPath()
+    ctx.moveTo(p.x, p.y)
+}
+const draw = (e) => {
+    if (!isDrawing.value || !ctx) return
+    const p = canvasPoint(e)
+    ctx.lineTo(p.x, p.y)
+    ctx.stroke()
+}
+const stopDrawing = () => {
+    if (!isDrawing.value) return
+    isDrawing.value = false
+    ctx.closePath()
+}
+const setTool = (t) => {
+    drawingTool.value = t
+    if (!ctx || t === 'scroll') return
+    ctx.globalCompositeOperation = t === 'eraser' ? 'destination-out' : 'source-over'
+    ctx.lineWidth = (t === 'eraser' ? 20 : 2) * CANVAS_RES
+}
+const clearCanvas = () => { if (ctx && drawCanvas.value) ctx.clearRect(0, 0, drawCanvas.value.width, drawCanvas.value.height) }
+const zoomIn = () => { pdfZoom.value = Math.min(3, Math.round((pdfZoom.value + 0.25) * 100) / 100) }
+const zoomOut = () => { pdfZoom.value = Math.max(1, Math.round((pdfZoom.value - 0.25) * 100) / 100) }
+const zoomReset = () => { pdfZoom.value = 1 }
 
 const confirmExitTest = () => {
     if (confirm("Testten çıkmak istediğine emin misin? İlerlemen kaybolacak.")) {
@@ -3440,12 +3651,31 @@ onMounted(() => {
     flex: 3;
     position: relative;
     background: #222;
+    overflow: auto;
+}
+
+.pdf-stage {
+    position: relative;
+    min-width: 100%;
+    min-height: 100%;
 }
 
 .pdf-frame {
     width: 100%;
     height: 100%;
     border: none;
+    display: block;
+}
+
+.pdf-missing {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+    padding: 24px;
+    color: #64748b;
 }
 
 .drawing-canvas {
@@ -3455,7 +3685,40 @@ onMounted(() => {
     width: 100%;
     height: 100%;
     z-index: 10;
+    pointer-events: none;
+}
+
+.drawing-canvas.draw-active {
+    pointer-events: auto;
     cursor: crosshair;
+    touch-action: none;
+}
+
+.zoom-group {
+    display: inline-flex;
+    align-items: center;
+    margin-left: 8px;
+}
+
+.zoom-group button {
+    margin-left: 4px !important;
+    width: 34px !important;
+    font-size: 1.1rem;
+}
+
+.zoom-group button:disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
+}
+
+.zoom-label {
+    min-width: 48px;
+    text-align: center;
+    color: #ccc;
+    font-size: 0.8rem;
+    font-weight: 700;
+    cursor: pointer;
+    margin-left: 4px;
 }
 
 .optical-form {
@@ -4891,6 +5154,171 @@ onMounted(() => {
 
     .ai-helper-panel {
         padding: 14px;
+    }
+}
+
+/* ── Eduty AI geçmiş paneli ── */
+.ai-layout {
+    display: flex;
+    gap: 24px;
+    align-items: flex-start;
+    width: 100%;
+    max-width: 1100px;
+    margin: 0 auto;
+}
+
+.ai-layout .eduty-ai-panel {
+    flex: 1;
+    min-width: 0;
+    margin: 0;
+}
+
+.ai-history {
+    width: 260px;
+    flex-shrink: 0;
+    position: sticky;
+    top: 16px;
+    max-height: calc(100vh - 32px);
+    overflow-y: auto;
+    background: linear-gradient(180deg, #141414, #101010);
+    border: 1px solid #2a2a2a;
+    border-radius: 16px;
+    padding: 14px;
+}
+
+.ai-history-new {
+    width: 100%;
+    padding: 10px;
+    background: #0055ff;
+    color: #fff;
+    border: none;
+    border-radius: 10px;
+    font-weight: 700;
+    cursor: pointer;
+}
+
+.ai-history-toggle {
+    display: none;
+    width: 100%;
+    margin-top: 8px;
+    padding: 10px;
+    background: #222;
+    color: #ccc;
+    border: 1px solid #444;
+    border-radius: 10px;
+    cursor: pointer;
+    font-weight: 600;
+}
+
+.ai-history-heading {
+    margin: 16px 0 8px;
+    font-size: 0.75rem;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    color: #888;
+    font-weight: 700;
+}
+
+.ai-history-empty {
+    font-size: 0.82rem;
+    color: #777;
+    line-height: 1.4;
+}
+
+.ai-history-item {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 8px;
+    border-radius: 10px;
+    cursor: pointer;
+    border: 1px solid transparent;
+}
+
+.ai-history-item:hover {
+    background: #1b1b1b;
+}
+
+.ai-history-item.active {
+    background: #14213d;
+    border-color: #0055ff;
+}
+
+.ai-history-thumb {
+    width: 40px;
+    height: 40px;
+    object-fit: cover;
+    border-radius: 6px;
+    flex-shrink: 0;
+    background: #222;
+}
+
+.ai-history-text {
+    flex: 1;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+}
+
+.ai-history-text strong {
+    font-size: 0.85rem;
+    color: #e5e5e5;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.ai-history-text small {
+    font-size: 0.72rem;
+    color: #888;
+}
+
+.ai-history-del {
+    background: none;
+    border: none;
+    cursor: pointer;
+    opacity: 0;
+    font-size: 0.9rem;
+}
+
+.ai-history-item:hover .ai-history-del {
+    opacity: 0.8;
+}
+
+.ai-history-note {
+    font-size: 0.85rem;
+    color: #9aa;
+    margin: 6px 0 10px;
+}
+
+@media (max-width: 1100px) {
+    .ai-layout {
+        flex-direction: column;
+        gap: 14px;
+    }
+
+    .ai-history {
+        width: 100%;
+        position: static;
+        max-height: none;
+    }
+
+    .ai-history-toggle {
+        display: block;
+    }
+
+    .ai-history-list {
+        display: none;
+    }
+
+    .ai-history.open .ai-history-list {
+        display: block;
+        max-height: 50vh;
+        overflow-y: auto;
+    }
+
+    .ai-history-del {
+        opacity: 0.8;
     }
 }
 </style>

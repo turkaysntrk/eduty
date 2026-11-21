@@ -141,7 +141,32 @@ function resolveHintLevel(rawLevel) {
     return [1, 2, 3].includes(n) ? n : 1
 }
 
-async function callGemini(config, model, parts) {
+// ─────────────────────────────────────────────────────────────
+// Matematik/biçim kuralı — her istekte en başa eklenir.
+// Frontend matematiği KaTeX ile çizer; bu yüzden LaTeX ($...$) beklenir.
+// ─────────────────────────────────────────────────────────────
+const MATH_FORMAT_GUIDE = [
+    'Yazım kuralları (çok önemli):',
+    '- Tüm matematiksel ifadeleri LaTeX ile yaz: satır içi için $...$, ayrı satırda büyük formüller için $$...$$.',
+    '  Örnek: $x^2 + 3x - 4 = 0$, $\\frac{a}{b}$, $\\sqrt{2}$, $\\cdot$, $\\times$.',
+    '- Üs, kök, kesir için Unicode üst simgeler (², ³) veya düz "x^2" yazma; LaTeX kullan.',
+    '- Para birimi için $ işareti kullanma ("TL" yaz).',
+    '- Kalın yazı için **kalın** kullan; ** işaretlerinin içindeki metin boşlukla başlayıp bitmesin.',
+    '- Markdown dışında HTML etiketi kullanma.'
+].join('\n')
+
+const TITLE_GUIDE = 'Cevabının İLK satırı tam olarak şu biçimde olsun: "BAŞLIK: <sorunun konusunu anlatan 3-6 kelimelik kısa başlık>" (başlıkta LaTeX, Markdown veya $ kullanma). Bu satırdan sonra çözümü yaz.'
+
+function extractTitle(answer: string | null) {
+    if (!answer) return { title: '', answer }
+    const m = answer.match(/^\s*BAŞLIK:\s*(.+?)\s*(?:\n|$)/i)
+    if (!m) return { title: '', answer }
+    const title = m[1].replace(/[*#`$]/g, '').trim().slice(0, 60)
+    return { title, answer: answer.slice(m[0].length).trim() }
+}
+
+async function callGemini(config, model, rawParts) {
+    const parts = [{ text: MATH_FORMAT_GUIDE }, ...rawParts]
     const response = await fetch(
         `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${config.geminiApiKey}`,
         {
@@ -183,12 +208,14 @@ async function handleSolve(config, body) {
     const systemPrompt = SYSTEM_PROMPTS[mode]
     const model = MODEL_BY_MODE[mode]
 
-    const answer = await callGemini(config, model, [
+    const raw = await callGemini(config, model, [
         { text: systemPrompt },
+        { text: TITLE_GUIDE },
         { inline_data: { mime_type: 'image/jpeg', data: body.imageBase64 } }
     ])
+    const { title, answer } = extractTitle(raw)
 
-    return { answer: answer ?? 'Cevap alınamadı, tekrar dener misin?', mode }
+    return { answer: answer ?? 'Cevap alınamadı, tekrar dener misin?', title: answer ? title : '', ok: !!answer, mode }
 }
 
 // Yeni akış: "Daha basit anlat" — var olan cevabı görsel olmadan, sadece

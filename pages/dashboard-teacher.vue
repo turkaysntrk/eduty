@@ -75,7 +75,12 @@
                             <input type="text" :value="editTestForm.subject" disabled class="disabled-input" />
                         </div>
                     </div>
-                    <p style="font-size:0.8rem; color:#666;">Not: PDF ve Cevap Anahtarı bu ekrandan değiştirilemez.
+                    <div class="form-group">
+                        <label>PDF Bağlantısı</label>
+                        <input type="url" v-model="editTestForm.pdfUrl"
+                            placeholder="Google Drive paylaşım bağlantısı (Bağlantıya sahip herkes)" />
+                    </div>
+                    <p style="font-size:0.8rem; color:#666;">Not: Cevap Anahtarı bu ekrandan değiştirilemez.
                         Hatalıysa testi silip yeniden yükleyiniz.</p>
                 </div>
                 <div class="modal-actions">
@@ -221,21 +226,10 @@
                                 </div>
 
                                 <div class="form-group">
-                                    <label>PDF Dosyası</label>
-                                    <div class="file-drop-area" @click="$refs.pdfInput.click()"
-                                        :class="{ 'has-file': testForm.file }">
-                                        <div v-if="!testForm.file">
-                                            <span class="icon-upload">📄</span>
-                                            <p>PDF Yüklemek İçin Tıklayın</p>
-                                        </div>
-                                        <div v-else class="file-selected">
-                                            <span class="icon-check">✅</span>
-                                            <p>{{ testForm.file.name }}</p>
-                                            <small>Değiştirmek için tıklayın</small>
-                                        </div>
-                                        <input type="file" ref="pdfInput" accept="application/pdf"
-                                            @change="handlePdfUpload" hidden />
-                                    </div>
+                                    <label>PDF Bağlantısı</label>
+                                    <input v-model="testForm.pdfLink" type="url"
+                                        placeholder="Google Drive paylaşım bağlantısı (Bağlantıya sahip herkes)" />
+                                    <small>PDF'i Google Drive'a yükleyin, "Bağlantıya sahip olan herkes görüntüleyebilir" olarak paylaşın ve bağlantıyı buraya yapıştırın.</small>
                                 </div>
 
                                 <div class="form-group">
@@ -500,10 +494,10 @@ const router = useRouter(); const { $auth } = useNuxtApp(); let db;
 const isSidebarOpen = ref(false); const isLoading = ref(true); const isTeacher = ref(false); const activeTab = ref('calendar'); const userDisplayName = ref(''); const userEmail = ref(''); const userBranch = ref(''); const userSchoolLevel = ref(''); const teacherScore = ref(0); const pastLessons = ref([]); const myTests = ref([]);
 const myChats = ref([]); const activeChat = ref(null); const activeMessages = ref([]); const newMessage = ref(''); let typingTimeout = null;
 const daysOfWeek = ["Pzt", "Sal", "Çar", "Per", "Cum", "Cmt", "Paz"]; const timeSlots = ["09:00", "10:00", "11:00", "12:00", "13:00", "14:00", "15:00", "16:00", "17:00", "18:00", "19:00", "20:00"]; const myAvailability = reactive({}); const myBookings = reactive({});
-const testForm = reactive({ title: '', grade: '', subject: '', questionCount: 0, file: null, answers: [] });
+const testForm = reactive({ title: '', grade: '', subject: '', questionCount: 0, file: null, pdfLink: '', answers: [] });
 const availableGrades = computed(() => { const level = userSchoolLevel.value; if (level === 'ilkokul') return [1, 2, 3, 4]; else if (level === 'ortaokul') return [5, 6, 7, 8]; else if (level === 'lise') return [9, 10, 11, 12, 'Mezun']; else return [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, "Mezun"]; });
-const isFormValid = computed(() => testForm.title && testForm.grade && userBranch.value && testForm.file && testForm.questionCount > 0 && testForm.answers.length === testForm.questionCount && !testForm.answers.includes(undefined));
-const isUpdateModalOpen = ref(false); const editTestForm = reactive({ id: null, title: '', grade: '', subject: '' });
+const isFormValid = computed(() => testForm.title && testForm.grade && userBranch.value && /^https:\/\/(drive|docs)\.google\.com\//.test(testForm.pdfLink.trim()) && testForm.questionCount > 0 && testForm.answers.length === testForm.questionCount && !testForm.answers.includes(undefined));
+const isUpdateModalOpen = ref(false); const editTestForm = reactive({ id: null, title: '', grade: '', subject: '', pdfUrl: '' });
 const isPublished = ref(false)
 const lessonPriceInput = ref(0)
 const bioInput = ref('')
@@ -687,7 +681,7 @@ const submitTest = async () => {
     if (!db) db = getFirestore()
     const finalSubject = userBranch.value
     try {
-        const fakePdfUrl = "https://example.com/uploads/sample_test.pdf"
+        const fakePdfUrl = testForm.pdfLink.trim()
         await addDoc(collection(db, "tests"), {
             uploaderId: $auth.currentUser.uid,
             uploaderName: userDisplayName.value,
@@ -707,11 +701,11 @@ const submitTest = async () => {
         } else {
             alert(`✅ Test yüklendi! Artık yayına alabilirsin. 🎉`)
         }
-        Object.assign(testForm, { title: '', questionCount: 0, file: null, answers: [] })
+        Object.assign(testForm, { title: '', questionCount: 0, file: null, pdfLink: '', answers: [] })
     } catch (error) { alert("Hata: " + error.message) }
 }
-const openUpdateModal = (test) => { editTestForm.id = test.id; editTestForm.title = test.title; editTestForm.grade = test.grade; editTestForm.subject = test.subject; isUpdateModalOpen.value = true }
-const saveTestUpdate = async () => { if (!db) db = getFirestore(); try { const testRef = doc(db, "tests", editTestForm.id); await updateDoc(testRef, { title: editTestForm.title, grade: editTestForm.grade, }); alert("Test güncellendi."); isUpdateModalOpen.value = false; await fetchMyTests($auth.currentUser.uid) } catch (e) { alert("Güncelleme hatası: " + e.message) } }
+const openUpdateModal = (test) => { editTestForm.id = test.id; editTestForm.title = test.title; editTestForm.grade = test.grade; editTestForm.subject = test.subject; editTestForm.pdfUrl = (test.pdfUrl && !/^https?:\/\/(www\.)?example\.com/i.test(test.pdfUrl)) ? test.pdfUrl : ''; isUpdateModalOpen.value = true }
+const saveTestUpdate = async () => { if (!db) db = getFirestore(); try { const link = (editTestForm.pdfUrl || '').trim(); if (link && !/^https:\/\/(drive|docs)\.google\.com\//.test(link)) { alert("PDF bağlantısı Google Drive (drive.google.com) bağlantısı olmalı."); return } const testRef = doc(db, "tests", editTestForm.id); const payload = { title: editTestForm.title, grade: editTestForm.grade }; if (link) payload.pdfUrl = link; await updateDoc(testRef, payload); alert("Test güncellendi."); isUpdateModalOpen.value = false; await fetchMyTests($auth.currentUser.uid) } catch (e) { alert("Güncelleme hatası: " + e.message) } }
 const fetchChats = () => { if (!db) db = getFirestore(); const q = query(collection(db, "chats"), where("participants", "array-contains", $auth.currentUser.uid)); onSnapshot(q, (snapshot) => { myChats.value = snapshot.docs.map(doc => { const data = doc.data(); const otherId = data.participants.find(p => p !== $auth.currentUser.uid); const otherName = otherId === data.studentId ? data.studentName : data.teacherName; return { id: doc.id, ...data, otherUserName: otherName, otherUserId: otherId }; }); if (activeChat.value) { const updated = myChats.value.find(c => c.id === activeChat.value.id); if (updated) activeChat.value = { ...activeChat.value, ...updated }; } }); };
 const selectChat = (chat) => { activeChat.value = chat; loadMessages(chat.id); markAsRead(chat.id); };
 const loadMessages = (chatId) => { if (!db) db = getFirestore(); const q = query(collection(db, "chats", chatId, "messages"), orderBy("createdAt", "asc")); onSnapshot(q, (snapshot) => { activeMessages.value = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })); setTimeout(() => { const container = document.querySelector('.messages-area'); if (container) container.scrollTop = container.scrollHeight; }, 100); }); };

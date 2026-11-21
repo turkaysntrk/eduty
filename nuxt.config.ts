@@ -31,12 +31,12 @@ export default defineNuxtConfig({
         // İzin verilen kaynaklar (Content Security Policy)
         'Content-Security-Policy': [
           "default-src 'self'",
-          "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://meet.jit.si https://*.firebaseapp.com https://*.googleapis.com https://cdnjs.cloudflare.com",
+          "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://meet.jit.si https://*.firebaseapp.com https://*.googleapis.com https://cdnjs.cloudflare.com https://www.googletagmanager.com",
           "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
           "font-src 'self' https://fonts.gstatic.com",
           "img-src 'self' data: blob: https: http:",
-          "connect-src 'self' https://*.firebaseio.com https://*.googleapis.com wss://*.firebaseio.com https://meet.jit.si wss://meet.jit.si",
-          "frame-src https://meet.jit.si https://*.firebaseapp.com",
+          "connect-src 'self' https://*.firebaseio.com https://*.googleapis.com wss://*.firebaseio.com https://meet.jit.si wss://meet.jit.si https://*.google-analytics.com https://*.analytics.google.com https://www.googletagmanager.com",
+          "frame-src https://meet.jit.si https://*.firebaseapp.com https://docs.google.com https://drive.google.com https://*.googleusercontent.com https://firebasestorage.googleapis.com https://storage.googleapis.com",
           "media-src 'self' blob: https:",
         ].join('; ')
       }
