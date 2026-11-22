@@ -27,6 +27,14 @@
                         </option>
                     </select>
 
+                    <label>Bölümünüz:</label>
+                    <select v-model="tempProfile.track" class="modal-select">
+                        <option :value="null">{{ trackRequiredForGrade(tempProfile.grade) ? 'Seçiniz (zorunlu)' : 'Seçilmedi' }}</option>
+                        <option v-for="t in dutyTrackOptions" :key="t.value" :value="t.value">{{ t.label }}</option>
+                    </select>
+                    <small v-if="trackRequiredForGrade(tempProfile.grade)" style="color:#9aa;">11. sınıf, 12. sınıf ve
+                        mezunlar için bölüm seçimi zorunludur (Duty kartları buna göre gelir).</small>
+
                     <label>Profil Fotoğrafı:</label>
                     <div class="avatar-selection">
                         <div class="avatar-option"
@@ -293,6 +301,7 @@
                 <p v-if="userGrade" class="user-grade-info">{{ userGrade === 'Mezun' || userGrade === 13 ? 'Mezun' :
                     userGrade +
                     '. Sınıf' }}</p>
+                <p v-if="userTrack" class="user-grade-info">{{ dutyTrackLabel(userTrack) }}</p>
             </div>
 
             <nav class="sidebar-nav">
@@ -871,7 +880,7 @@
 
                 <!-- Duty: kısa öğrenme kartları akışı (components/duty/DutyFeed.vue) -->
                 <div v-if="activeTab === 'duty'">
-                    <DutyFeed />
+                    <DutyFeed :grade="userGrade" :track="userTrack" @set-track="saveDutyTrack" />
                 </div>
 
             </section>
@@ -886,6 +895,7 @@ import { onAuthStateChanged, signOut, updateProfile } from 'firebase/auth'
 import { getFirestore, doc, getDoc, updateDoc, collection, getDocs, query, where, addDoc, onSnapshot, orderBy, serverTimestamp, deleteField, runTransaction, limit, deleteDoc } from 'firebase/firestore'
 import { getVaultBalance, withdrawFromVault } from '~/utils/mainVault.js'
 import { renderAiMarkdown } from '~/utils/aiMarkdown.js'
+import { TRACK_OPTIONS as dutyTrackOptions, trackLabel as dutyTrackLabel, trackRequiredForGrade } from '~/utils/dutyFeed.js'
 // AI Soru Çözme
 const aiImageBase64 = ref('')
 const aiImagePreviewUrl = ref('')
@@ -1193,6 +1203,20 @@ function onAiCheckFileChange(e) {
     reader.readAsDataURL(file)
 }
 
+// /api/solve çağrıları giriş jetonu ister (sunucu doğrular)
+async function aiAuthHeaders() {
+    try {
+        const token = await $auth.currentUser?.getIdToken()
+        return token ? { Authorization: `Bearer ${token}` } : {}
+    } catch (_) { return {} }
+}
+
+// Sunucunun Türkçe hata mesajını (401/429/400) kullanıcıya göster
+function aiErrorText(err, fallback) {
+    const m = err?.statusMessage || err?.data?.statusMessage
+    return (err?.statusCode === 401 || err?.statusCode === 429 || err?.statusCode === 400) && m ? m : fallback
+}
+
 function generateAnswerId() {
     return `${Date.now()}_${Math.random().toString(36).slice(2, 10)}`
 }
@@ -1210,6 +1234,7 @@ async function solveWithAi() {
     try {
         const res = await $fetch('/api/solve', {
             method: 'POST',
+            headers: await aiAuthHeaders(),
             body: { imageBase64: aiImageBase64.value, mode: aiMode.value }
         })
         aiAnswer.value = res.answer
@@ -1218,7 +1243,7 @@ async function solveWithAi() {
         typewriterReveal(res.answer)
         if (res.ok) saveAiHistory(res.title, res.answer)
     } catch (err) {
-        aiAnswer.value = 'Bir hata oluştu, tekrar dener misin?'
+        aiAnswer.value = aiErrorText(err, 'Bir hata oluştu, tekrar dener misin?')
         typewriterReveal(aiAnswer.value)
     } finally {
         aiLoading.value = false
@@ -1233,6 +1258,7 @@ async function simplifyAiAnswer() {
     try {
         const res = await $fetch('/api/solve', {
             method: 'POST',
+            headers: await aiAuthHeaders(),
             body: { action: 'simplify', previousAnswer: aiAnswer.value }
         })
         aiAnswer.value = res.answer
@@ -1263,6 +1289,7 @@ async function requestHint() {
     try {
         const res = await $fetch('/api/solve', {
             method: 'POST',
+            headers: await aiAuthHeaders(),
             body: {
                 action: 'hint',
                 imageBase64: aiImageBase64.value,
@@ -1273,7 +1300,7 @@ async function requestHint() {
         aiHints.value.push(res.answer)
         aiHintLevel.value = nextLevel
     } catch (err) {
-        aiHints.value.push('İpucu alınamadı, tekrar dener misin?')
+        aiHints.value.push(aiErrorText(err, 'İpucu alınamadı, tekrar dener misin?'))
     } finally {
         aiHintLoading.value = false
         aiStatusMessage.value = ''
@@ -1295,6 +1322,7 @@ async function checkMySolution() {
     try {
         const res = await $fetch('/api/solve', {
             method: 'POST',
+            headers: await aiAuthHeaders(),
             body: {
                 action: 'check',
                 imageBase64: aiImageBase64.value,
@@ -1305,7 +1333,7 @@ async function checkMySolution() {
         aiCheckAnswer.value = res.answer
         checkTypewriter.reveal(res.answer)
     } catch (err) {
-        aiCheckAnswer.value = 'Çözümün kontrol edilemedi, tekrar dener misin?'
+        aiCheckAnswer.value = aiErrorText(err, 'Çözümün kontrol edilemedi, tekrar dener misin?')
         checkTypewriter.reveal(aiCheckAnswer.value)
     } finally {
         aiCheckLoading.value = false
@@ -1375,6 +1403,7 @@ watch(activeTab, (t) => {
 const userDisplayName = ref('')
 const userEmail = ref('')
 const userGrade = ref(null)
+const userTrack = ref(null) // bölüm: sayisal | ea | sozel | dil
 const studentScore = ref(0)
 const completedLessons = ref(0)
 const completedTestCount = ref(0)
@@ -2189,7 +2218,19 @@ const buildReview = (totalQuestions, answerKey) => {
         return { no, userAnswer, correctAnswer, status }
     })
 }
-const isProfileModalOpen = ref(false); const fileInput = ref(null); const profileState = ref({ avatarType: 'initials', selectedPreset: '', uploadedImage: null }); const tempProfile = ref({ name: '', grade: null, avatarType: 'initials', selectedPreset: '', uploadedImage: null }); const presetAvatars = ["https://api.dicebear.com/7.x/avataaars/svg?seed=Felix", "https://api.dicebear.com/7.x/avataaars/svg?seed=Aneka", "https://api.dicebear.com/7.x/bottts/svg?seed=Bubba", "https://api.dicebear.com/7.x/micah/svg?seed=Callie", "https://api.dicebear.com/7.x/notionists/svg?seed=Cookie"]; const currentAvatarUrl = computed(() => { if (profileState.value.avatarType === 'upload' && profileState.value.uploadedImage) return profileState.value.uploadedImage; if (profileState.value.avatarType === 'preset' && profileState.value.selectedPreset) return profileState.value.selectedPreset; return `https://ui-avatars.com/api/?name=${userDisplayName.value || 'O'}&background=0055ff&color=fff` }); const openProfileModal = () => { tempProfile.value = { name: userDisplayName.value, grade: userGrade.value, avatarType: profileState.value.avatarType, selectedPreset: profileState.value.selectedPreset, uploadedImage: profileState.value.uploadedImage }; isProfileModalOpen.value = true }; const triggerFileUpload = () => fileInput.value.click(); const handleFileUpload = (event) => { const file = event.target.files[0]; if (file) { const reader = new FileReader(); reader.onload = (e) => { tempProfile.value.uploadedImage = e.target.result; tempProfile.value.avatarType = 'upload' }; reader.readAsDataURL(file) } }; const selectPresetAvatar = (url) => { tempProfile.value.selectedPreset = url; tempProfile.value.avatarType = 'preset' }; const saveProfile = async () => { if (!db) db = getFirestore(); userDisplayName.value = tempProfile.value.name; userGrade.value = tempProfile.value.grade; profileState.value = { avatarType: tempProfile.value.avatarType, selectedPreset: tempProfile.value.selectedPreset, uploadedImage: tempProfile.value.uploadedImage }; if ($auth.currentUser) { try { await updateProfile($auth.currentUser, { displayName: tempProfile.value.name }); const userRef = doc(db, "users", $auth.currentUser.uid); await updateDoc(userRef, { displayName: tempProfile.value.name, grade: tempProfile.value.grade, avatar: { type: tempProfile.value.avatarType, preset: tempProfile.value.selectedPreset, uploadedImage: tempProfile.value.uploadedImage } }) } catch (e) { console.error("Profil güncellenemedi", e) } } isProfileModalOpen.value = false }; const handleLogout = async () => { await signOut($auth); router.push('/'); }; const studentRank = computed(() => { const s = studentScore.value; if (s < 100) return { title: 'Acemi', class: 'rank-1' }; if (s < 500) return { title: 'Hırslı', class: 'rank-2' }; if (s < 1000) return { title: 'Kalfa', class: 'rank-3' }; if (s < 2000) return { title: 'Usta', class: 'rank-4' }; if (s < 5000) return { title: 'Doçent', class: 'rank-5' }; return { title: 'Profesör', class: 'rank-6' } });
+const isProfileModalOpen = ref(false); const fileInput = ref(null); const profileState = ref({ avatarType: 'initials', selectedPreset: '', uploadedImage: null }); const tempProfile = ref({ name: '', grade: null, track: null, avatarType: 'initials', selectedPreset: '', uploadedImage: null }); const presetAvatars = ["https://api.dicebear.com/7.x/avataaars/svg?seed=Felix", "https://api.dicebear.com/7.x/avataaars/svg?seed=Aneka", "https://api.dicebear.com/7.x/bottts/svg?seed=Bubba", "https://api.dicebear.com/7.x/micah/svg?seed=Callie", "https://api.dicebear.com/7.x/notionists/svg?seed=Cookie"]; const currentAvatarUrl = computed(() => { if (profileState.value.avatarType === 'upload' && profileState.value.uploadedImage) return profileState.value.uploadedImage; if (profileState.value.avatarType === 'preset' && profileState.value.selectedPreset) return profileState.value.selectedPreset; return `https://ui-avatars.com/api/?name=${userDisplayName.value || 'O'}&background=0055ff&color=fff` }); const openProfileModal = () => { tempProfile.value = { name: userDisplayName.value, grade: userGrade.value, track: userTrack.value, avatarType: profileState.value.avatarType, selectedPreset: profileState.value.selectedPreset, uploadedImage: profileState.value.uploadedImage }; isProfileModalOpen.value = true }; const triggerFileUpload = () => fileInput.value.click(); const handleFileUpload = (event) => { const file = event.target.files[0]; if (file) { const reader = new FileReader(); reader.onload = (e) => { tempProfile.value.uploadedImage = e.target.result; tempProfile.value.avatarType = 'upload' }; reader.readAsDataURL(file) } }; const selectPresetAvatar = (url) => { tempProfile.value.selectedPreset = url; tempProfile.value.avatarType = 'preset' }; const saveProfile = async () => { if (trackRequiredForGrade(tempProfile.value.grade) && !tempProfile.value.track) { alert('11. sınıf, 12. sınıf ve mezunlar için bölüm seçimi zorunludur.'); return }; if (!db) db = getFirestore(); userDisplayName.value = tempProfile.value.name; userGrade.value = tempProfile.value.grade; userTrack.value = tempProfile.value.track || null; profileState.value = { avatarType: tempProfile.value.avatarType, selectedPreset: tempProfile.value.selectedPreset, uploadedImage: tempProfile.value.uploadedImage }; if ($auth.currentUser) { try { await updateProfile($auth.currentUser, { displayName: tempProfile.value.name }); const userRef = doc(db, "users", $auth.currentUser.uid); await updateDoc(userRef, { displayName: tempProfile.value.name, grade: tempProfile.value.grade, track: tempProfile.value.track || deleteField(), avatar: { type: tempProfile.value.avatarType, preset: tempProfile.value.selectedPreset, uploadedImage: tempProfile.value.uploadedImage } }) } catch (e) { console.error("Profil güncellenemedi", e); alert("Profil kaydedilemedi (" + (e.code || "hata") + "): " + e.message) } } isProfileModalOpen.value = false }; const saveDutyTrack = async (t) => {
+    const prev = userTrack.value
+    userTrack.value = t || null
+    try {
+        if (!db) db = getFirestore()
+        await updateDoc(doc(db, 'users', $auth.currentUser.uid), { track: t || deleteField() })
+    } catch (e) {
+        userTrack.value = prev
+        console.error('[Duty] bölüm kaydedilemedi:', e)
+        alert('Bölüm kaydedilemedi (' + (e.code || 'hata') + '): ' + e.message)
+    }
+}
+const handleLogout = async () => { await signOut($auth); router.push('/'); }; const studentRank = computed(() => { const s = studentScore.value; if (s < 100) return { title: 'Acemi', class: 'rank-1' }; if (s < 500) return { title: 'Hırslı', class: 'rank-2' }; if (s < 1000) return { title: 'Kalfa', class: 'rank-3' }; if (s < 2000) return { title: 'Usta', class: 'rank-4' }; if (s < 5000) return { title: 'Doçent', class: 'rank-5' }; return { title: 'Profesör', class: 'rank-6' } });
 onMounted(() => {
     db = getFirestore()
     onAuthStateChanged($auth, async (user) => {
@@ -2206,6 +2247,7 @@ onMounted(() => {
                 }
                 isStudent.value = true
                 if (data.grade) userGrade.value = data.grade
+                if (data.track) userTrack.value = data.track
                 if (data.displayName) userDisplayName.value = data.displayName
                 studentScore.value = data.score || 0
                 completedTestCount.value = data.completedTestCount || 0

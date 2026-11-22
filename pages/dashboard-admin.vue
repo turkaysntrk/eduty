@@ -98,6 +98,11 @@
                     <span class="nav-count">{{ aiFeedbackTotal }}</span>
                 </button>
 
+                <button @click="setTab('duty-reports')" :class="{ active: activeTab === 'duty-reports' }">
+                    <span class="icon">⚑</span> Duty Bildirimleri
+                    <span class="nav-count">{{ openDutyReportCount }}</span>
+                </button>
+
                 <div class="sidebar-divider"></div>
 
                 <NuxtLink to="/" class="nav-link-home" @click="isSidebarOpen = false">
@@ -594,6 +599,71 @@
                     </div>
                 </div>
 
+                <!-- Duty bildirimleri ve tepki istatistikleri -->
+                <div v-if="activeTab === 'duty-reports'" class="animate-fade">
+                    <div v-if="dutyLoadError" class="access-denied" style="padding:16px; margin-bottom:16px; border-radius:8px; background:rgba(239,68,68,0.08); border:1px solid rgba(239,68,68,0.35);">
+                        <p style="color:#ef4444; font-size:0.9rem; margin:0;">⚠️ {{ dutyLoadError }}</p>
+                    </div>
+                    <div class="stats-grid">
+                        <div class="stat-card"><span class="ds-val">{{ openDutyReportCount }}</span><span class="ds-label">Açık bildirim</span></div>
+                        <div class="stat-card"><span class="ds-val">{{ allDutyReports.length }}</span><span class="ds-label">Toplam bildirim</span></div>
+                        <div class="stat-card"><span class="ds-val">{{ allDutyReactions.length }}</span><span class="ds-label">Tepki kaydı</span></div>
+                    </div>
+
+                    <h3 style="margin:18px 0 8px;">Bildirimler</h3>
+                    <div class="filter-bar" style="display:flex; gap:10px;">
+                        <select v-model="dutyReportFilter" class="filter-select">
+                            <option value="open">Açık</option>
+                            <option value="resolved">Çözüldü</option>
+                            <option value="dismissed">Reddedildi</option>
+                            <option value="">Hepsi</option>
+                        </select>
+                    </div>
+                    <div class="table-wrapper" style="margin-top:12px;">
+                        <table class="data-table">
+                            <thead>
+                                <tr><th>Kart</th><th>Sebep</th><th>Not</th><th>Sürüm</th><th>Tarih</th><th>Durum</th><th></th></tr>
+                            </thead>
+                            <tbody>
+                                <tr v-for="r in filteredDutyReports" :key="r.id">
+                                    <td>{{ dutyTitleFor(r.cardId) }}<br><small class="td-email">{{ r.cardId }}</small></td>
+                                    <td><span class="badge-subject">{{ dutyReasonLabel(r.reason) }}</span></td>
+                                    <td class="td-email">{{ r.note || '—' }}</td>
+                                    <td class="td-date">v{{ r.cardVersion || 1 }}<span v-if="dutyVersionFor(r.cardId) > (r.cardVersion || 1)"> (güncel v{{ dutyVersionFor(r.cardId) }})</span></td>
+                                    <td class="td-date">{{ formatTimestamp(r.createdAt) }}</td>
+                                    <td><span class="status-pill" :class="r.status === 'open' ? 'pill-pending' : 'pill-done'">{{ r.status === 'open' ? 'Açık' : (r.status === 'resolved' ? 'Çözüldü' : 'Reddedildi') }}</span></td>
+                                    <td>
+                                        <button v-if="r.status === 'open'" class="btn-edit" @click="setDutyReportStatus(r, 'resolved')" title="Çözüldü">✅</button>
+                                        <button v-if="r.status === 'open'" class="btn-edit" @click="setDutyReportStatus(r, 'dismissed')" title="Reddet">🚫</button>
+                                        <button v-if="r.status !== 'open'" class="btn-edit" @click="setDutyReportStatus(r, 'open')" title="Yeniden aç">↩️</button>
+                                        <button class="btn-del" @click="deleteDutyReport(r)" title="Sil">🗑️</button>
+                                    </td>
+                                </tr>
+                                <tr v-if="filteredDutyReports.length === 0"><td colspan="7" class="empty-row">Bildirim yok.</td></tr>
+                            </tbody>
+                        </table>
+                    </div>
+
+                    <h3 style="margin:22px 0 8px;">Kart bazlı tepkiler</h3>
+                    <div class="table-wrapper">
+                        <table class="data-table">
+                            <thead>
+                                <tr><th>Kart</th><th>👍</th><th>👎</th><th>✓ Biliyordum</th><th>Açık bildirim</th></tr>
+                            </thead>
+                            <tbody>
+                                <tr v-for="row in dutyCardStats" :key="row.id">
+                                    <td>{{ row.title }}<br><small class="td-email">{{ row.id }}</small></td>
+                                    <td>{{ row.like }}</td>
+                                    <td :style="row.dislike > row.like ? 'color:#ef4444;font-weight:700' : ''">{{ row.dislike }}</td>
+                                    <td>{{ row.known }}</td>
+                                    <td :style="row.openReports ? 'color:#f59e0b;font-weight:700' : ''">{{ row.openReports }}</td>
+                                </tr>
+                                <tr v-if="dutyCardStats.length === 0"><td colspan="5" class="empty-row">Henüz tepki yok.</td></tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
             </section>
         </main>
     </div>
@@ -619,6 +689,7 @@ import {
     collection, query, orderBy, where, serverTimestamp
 } from 'firebase/firestore'
 import { getVaultStats, getVaultTransactions } from '~/utils/mainVault.js'
+import { loadDutyCards } from '~/utils/dutyContent.js'
 
 const router = useRouter()
 const { $auth } = useNuxtApp()
@@ -642,6 +713,29 @@ const distributionHistory = ref([])
 // AI Geri Bildirimleri — öğrenciler bu veriyi kendi panellerinden göremez,
 // yalnızca Admin Dashboard üzerinden görüntülenir.
 const allAiFeedback = ref([])
+const allDutyReports = ref([])
+const allDutyReactions = ref([])
+const dutyLoadError = ref('')
+const dutyReportFilter = ref('open')
+const dutyCards = loadDutyCards()
+const dutyCardMap = Object.fromEntries(dutyCards.map(c => [c.id, c]))
+const dutyTitleFor = (id) => (dutyCardMap[id] ? dutyCardMap[id].title : '(silinmiş kart)')
+const dutyVersionFor = (id) => (dutyCardMap[id] ? dutyCardMap[id].version || 1 : 0)
+const dutyReasonLabel = (r) => ({ wrong: 'Yanlış bilgi', missing: 'Eksik bilgi', other: 'Diğer' }[r] || r)
+const openDutyReportCount = computed(() => allDutyReports.value.filter(r => r.status === 'open').length)
+const filteredDutyReports = computed(() => allDutyReports.value.filter(r => !dutyReportFilter.value || r.status === dutyReportFilter.value))
+const dutyCardStats = computed(() => {
+    const m = {}
+    const row = (id) => (m[id] ||= { id, title: dutyTitleFor(id), like: 0, dislike: 0, known: 0, openReports: 0 })
+    allDutyReactions.value.forEach(x => {
+        const r = row(x.cardId)
+        if (x.reaction === 'like') r.like++
+        if (x.reaction === 'dislike') r.dislike++
+        if (x.known) r.known++
+    })
+    allDutyReports.value.filter(x => x.status === 'open').forEach(x => { row(x.cardId).openReports++ })
+    return Object.values(m).sort((a, b) => (b.openReports - a.openReports) || (b.dislike - a.dislike) || (b.like - a.like))
+})
 const aiFeedbackSubjectFilter = ref('')
 const aiFeedbackTypeFilter = ref('')
 // fetchAll() içindeki diğer sorgulardan biri (users/tests/donations vb.) hata verirse
@@ -860,6 +954,39 @@ const fetchAll = async () => {
     }
 }
 
+async function fetchDuty() {
+    dutyLoadError.value = ''
+    try {
+        const [rep_, rea] = await Promise.all([
+            getDocs(collection(db, 'dutyReports')),
+            getDocs(collection(db, 'dutyReactions'))
+        ])
+        allDutyReports.value = rep_.docs.map(d => ({ id: d.id, ...d.data() }))
+            .sort((x, y) => (y.createdAt?.seconds || 0) - (x.createdAt?.seconds || 0))
+        allDutyReactions.value = rea.docs.map(d => ({ id: d.id, ...d.data() }))
+    } catch (e) {
+        console.error('Duty verileri çekilemedi:', e)
+        dutyLoadError.value = e?.code === 'permission-denied'
+            ? 'Duty bildirimleri okunamadı: Firestore kuralları güncel değil. Yeni firestore.rules dosyasını Publish edin.'
+            : 'Duty verileri yüklenirken bir hata oluştu.'
+    }
+}
+
+const setDutyReportStatus = async (r, status) => {
+    try {
+        await updateDoc(doc(db, 'dutyReports', r.id), { status, resolvedAt: status === 'open' ? null : serverTimestamp() })
+        r.status = status
+    } catch (e) { alert('Güncellenemedi: ' + e.message) }
+}
+
+const deleteDutyReport = async (r) => {
+    if (!confirm('Bu bildirim silinsin mi?')) return
+    try {
+        await deleteDoc(doc(db, 'dutyReports', r.id))
+        allDutyReports.value = allDutyReports.value.filter(x => x.id !== r.id)
+    } catch (e) { alert('Silinemedi: ' + e.message) }
+}
+
 // ── Öğretmen yayın toggle ──
 const toggleTeacherPublish = async (teacher) => {
     if (!db) db = getFirestore()
@@ -927,6 +1054,7 @@ onMounted(() => {
             isAdmin.value = true
             userDisplayName.value = snap.data().displayName || user.email
             await fetchAll()
+            await fetchDuty()
         } else {
             isAdmin.value = false
         }

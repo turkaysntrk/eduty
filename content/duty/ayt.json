@@ -4,6 +4,11 @@
     "exam": "AYT",
     "subject": "Matematik",
     "topic": "Türev",
+    "minGrade": 12,
+    "tracks": [
+      "sayisal",
+      "ea"
+    ],
     "type": "exception",
     "title": "Türevliyse sürekli; peki tersi?",
     "blocks": [
@@ -40,6 +45,11 @@
     "exam": "AYT",
     "subject": "Matematik",
     "topic": "Logaritma",
+    "minGrade": 12,
+    "tracks": [
+      "sayisal",
+      "ea"
+    ],
     "type": "confusion",
     "title": "log(x²) ile 2·log x aynı mı?",
     "blocks": [
@@ -69,6 +79,10 @@
     "exam": "AYT",
     "subject": "Fizik",
     "topic": "Elektrik ve manyetizma",
+    "minGrade": 11,
+    "tracks": [
+      "sayisal"
+    ],
     "type": "compare",
     "title": "Elektrik alan mı, potansiyel mi?",
     "blocks": [
@@ -110,6 +124,10 @@
     "exam": "AYT",
     "subject": "Fizik",
     "topic": "Dairesel hareket",
+    "minGrade": 12,
+    "tracks": [
+      "sayisal"
+    ],
     "type": "confusion",
     "title": "Merkezcil kuvvet ayrı bir kuvvet midir?",
     "blocks": [
@@ -141,6 +159,10 @@
     "exam": "AYT",
     "subject": "Fizik",
     "topic": "İtme ve momentum",
+    "minGrade": 11,
+    "tracks": [
+      "sayisal"
+    ],
     "type": "compare",
     "title": "Esnek ve esnek olmayan çarpışma",
     "blocks": [
@@ -188,6 +210,10 @@
     "exam": "AYT",
     "subject": "Kimya",
     "topic": "Elektrokimya",
+    "minGrade": 12,
+    "tracks": [
+      "sayisal"
+    ],
     "type": "compare",
     "title": "Anot ve katot: işaret mi, tepkime mi?",
     "blocks": [
@@ -241,6 +267,10 @@
     "exam": "AYT",
     "subject": "Kimya",
     "topic": "Kimyasal denge",
+    "minGrade": 11,
+    "tracks": [
+      "sayisal"
+    ],
     "type": "confusion",
     "title": "Katalizör dengeyi kaydırır mı?",
     "blocks": [
@@ -270,6 +300,10 @@
     "exam": "AYT",
     "subject": "Kimya",
     "topic": "Asitler ve bazlar",
+    "minGrade": 11,
+    "tracks": [
+      "sayisal"
+    ],
     "type": "confusion",
     "title": "Kuvvetli asit ile derişik asit aynı mı?",
     "blocks": [
@@ -311,6 +345,10 @@
     "exam": "AYT",
     "subject": "Biyoloji",
     "topic": "Nükleik asitler ve protein sentezi",
+    "minGrade": 12,
+    "tracks": [
+      "sayisal"
+    ],
     "type": "compare",
     "title": "Replikasyon, transkripsiyon, translasyon",
     "blocks": [
@@ -362,6 +400,10 @@
     "exam": "AYT",
     "subject": "Biyoloji",
     "topic": "Kalıtım",
+    "minGrade": 10,
+    "tracks": [
+      "sayisal"
+    ],
     "type": "compare",
     "title": "Eksik baskınlık ve ortak baskınlık",
     "blocks": [
@@ -403,6 +445,11 @@
     "exam": "AYT",
     "subject": "Türk Dili ve Edebiyatı",
     "topic": "Eski Türk edebiyatı",
+    "minGrade": 10,
+    "tracks": [
+      "ea",
+      "sozel"
+    ],
     "type": "compare",
     "title": "Divan ve halk edebiyatı",
     "blocks": [
@@ -451,6 +498,11 @@
     "exam": "AYT",
     "subject": "Türk Dili ve Edebiyatı",
     "topic": "Divan edebiyatı",
+    "minGrade": 10,
+    "tracks": [
+      "ea",
+      "sozel"
+    ],
     "type": "compare",
     "title": "Gazel, kaside, mesnevi",
     "blocks": [

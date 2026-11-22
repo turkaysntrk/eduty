@@ -1,18 +1,11 @@
 <template>
     <article class="duty-card" :data-type="card.type" :aria-label="card.title">
+        <div class="duty-main">
         <div class="duty-card-top">
             <div class="duty-chips">
                 <span class="duty-chip duty-chip-exam">{{ card.exam }}</span>
                 <span class="duty-chip">{{ card.subject }}</span>
             </div>
-            <button type="button" class="duty-heart" :class="{ on: favorite }" data-no-drag
-                :aria-pressed="favorite" :aria-label="favorite ? 'Favorilerden çıkar' : 'Favorilere ekle'"
-                @click.stop="$emit('toggle-favorite')">
-                <svg viewBox="0 0 24 24" aria-hidden="true">
-                    <path
-                        d="M12 21s-7.5-4.6-9.6-9.2C1 8.6 2.7 5 6.2 5c2 0 3.2 1 3.8 2 .6-1 1.8-2 3.8-2 3.5 0 5.2 3.6 3.8 6.8C19.5 16.4 12 21 12 21z" />
-                </svg>
-            </button>
         </div>
 
         <div class="duty-kicker">{{ typeLabel }} · {{ card.topic }}</div>
@@ -76,6 +69,61 @@
 
             </template>
         </div>
+
+        <div class="duty-card-foot">
+            <button type="button" class="duty-report-btn" data-no-drag :disabled="reported"
+                @click.stop="openReport">
+                {{ reported ? '⚑ Bildirildi, teşekkürler' : '⚑ Bildir' }}
+            </button>
+        </div>
+        </div>
+
+        <!-- Sağ kenar: favori + tepkiler -->
+        <div class="duty-rail" data-no-drag>
+            <button type="button" class="duty-rail-btn duty-heart" :class="{ on: favorite }" data-no-drag
+                :aria-pressed="favorite" :aria-label="favorite ? 'Favorilerden çıkar' : 'Favorilere ekle'"
+                @click.stop="emit('toggle-favorite')">
+                <svg viewBox="0 0 24 24" aria-hidden="true">
+                    <path
+                        d="M12 21s-7.5-4.6-9.6-9.2C1 8.6 2.7 5 6.2 5c2 0 3.2 1 3.8 2 .6-1 1.8-2 3.8-2 3.5 0 5.2 3.6 3.8 6.8C19.5 16.4 12 21 12 21z" />
+                </svg>
+            </button>
+            <button type="button" class="duty-rail-btn" :class="{ on: reaction === 'like' }" data-no-drag
+                :aria-pressed="reaction === 'like'" aria-label="Beğen" title="Beğen"
+                @click.stop="emit('react', 'like')">👍</button>
+            <button type="button" class="duty-rail-btn" :class="{ on: reaction === 'dislike' }" data-no-drag
+                :aria-pressed="reaction === 'dislike'" aria-label="Beğenme" title="Beğenme"
+                @click.stop="emit('react', 'dislike')">👎</button>
+            <button type="button" class="duty-rail-btn duty-known" :class="{ on: known }" data-no-drag
+                :aria-pressed="known" aria-label="Biliyordum" title="Biliyordum"
+                @click.stop="emit('toggle-known')">✓</button>
+        </div>
+
+        <!-- Bildir paneli -->
+        <div v-if="reportOpen" class="duty-sheet" data-no-drag @click.self="closeReport">
+            <div class="duty-sheet-box" role="dialog" aria-label="Kartı bildir">
+                <template v-if="!reportDone">
+                    <div class="duty-sheet-title">Bu kartta ne var?</div>
+                    <button v-for="r in reasons" :key="r.value" type="button" class="duty-reason"
+                        :class="{ on: reportReason === r.value }" @click="reportReason = r.value">{{ r.label }}</button>
+                    <textarea v-model="reportNote" class="duty-note" maxlength="300" rows="3"
+                        :placeholder="reportReason === 'other' ? 'Lütfen sorunu kısaca yaz (zorunlu)' : 'İstersen ayrıntı ekle (isteğe bağlı)'"></textarea>
+                    <p v-if="reportError" class="duty-sheet-error">{{ reportError }}</p>
+                    <div class="duty-sheet-actions">
+                        <button type="button" class="duty-sheet-cancel" @click="closeReport">Vazgeç</button>
+                        <button type="button" class="duty-sheet-send" :disabled="!canSend || reportSending"
+                            @click="sendReport">{{ reportSending ? 'Gönderiliyor…' : 'Gönder' }}</button>
+                    </div>
+                </template>
+                <template v-else>
+                    <div class="duty-sheet-title">Teşekkürler! 🙏</div>
+                    <p class="duty-sheet-thanks">Bildirimin bize ulaştı, kartı inceleyeceğiz.</p>
+                    <div class="duty-sheet-actions">
+                        <button type="button" class="duty-sheet-send" @click="closeReport">Kapat</button>
+                    </div>
+                </template>
+            </div>
+        </div>
     </article>
 </template>
 
@@ -84,9 +132,42 @@ import { ref, computed, watch, onMounted, onBeforeUnmount, nextTick } from 'vue'
 
 const props = defineProps({
     card: { type: Object, required: true },
-    favorite: { type: Boolean, default: false }
+    favorite: { type: Boolean, default: false },
+    reaction: { type: String, default: null },     // 'like' | 'dislike' | null
+    known: { type: Boolean, default: false },
+    reported: { type: Boolean, default: false }
 })
-defineEmits(['toggle-favorite'])
+const emit = defineEmits(['toggle-favorite', 'react', 'toggle-known', 'report'])
+
+// ── Bildir paneli ──
+const reasons = [
+    { value: 'wrong', label: 'Yanlış bilgi' },
+    { value: 'missing', label: 'Eksik bilgi' },
+    { value: 'other', label: 'Diğer' }
+]
+const reportOpen = ref(false)
+const reportReason = ref('')
+const reportNote = ref('')
+const reportSending = ref(false)
+const reportDone = ref(false)
+const reportError = ref('')
+const canSend = computed(() => !!reportReason.value && (reportReason.value !== 'other' || reportNote.value.trim().length >= 3))
+function openReport() { if (props.reported) return; reportOpen.value = true; reportDone.value = false; reportError.value = '' }
+function closeReport() { reportOpen.value = false; reportReason.value = ''; reportNote.value = ''; reportSending.value = false }
+function sendReport() {
+    if (!canSend.value || reportSending.value) return
+    reportSending.value = true
+    reportError.value = ''
+    emit('report', {
+        reason: reportReason.value,
+        note: reportNote.value,
+        done: (ok) => {
+            reportSending.value = false
+            if (ok) reportDone.value = true
+            else reportError.value = 'Gönderilemedi, lütfen tekrar dene.'
+        }
+    })
+}
 
 const TYPE_LABELS = {
     confusion: 'Sık karıştırılır',
@@ -162,10 +243,11 @@ watch(() => props.card.id, fit)
     --accent: #4d94ff;
     position: relative;
     display: flex;
-    flex-direction: column;
     width: 100%;
     height: 100%;
-    padding: 20px 20px 18px;
+    padding: 20px 14px 14px 20px;
+    flex-direction: row;
+    gap: 10px;
     border-radius: 26px;
     background: linear-gradient(160deg, #0f1f45 0%, #0a1632 100%);
     border: 1px solid rgba(77, 148, 255, 0.22);
@@ -217,6 +299,115 @@ watch(() => props.card.id, fit)
     white-space: nowrap;
 }
 .duty-chip-exam { background: rgba(0, 85, 255, 0.28); color: #cfe0ff; }
+
+.duty-main {
+    flex: 1;
+    min-width: 0;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+}
+
+.duty-rail {
+    flex-shrink: 0;
+    width: 44px;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    gap: 12px;
+}
+
+.duty-rail-btn {
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    display: grid;
+    place-items: center;
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    background: rgba(255, 255, 255, 0.05);
+    color: #9fb2d6;
+    cursor: pointer;
+    font: inherit;
+    font-size: 1.05rem;
+    transition: transform 0.18s ease, background 0.2s ease, color 0.2s ease;
+    -webkit-tap-highlight-color: transparent;
+}
+.duty-rail-btn:hover { background: rgba(255, 255, 255, 0.1); }
+.duty-rail-btn:active { transform: scale(0.9); }
+.duty-rail-btn.on { background: rgba(77, 148, 255, 0.22); border-color: rgba(77, 148, 255, 0.55); color: #fff; }
+.duty-known.on { background: rgba(16, 185, 129, 0.22); border-color: rgba(16, 185, 129, 0.6); color: #34d399; }
+
+.duty-card-foot { margin-top: 8px; display: flex; justify-content: flex-start; }
+.duty-report-btn {
+    background: none;
+    border: none;
+    color: #7f93bb;
+    font: inherit;
+    font-size: 0.74rem;
+    cursor: pointer;
+    padding: 4px 2px;
+}
+.duty-report-btn:hover:not(:disabled) { color: #f59e0b; }
+.duty-report-btn:disabled { cursor: default; color: #5f7396; }
+
+.duty-sheet {
+    position: absolute;
+    inset: 0;
+    z-index: 5;
+    display: flex;
+    align-items: flex-end;
+    background: rgba(2, 8, 24, 0.66);
+}
+.duty-sheet-box {
+    width: 100%;
+    padding: 16px;
+    border-radius: 20px 20px 0 0;
+    background: #0b1a3a;
+    border-top: 1px solid rgba(77, 148, 255, 0.3);
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+.duty-sheet-title { font-weight: 700; color: #fff; }
+.duty-sheet-thanks { margin: 0; color: #c7d6f2; font-size: 0.9rem; }
+.duty-reason {
+    text-align: left;
+    padding: 10px 12px;
+    border-radius: 12px;
+    border: 1px solid rgba(255, 255, 255, 0.14);
+    background: rgba(255, 255, 255, 0.04);
+    color: #dbe5fa;
+    font: inherit;
+    cursor: pointer;
+}
+.duty-reason.on { border-color: #4d94ff; background: rgba(77, 148, 255, 0.18); color: #fff; }
+.duty-note {
+    width: 100%;
+    resize: none;
+    padding: 10px;
+    border-radius: 12px;
+    border: 1px solid rgba(255, 255, 255, 0.14);
+    background: rgba(255, 255, 255, 0.05);
+    color: #fff;
+    font: inherit;
+    font-size: 0.85rem;
+    user-select: text;
+    -webkit-user-select: text;
+}
+.duty-sheet-error { margin: 0; color: #f87171; font-size: 0.8rem; }
+.duty-sheet-actions { display: flex; gap: 8px; justify-content: flex-end; }
+.duty-sheet-cancel, .duty-sheet-send {
+    padding: 9px 16px;
+    border-radius: 10px;
+    border: none;
+    font: inherit;
+    font-weight: 700;
+    cursor: pointer;
+}
+.duty-sheet-cancel { background: rgba(255, 255, 255, 0.08); color: #c7d6f2; }
+.duty-sheet-send { background: #0055ff; color: #fff; }
+.duty-sheet-send:disabled { opacity: 0.45; cursor: not-allowed; }
 
 .duty-heart {
     flex-shrink: 0;

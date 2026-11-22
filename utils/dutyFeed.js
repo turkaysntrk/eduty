@@ -24,6 +24,18 @@ export const CARD_TYPES = ['confusion', 'compare', 'exception', 'tip']
 export const BLOCK_KINDS = ['text', 'list', 'compare', 'table', 'formula', 'callout', 'image']
 export const CALLOUT_TONES = ['tip', 'warning', 'info']
 
+// ── Sınıf / bölüm kuralları ──
+export const MIN_DUTY_GRADE = 9
+export const GRADUATE_GRADE = 13                       // "Mezun" 12. sınıf gibi davranır
+export const TRACKS = ['sayisal', 'ea', 'sozel', 'dil']
+export const TRACK_OPTIONS = [
+    { value: 'sayisal', label: 'Sayısal' },
+    { value: 'ea', label: 'Eşit Ağırlık' },
+    { value: 'sozel', label: 'Sözel' },
+    { value: 'dil', label: 'Dil' }
+]
+export const trackLabel = (t) => (TRACK_OPTIONS.find(o => o.value === t) || {}).label || ''
+
 const isStr = (v) => typeof v === 'string' && v.trim().length > 0
 const isStrArray = (v, min = 1) => Array.isArray(v) && v.length >= min && v.every(isStr)
 
@@ -103,6 +115,8 @@ export function validateCards(raw) {
         if (!['published', 'draft', 'archived'].includes(c.status)) problems.push('status geçersiz')
         if (!Number.isInteger(c.version) || c.version < 1) problems.push('version >= 1 tam sayı olmalı')
         if (!Array.isArray(c.blocks) || c.blocks.length === 0) problems.push('blocks boş')
+        if (c.minGrade !== undefined && !(Number.isInteger(c.minGrade) && c.minGrade >= 9 && c.minGrade <= 12)) problems.push('minGrade 9-12 arası tam sayı olmalı')
+        if (c.tracks !== undefined && !(Array.isArray(c.tracks) && c.tracks.length > 0 && c.tracks.every(t => TRACKS.includes(t)))) problems.push('tracks geçersiz (sayisal/ea/sozel/dil)')
         if (problems.length) { errors.push(`${where}: ${problems.join('; ')}`); return }
 
         let blocksOk = true
@@ -112,6 +126,62 @@ export function validateCards(raw) {
         if (c.status === 'published') cards.push(c)
     })
     return { cards, errors }
+}
+
+// ────────────────────────────────────────────────────
+// SINIF / BÖLÜM ERİŞİMİ VE KART FİLTRESİ
+// ────────────────────────────────────────────────────
+
+/** "9", 9, "9. Sınıf" → 9; "Mezun" → 13; geçersiz → null */
+export function normalizeGrade(g) {
+    if (g === null || g === undefined || g === '') return null
+    const str = String(g).trim().toLowerCase()
+    if (str === 'mezun' || str === '13') return GRADUATE_GRADE
+    const n = parseInt(str, 10)
+    return Number.isInteger(n) && n >= 1 && n <= 12 ? n : null
+}
+
+/** 11. sınıf, 12. sınıf ve mezunlarda bölüm seçimi zorunludur. */
+export function trackRequiredForGrade(grade) {
+    const g = normalizeGrade(grade)
+    return g !== null && g >= 11
+}
+
+/**
+ * Öğrencinin Duty'ye erişim durumu.
+ *  'noGrade'   → sınıf bilgisi yok
+ *  'inactive'  → 1-8. sınıf (henüz aktif değil)
+ *  'needTrack' → bölüm seçilmeli (11, 12, mezun)
+ *  'ok'
+ */
+export function getDutyAccess({ grade, track } = {}) {
+    const g = normalizeGrade(grade)
+    if (g === null) return { status: 'noGrade', grade: null }
+    if (g < MIN_DUTY_GRADE) return { status: 'inactive', grade: g }
+    if (trackRequiredForGrade(g) && !TRACKS.includes(track)) return { status: 'needTrack', grade: g }
+    return { status: 'ok', grade: g }
+}
+
+/**
+ * Profile göre görünür kartlar:
+ *  9. sınıf  → TYT, minGrade ≤ 9
+ *  10. sınıf → TYT, minGrade ≤ 10
+ *  11. sınıf → TYT + AYT, minGrade ≤ 11 (AYT'de bölüme uygun olanlar)
+ *  12/Mezun  → hepsi (bölüme uygun olanlar)
+ * minGrade yoksa: TYT → 9, AYT → 11. tracks yoksa kart tüm bölümlere uygundur.
+ */
+export function filterCardsForProfile(cards, { grade, track } = {}) {
+    const access = getDutyAccess({ grade, track })
+    if (access.status !== 'ok') return []
+    const g = Math.min(access.grade, 12)
+    const wantsTrack = trackRequiredForGrade(g) ? track : null
+    return (cards || []).filter(c => {
+        const min = Number.isInteger(c.minGrade) ? c.minGrade : (c.exam === 'AYT' ? 11 : 9)
+        if (min > g) return false
+        if (c.exam === 'AYT' && g < 11) return false
+        if (Array.isArray(c.tracks) && c.tracks.length && wantsTrack && !c.tracks.includes(wantsTrack)) return false
+        return true
+    })
 }
 
 // ────────────────────────────────────────────────────
@@ -193,8 +263,10 @@ function reconcileRound(round, poolIds, rng) {
  * @param {Function} opts.rng
  * @param {Function} opts.now
  */
-export function createDutyFeed({ cards, storage = null, rng = Math.random, now = Date.now } = {}) {
+export function createDutyFeed({ cards, knownIds = null, storage = null, rng = Math.random, now = Date.now } = {}) {
     const byId = new Map((cards || []).map(c => [c.id, c]))
+    // Havuz dışındaki (örn. bölüm değişince görünmeyen) kartların favorisi silinmesin
+    const known = knownIds ? new Set(knownIds) : new Set(byId.keys())
     const allIds = (cards || []).map(c => c.id)
     const listeners = new Set()
 
@@ -218,11 +290,11 @@ export function createDutyFeed({ cards, storage = null, rng = Math.random, now =
 
         if (Array.isArray(parsed.favorites)) {
             const seenFav = new Set()
-            state.favorites = parsed.favorites.filter(id => byId.has(id) && !seenFav.has(id) && seenFav.add(id))
+            state.favorites = parsed.favorites.filter(id => known.has(id) && !seenFav.has(id) && seenFav.add(id))
         }
         if (parsed.seen && typeof parsed.seen === 'object') {
             for (const [id, v] of Object.entries(parsed.seen)) {
-                if (byId.has(id) && v && Number.isFinite(v.n)) state.seen[id] = { n: v.n, t: Number(v.t) || 0 }
+                if (known.has(id) && v && Number.isFinite(v.n)) state.seen[id] = { n: v.n, t: Number(v.t) || 0 }
             }
         }
         if (Array.isArray(parsed.recent)) state.recent = parsed.recent.filter(id => byId.has(id)).slice(-RECENT_KEEP)
@@ -276,7 +348,7 @@ export function createDutyFeed({ cards, storage = null, rng = Math.random, now =
             index: r ? r.index : 0,
             total: r ? r.order.length : 0,
             isFavorite: id ? state.favorites.includes(id) : false,
-            favoriteCount: state.favorites.length,
+            favoriteCount: state.favorites.filter(id => byId.has(id)).length,
             seenCount: Object.keys(state.seen).length,
             cardCount: allIds.length,
             canPrev: !!r && r.index > 0,
@@ -364,6 +436,30 @@ export function createDutyFeed({ cards, storage = null, rng = Math.random, now =
             markShown(currentId())
             emit()
             return true
+        },
+
+        /** Favorileri uzak kaynaktan gelen listeyle DEĞİŞTİRİR (bilinmeyen kartlar atılır). */
+        setFavorites(ids) {
+            const seenIds = new Set()
+            const next = (ids || []).filter(id => known.has(id) && !seenIds.has(id) && seenIds.add(id))
+            if (next.length === state.favorites.length && next.every((id, i) => id === state.favorites[i])) return false
+            state.favorites = next
+            state.rounds.favorites = null
+            if (state.mode === 'favorites') {
+                if (poolFor('favorites').length === 0) { state.mode = 'all'; if (!state.rounds.all) startRound('all') } else startRound('favorites')
+            }
+            emit()
+            return true
+        },
+
+        /** Gelen favorileri mevcutlara EKLER (birleşim). */
+        mergeFavorites(ids) {
+            let changed = false
+            for (const id of ids || []) {
+                if (known.has(id) && !state.favorites.includes(id)) { state.favorites.push(id); changed = true }
+            }
+            if (changed) emit()
+            return changed
         },
 
         isFavorite: (id) => state.favorites.includes(id),

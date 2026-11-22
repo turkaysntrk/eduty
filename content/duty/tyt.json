@@ -4,6 +4,7 @@
     "exam": "TYT",
     "subject": "Matematik",
     "topic": "Sayılar",
+    "minGrade": 9,
     "type": "exception",
     "title": "1 asal mıdır? 2 hakkında ne söylenir?",
     "blocks": [
@@ -38,6 +39,7 @@
     "exam": "TYT",
     "subject": "Matematik",
     "topic": "Üslü ve köklü ifadeler",
+    "minGrade": 9,
     "type": "confusion",
     "title": "√(x²) her zaman x midir?",
     "blocks": [
@@ -84,6 +86,7 @@
     "exam": "TYT",
     "subject": "Matematik",
     "topic": "Permütasyon ve kombinasyon",
+    "minGrade": 10,
     "type": "compare",
     "title": "Permütasyon mu, kombinasyon mu?",
     "blocks": [
@@ -135,6 +138,7 @@
     "exam": "TYT",
     "subject": "Fizik",
     "topic": "Kuvvet ve hareket",
+    "minGrade": 9,
     "type": "compare",
     "title": "Kütle ile ağırlık aynı şey değil",
     "blocks": [
@@ -178,6 +182,7 @@
     "exam": "TYT",
     "subject": "Fizik",
     "topic": "Hareket",
+    "minGrade": 9,
     "type": "confusion",
     "title": "Sürat ile hız aynı mı?",
     "blocks": [
@@ -225,6 +230,7 @@
     "exam": "TYT",
     "subject": "Kimya",
     "topic": "Atom yapısı",
+    "minGrade": 9,
     "type": "compare",
     "title": "İzotop, izoton, izobar",
     "blocks": [
@@ -262,6 +268,7 @@
     "exam": "TYT",
     "subject": "Biyoloji",
     "topic": "Hücre bölünmeleri",
+    "minGrade": 10,
     "type": "compare",
     "title": "Mitoz ve mayoz karşılaştırması",
     "blocks": [
@@ -319,6 +326,7 @@
     "exam": "TYT",
     "subject": "Biyoloji",
     "topic": "Hücre",
+    "minGrade": 9,
     "type": "confusion",
     "title": "Prokaryot hücrede ribozom var mı?",
     "blocks": [
@@ -353,6 +361,7 @@
     "exam": "TYT",
     "subject": "Türk Dili ve Edebiyatı",
     "topic": "Yazım kuralları",
+    "minGrade": 9,
     "type": "tip",
     "title": "“de/da” ne zaman ayrı yazılır?",
     "blocks": [
@@ -393,6 +402,7 @@
     "exam": "TYT",
     "subject": "Tarih",
     "topic": "İlk Türk-İslam devletleri ve Anadolu",
+    "minGrade": 9,
     "type": "compare",
     "title": "Malazgirt ve Miryokefalon: kim ne kazandırdı?",
     "blocks": [
@@ -440,6 +450,7 @@
     "exam": "TYT",
     "subject": "Coğrafya",
     "topic": "Dünya'nın hareketleri",
+    "minGrade": 9,
     "type": "confusion",
     "title": "Mevsimler Güneş'e yakınlıktan mı oluşur?",
     "blocks": [
@@ -473,6 +484,7 @@
     "exam": "TYT",
     "subject": "Tarih",
     "topic": "Millî Mücadele",
+    "minGrade": 12,
     "type": "compare",
     "title": "Mondros, Mudanya ve Lozan",
     "blocks": [

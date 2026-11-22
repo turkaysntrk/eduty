@@ -1,10 +1,33 @@
 <template>
     <section class="duty-root" aria-label="Duty kart akışı">
-        <div class="duty-top">
+        <div v-if="access.status !== 'ok'" class="duty-gate">
+            <template v-if="access.status === 'noGrade'">
+                <h3>Önce sınıfını seç</h3>
+                <p>Duty kartlarını sana göre hazırlayabilmemiz için profilinden sınıfını seçmen gerekiyor.</p>
+            </template>
+            <template v-else-if="access.status === 'inactive'">
+                <h3>Duty seni bekliyor 🌱</h3>
+                <p>Duty kartlarını 9. sınıftan itibaren hazırlıyoruz. Senin sınıf düzeyine özel kartlar çok yakında
+                    burada olacak, bizi takipte kal!</p>
+            </template>
+            <template v-else>
+                <h3>Önce bölümünü seç</h3>
+                <p>Sana uygun kartları gösterebilmemiz için bölümünü seçmen gerekiyor. Bunu istediğin zaman
+                    profilinden değiştirebilirsin.</p>
+                <div class="duty-track-grid">
+                    <button v-for="t in trackOptions" :key="t.value" type="button"
+                        @click="emit('set-track', t.value)">{{ t.label }}</button>
+                </div>
+            </template>
+        </div>
+
+        <div v-if="access.status === 'ok'" class="duty-top">
             <div class="duty-brand">
                 <span class="duty-brand-mark" role="heading" aria-level="2">Duty</span>
                 <span v-if="state.total" class="duty-counter" aria-live="off">{{ state.index + 1 }} / {{ state.total }}</span>
             </div>
+            <button v-if="track" type="button" class="duty-track-chip" title="Bölümü sıfırla ve yeniden seç"
+                @click="emit('set-track', null)">🎓 {{ trackName }} · değiştir</button>
             <div class="duty-modes" role="group" aria-label="Akış seçimi">
                 <button type="button" :class="{ active: state.mode === 'all' }" @click="changeMode('all')">Tümü</button>
                 <button type="button" :class="{ active: state.mode === 'favorites' }"
@@ -15,7 +38,7 @@
             </div>
         </div>
 
-        <div ref="stageEl" class="duty-stage" @pointerdown="onPointerDown" @pointermove="onPointerMove"
+        <div v-if="access.status === 'ok'" ref="stageEl" class="duty-stage" @pointerdown="onPointerDown" @pointermove="onPointerMove"
             @pointerup="onPointerUp" @pointercancel="onPointerCancel" @wheel.prevent="onWheel">
 
             <div v-if="!state.ready" class="duty-empty">Yükleniyor…</div>
@@ -27,7 +50,11 @@
                 <div v-if="state.card" :key="state.card.id" class="duty-slot">
                     <div class="duty-drag" :class="{ settle }" :style="dragStyle">
                         <DutyCard :card="state.card" :favorite="state.isFavorite"
-                            @toggle-favorite="onHeartClick" />
+                            :reaction="reactions[state.card.id] ? reactions[state.card.id].reaction : null"
+                            :known="!!(reactions[state.card.id] && reactions[state.card.id].known)"
+                            :reported="!!reported[state.card.id]" @toggle-favorite="onHeartClick"
+                            @react="kind => social.react(state.card.id, kind)"
+                            @toggle-known="social.toggleKnown(state.card.id)" @report="onReport" />
                     </div>
                 </div>
             </Transition>
@@ -61,7 +88,7 @@
             </div>
         </div>
 
-        <p class="duty-hint">
+        <p v-if="access.status === 'ok'" class="duty-hint">
             <template v-if="isCoarse">Yukarı kaydır: sonraki · Aşağı: önceki · Sola: favori</template>
             <template v-else>↓ / ↑ ya da fare tekerleği: gez · ← ya da sola sürükle: favori</template>
         </p>
@@ -71,10 +98,22 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted, onBeforeUnmount } from 'vue'
+import { ref, computed, watch, onMounted, onBeforeUnmount } from 'vue'
 import { createGestureTracker } from '~/utils/dutyGestures.js'
+import { getDutyAccess, TRACK_OPTIONS } from '~/utils/dutyFeed.js'
+
+const props = defineProps({
+    grade: { type: [String, Number], default: null },
+    track: { type: String, default: null }
+})
+const emit = defineEmits(['set-track'])
+const trackOptions = TRACK_OPTIONS
+const trackName = computed(() => (TRACK_OPTIONS.find(o => o.value === props.track) || {}).label || '')
+const access = computed(() => getDutyAccess({ grade: props.grade, track: props.track }))
 
 const feed = useDutyFeed()
+const social = useDutySocial()
+const { reactions, reported } = social
 const state = feed.state
 
 // ── Görünüm durumu ──
@@ -157,6 +196,12 @@ function onHeartClick() {
     if (!card) return
     const nowFav = feed.toggleFavorite(card.id)
     if (nowFav) playBurst()
+}
+
+async function onReport({ reason, note, done }) {
+    const card = state.value.card
+    const ok = card ? await social.report(card, reason, note) : false
+    done(ok)
 }
 
 function changeMode(mode) {
@@ -259,8 +304,16 @@ function onKeydown(e) {
     }
 }
 
+// Sınıf/bölüm erişime uygunsa akışı (yeniden) kur, değilse kapat
+function setupFeed() {
+    if (access.value.status === 'ok') feed.init({ grade: props.grade, track: props.track }, social.favoritesRemote())
+    else feed.dispose()
+}
+watch(() => [props.grade, props.track], setupFeed)
+
 onMounted(() => {
-    feed.init()
+    setupFeed()
+    social.load()
     isCoarse.value = window.matchMedia ? window.matchMedia('(pointer: coarse)').matches : false
     reduceMotion = window.matchMedia ? window.matchMedia('(prefers-reduced-motion: reduce)').matches : false
     window.addEventListener('keydown', onKeydown)
@@ -276,6 +329,64 @@ onBeforeUnmount(() => {
 </script>
 
 <style scoped>
+.duty-gate {
+    max-width: 520px;
+    margin: 40px auto;
+    padding: 28px 24px;
+    text-align: center;
+    background: #101010;
+    border: 1px solid #2a2a2a;
+    border-radius: 16px;
+    color: #cfd8ea;
+}
+
+.duty-gate h3 {
+    margin: 0 0 10px;
+    color: #fff;
+}
+
+.duty-gate p {
+    margin: 0 0 18px;
+    line-height: 1.5;
+    color: #9fb2d6;
+}
+
+.duty-track-chip {
+    background: #14213d;
+    color: #cfe0ff;
+    border: 1px solid #27407a;
+    border-radius: 999px;
+    padding: 6px 12px;
+    font-size: 0.78rem;
+    font-weight: 600;
+    cursor: pointer;
+}
+
+.duty-track-chip:hover {
+    background: #0055ff;
+    color: #fff;
+}
+
+.duty-track-grid {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 10px;
+}
+
+.duty-track-grid button {
+    padding: 14px 10px;
+    background: #14213d;
+    color: #fff;
+    border: 1px solid #0055ff;
+    border-radius: 12px;
+    font-weight: 700;
+    cursor: pointer;
+}
+
+.duty-track-grid button:hover {
+    background: #0055ff;
+}
+
 .duty-root {
     display: flex;
     flex-direction: column;

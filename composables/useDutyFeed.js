@@ -5,20 +5,9 @@
 //   onMounted(feed.init)          // localStorage yalnızca istemcide okunur
 //   feed.state.value.card ...     // reaktif anlık görüntü
 import { shallowRef } from 'vue'
-import { createDutyFeed, validateCards } from '~/utils/dutyFeed.js'
-
-// content/duty/*.json dosyaları derleme zamanında pakete dahil edilir (yeni bağımlılık yok).
-// İleride Firestore'a geçilirse yalnızca bu yükleme kısmı değişir.
-const contentFiles = import.meta.glob('../content/duty/*.json', { eager: true, import: 'default' })
-
-function loadCards() {
-    const raw = Object.keys(contentFiles).sort().flatMap(k => contentFiles[k])
-    const { cards, errors } = validateCards(raw)
-    if (errors.length && import.meta.dev) {
-        console.warn('[Duty] İçerik doğrulama uyarıları:\n' + errors.join('\n'))
-    }
-    return cards
-}
+import { createDutyFeed, filterCardsForProfile } from '~/utils/dutyFeed.js'
+import { loadDutyCards } from '~/utils/dutyContent.js'
+import { startFavoriteSync } from '~/utils/dutySync.js'
 
 function getStorage() {
     try {
@@ -40,18 +29,34 @@ export const useDutyFeed = () => {
     const state = shallowRef(EMPTY)
     let engine = null
     let unsubscribe = null
+    let sync = null
 
-    const init = () => {
-        if (engine) return
-        engine = createDutyFeed({ cards: loadCards(), storage: getStorage() })
+    // profile: { grade, track } — kartlar sınıfa ve bölüme göre süzülür.
+    // Profil değişince tekrar çağrılabilir (akış yeniden kurulur, favoriler korunur).
+    const init = (profile = {}, remote = null) => {
+        dispose()
+        const all = loadDutyCards()
+        const storage = getStorage()
+        engine = createDutyFeed({
+            cards: filterCardsForProfile(all, profile),
+            knownIds: all.map(c => c.id),
+            storage
+        })
         unsubscribe = engine.subscribe(snap => { state.value = snap })
         state.value = engine.getSnapshot()
+        // Favorileri hesapla senkronla (çevrimdışı/izin hatasında yerel çalışmaya devam eder)
+        if (remote) {
+            sync = startFavoriteSync({ engine, remote, storage, onError: (e) => console.warn('[Duty] favori senkronu:', e && e.code ? e.code : e) })
+        }
     }
 
     const dispose = () => {
+        if (sync) sync.stop()
+        sync = null
         if (unsubscribe) unsubscribe()
         unsubscribe = null
         engine = null
+        state.value = EMPTY
     }
 
     return {
